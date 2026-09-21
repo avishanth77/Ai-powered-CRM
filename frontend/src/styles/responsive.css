@@ -1,0 +1,79 @@
+/* ==========================================================================
+   CRM Lite — Responsive Styles (Mobile & Tablet)
+   ========================================================================== */
+
+@media (max-width: 1024px) {
+  .dashboard-charts-grid {
+    grid-template-columns: 1fr;
+  }
+  .col-span-8, .col-span-7, .col-span-6, .col-span-5, .col-span-4 {
+    grid-column: span 1;
+  }
+  .lead-detail-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  :root {
+    --navbar-height: 60px;
+  }
+
+  .main-sidebar {
+    transform: translateX(-100%);
+  }
+
+  .main-sidebar.mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.6);
+    backdrop-filter: var(--backdrop-blur);
+    z-index: 99;
+  }
+
+  .mobile-close-btn, .mobile-menu-btn {
+    display: block;
+  }
+
+  .main-content-wrapper {
+    margin-left: 0;
+  }
+
+  .page-container {
+    padding: 1.25rem 1rem;
+  }
+
+  .form-grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .top-navbar {
+    padding: 0 1rem;
+  }
+
+  .user-details-compact, .navbar-role-pill {
+    display: none;
+  }
+
+  .filter-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .search-bar-container {
+    width: 100%;
+  }
+
+  .pipeline-board {
+    padding-bottom: 2rem;
+  }
+}
