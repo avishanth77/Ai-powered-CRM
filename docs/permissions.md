@@ -1,0 +1,57 @@
+# CRM Lite — Role-Based Access Control (RBAC) & Security
+
+## 1. Role Matrix Overview
+
+CRM Lite implements strict, server-enforced role permissions. Frontend route guards and button hiding are purely convenience layers; every API operation validates the requesting JWT user's role and object ownership.
+
+| Capability / Action | Admin / Mentor | Sales Manager | Sales Executive / Intern |
+|---|:---:|:---:|:---:|
+| **Authentication & Profile** | Full | Full | Full |
+| **Manage Users (Create/Delete)** | Yes | View Only | No |
+| **View Leads** | All Team Leads | All Team Leads | Assigned / Created Only |
+| **Create New Leads** | Yes | Yes | Yes |
+| **Edit Assigned Leads** | Yes | Yes | Yes |
+| **Edit Other Executive's Leads**| Yes | Yes | **Forbidden (403/404)** |
+| **Delete Leads** | Yes | No | No |
+| **Assign / Reassign Leads** | Yes | Yes | **Forbidden (403)** |
+| **Convert Qualified Lead to Customer** | Yes | Yes | **Forbidden (403)** |
+| **Convert Unqualified Lead** | **Forbidden (400)** | **Forbidden (400)** | **Forbidden (403)** |
+| **Add Communication Notes** | Yes | Yes | On Assigned Leads |
+| **Schedule Follow-ups** | Yes | Yes | On Assigned Leads |
+| **Complete Follow-up** | Yes | Yes | Own Assigned Only |
+| **View Reports & Dashboard** | Full Org-Wide | Team-Wide | Own Metric Scope |
+| **Export Reports to CSV** | Yes | Yes | **Forbidden (403)** |
+| **Manage Lead Sources** | Yes | Yes | Read-Only |
+
+---
+
+## 2. Backend Permission Implementation
+
+### Custom Permission Classes
+1. `IsAdmin`:
+   ```python
+   class IsAdmin(BasePermission):
+       def has_permission(self, request, view):
+           return request.user.is_authenticated and (request.user.role == 'ADMIN' or request.user.is_superuser)
+   ```
+2. `IsManagerOrAdmin`:
+   ```python
+   class IsManagerOrAdmin(BasePermission):
+       def has_permission(self, request, view):
+           return request.user.is_authenticated and (request.user.role in ['ADMIN', 'MANAGER'] or request.user.is_superuser)
+   ```
+3. `LeadPermission`:
+   - Validates object ownership for `EXECUTIVE` users (`obj.assigned_to_id == request.user.id or obj.created_by_id == request.user.id`).
+   - Rejects `DELETE` requests unless the user has `ADMIN` role.
+   - Scopes `get_queryset()` so executives never leak other reps' records in bulk listing or search queries.
+4. `FollowUpPermission`:
+   - Ensures an executive can only view, edit, or complete follow-ups assigned directly to them.
+
+---
+
+## 3. Data Integrity & Validation Rules
+
+- **Phone Deduplication**: Duplicate phone numbers are rejected for all active leads (`status not in ['WON', 'LOST']`).
+- **Follow-up Past Date Prevention**: New follow-up tasks cannot be scheduled in the past (`follow_up_at >= now() - 5min`).
+- **Lost Reason Enforcement**: Transitioning any lead to `status = 'LOST'` mandates a non-empty `lost_reason` field.
+- **Conversion Safety**: Conversion requires `status == 'QUALIFIED'`. Once converted, duplicate conversion attempts are rejected, and the operation runs within an atomic database transaction (`transaction.atomic()`).
