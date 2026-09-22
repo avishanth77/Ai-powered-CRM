@@ -291,14 +291,13 @@ export const Leads = () => {
   const statusCharts = kpis?.charts?.by_status || [];
   const priorityCharts = kpis?.charts?.by_priority || [];
 
-  const totalLeadsCount = kpiData.total_leads || totalCount || leads.length || 24;
-  const newLeadsCount = kpiData.new_leads || leads.filter((l) => l.status === 'NEW').length || 8;
-  const qualifiedLeadsCount = kpiData.qualified_leads || leads.filter((l) => l.status === 'QUALIFIED').length || 6;
+  const totalLeadsCount = kpiData.total_leads ?? totalCount ?? leads.length;
+  const newLeadsCount = kpiData.new_leads ?? leads.filter((l) => l.status === 'NEW').length;
+  const qualifiedLeadsCount = kpiData.qualified_leads ?? leads.filter((l) => l.status === 'QUALIFIED').length;
   const highPriorityCount =
-    priorityCharts.find((p) => p.priority === 'HIGH')?.count ||
-    leads.filter((l) => l.priority === 'HIGH').length ||
-    5;
-  const conversionRate = kpiData.conversion_rate || 28.5;
+    priorityCharts.find((p) => p.priority === 'HIGH')?.count ??
+    leads.filter((l) => l.priority === 'HIGH').length;
+  const conversionRate = kpiData.conversion_rate ?? 0;
 
   // Pipeline stage counts
   const getStageCount = (stageKey) => {
@@ -308,92 +307,12 @@ export const Leads = () => {
   };
 
   const pipelineStages = [
-    { key: 'NEW', label: 'New', count: getStageCount('NEW') || 8, sub: 'Inbound intake' },
-    { key: 'CONTACTED', label: 'Contacted', count: getStageCount('CONTACTED') || 5, sub: 'Initial call/chat' },
-    { key: 'QUALIFIED', label: 'Qualified', count: getStageCount('QUALIFIED') || 6, sub: 'Needs verified' },
-    { key: 'NEGOTIATION', label: 'Proposal', count: getStageCount('NEGOTIATION') || 3, sub: 'Pricing review' },
-    { key: 'WON', label: 'Converted', count: getStageCount('WON') || 4, sub: 'Customer created' },
+    { key: 'NEW', label: 'New', count: getStageCount('NEW'), sub: 'Inbound intake' },
+    { key: 'CONTACTED', label: 'Contacted', count: getStageCount('CONTACTED'), sub: 'Initial call/chat' },
+    { key: 'QUALIFIED', label: 'Qualified', count: getStageCount('QUALIFIED'), sub: 'Needs verified' },
+    { key: 'NEGOTIATION', label: 'Proposal', count: getStageCount('NEGOTIATION'), sub: 'Pricing review' },
+    { key: 'WON', label: 'Converted', count: getStageCount('WON'), sub: 'Customer created' },
   ];
-
-  // Fallback upcoming follow-ups if empty in DB
-  const displayFollowups = followups.length > 0
-    ? followups
-    : [
-        {
-          id: 101,
-          lead_name: 'Aisha Al-Mansoor',
-          lead_company: 'Emirates Smart Logistics',
-          lead: 1,
-          purpose: 'Product Demo',
-          follow_up_at: new Date(Date.now() + 3600000 * 2).toISOString(),
-          status: 'PENDING',
-          is_overdue: false,
-        },
-        {
-          id: 102,
-          lead_name: 'Carlos Gomez',
-          lead_company: 'Sol Real Estate Partners',
-          lead: 2,
-          purpose: 'Phone Call',
-          follow_up_at: new Date(Date.now() + 3600000 * 5).toISOString(),
-          status: 'PENDING',
-          is_overdue: false,
-        },
-        {
-          id: 103,
-          lead_name: 'David Kim',
-          lead_company: 'Omni Retail Technologies',
-          lead: 3,
-          purpose: 'Contract Review',
-          follow_up_at: new Date(Date.now() + 3600000 * 24).toISOString(),
-          status: 'PENDING',
-          is_overdue: false,
-        },
-        {
-          id: 104,
-          lead_name: 'Fatima Al-Zahra',
-          lead_company: 'Apex Health Systems',
-          lead: 4,
-          purpose: 'Discovery Meeting',
-          follow_up_at: new Date(Date.now() + 3600000 * 48).toISOString(),
-          status: 'PENDING',
-          is_overdue: false,
-        },
-      ];
-
-  // Fallback activity feed if empty in DB
-  const displayActivities = activities.length > 0
-    ? activities
-    : [
-        {
-          id: 201,
-          action: 'LEAD_CREATED',
-          notes: 'New lead Carlos Gomez created from WhatsApp marketing campaign',
-          performed_by_name: 'Eleanor Vance',
-          created_at: new Date(Date.now() - 1000 * 60 * 18).toISOString(),
-        },
-        {
-          id: 202,
-          action: 'STATUS_CHANGED',
-          notes: 'Aisha Al-Mansoor stage progressed from CONTACTED to QUALIFIED',
-          performed_by_name: 'Marcus Sterling',
-          created_at: new Date(Date.now() - 1000 * 60 * 54).toISOString(),
-        },
-        {
-          id: 203,
-          action: 'FOLLOWUP_COMPLETED',
-          notes: 'Completed discovery phone call with David Kim — scheduled follow-up demo',
-          performed_by_name: 'Sarah Jenkins',
-          created_at: new Date(Date.now() - 1000 * 60 * 130).toISOString(),
-        },
-        {
-          id: 204,
-          action: 'CUSTOMER_CONVERTED',
-          notes: 'Qualified prospect Liam O’Connor converted into Customer #108',
-          performed_by_name: 'Eleanor Vance',
-          created_at: new Date(Date.now() - 1000 * 60 * 310).toISOString(),
-        },
-      ];
 
   const getActivityIcon = (action) => {
     if (action.includes('CONVERT')) return <CheckCircle2 size={14} color="#10b981" />;
@@ -777,31 +696,37 @@ export const Leads = () => {
           </div>
 
           <div className="followup-compact-list">
-            {displayFollowups.slice(0, 4).map((fu) => (
-              <div key={fu.id} className="followup-compact-item">
-                <div className="followup-compact-lead">
-                  <Link to={`/leads/${fu.lead}`} className="followup-lead-name">
-                    {fu.lead_name || 'Prospect Contact'}
-                  </Link>
-                  <span className="followup-lead-company">
-                    {fu.lead_company || 'Corporate Prospect'}
-                  </span>
-                </div>
-
-                <div className="followup-compact-meta">
-                  <span className="followup-purpose-tag">{fu.purpose}</span>
-                  <div className="followup-time-pill">
-                    <Calendar size={12} color="var(--text-dim)" />
-                    <span>{formatDateTime(fu.follow_up_at)}</span>
-                  </div>
-                  {fu.is_overdue && (
-                    <span className="status-badge" style={{ color: 'var(--danger)', backgroundColor: 'rgba(239, 68, 68, 0.12)', fontSize: '0.6875rem' }}>
-                      Overdue
-                    </span>
-                  )}
-                </div>
+            {followups.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--text-dim)', fontSize: '0.8125rem' }}>
+                No upcoming follow-ups scheduled
               </div>
-            ))}
+            ) : (
+              followups.slice(0, 4).map((fu) => (
+                <div key={fu.id} className="followup-compact-item">
+                  <div className="followup-compact-lead">
+                    <Link to={`/leads/${fu.lead}`} className="followup-lead-name">
+                      {fu.lead_name || 'Prospect Contact'}
+                    </Link>
+                    <span className="followup-lead-company">
+                      {fu.lead_company || 'Corporate Prospect'}
+                    </span>
+                  </div>
+
+                  <div className="followup-compact-meta">
+                    <span className="followup-purpose-tag">{fu.purpose}</span>
+                    <div className="followup-time-pill">
+                      <Calendar size={12} color="var(--text-dim)" />
+                      <span>{formatDateTime(fu.follow_up_at)}</span>
+                    </div>
+                    {fu.is_overdue && (
+                      <span className="status-badge" style={{ color: 'var(--danger)', backgroundColor: 'rgba(239, 68, 68, 0.12)', fontSize: '0.6875rem' }}>
+                        Overdue
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -816,27 +741,33 @@ export const Leads = () => {
           </div>
 
           <div className="activity-compact-list">
-            {displayActivities.slice(0, 4).map((act) => (
-              <div key={act.id} className="activity-compact-item">
-                <div className="activity-compact-icon">
-                  {getActivityIcon(act.action)}
-                </div>
-                <div className="activity-compact-content">
-                  <p className="activity-compact-text">{act.notes}</p>
-                  <div className="activity-compact-meta">
-                    <span>{formatDateTime(act.created_at)}</span>
-                    {act.performed_by_name && (
-                      <>
-                        <span>•</span>
-                        <span style={{ color: 'var(--primary-light)', fontWeight: 600 }}>
-                          {act.performed_by_name}
-                        </span>
-                      </>
-                    )}
+            {activities.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--text-dim)', fontSize: '0.8125rem' }}>
+                No recent activity recorded
+              </div>
+            ) : (
+              activities.slice(0, 4).map((act) => (
+                <div key={act.id} className="activity-compact-item">
+                  <div className="activity-compact-icon">
+                    {getActivityIcon(act.action)}
+                  </div>
+                  <div className="activity-compact-content">
+                    <p className="activity-compact-text">{act.notes}</p>
+                    <div className="activity-compact-meta">
+                      <span>{formatDateTime(act.created_at)}</span>
+                      {act.performed_by_name && (
+                        <>
+                          <span>•</span>
+                          <span style={{ color: 'var(--primary-light)', fontWeight: 600 }}>
+                            {act.performed_by_name}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </div>
       </div>

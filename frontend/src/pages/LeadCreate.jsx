@@ -247,7 +247,7 @@ export const LeadCreate = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="lead-value">Expected Deal Value ($)</label>
+              <label className="form-label" htmlFor="lead-value">Expected Deal Value (₹)</label>
               <input
                 id="lead-value"
                 name="expected_value"

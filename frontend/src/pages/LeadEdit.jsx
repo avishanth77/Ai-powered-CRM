@@ -275,7 +275,7 @@ export const LeadEdit = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="edit-value">Expected Deal Value ($)</label>
+              <label className="form-label" htmlFor="edit-value">Expected Deal Value (₹)</label>
               <input
                 id="edit-value"
                 name="expected_value"

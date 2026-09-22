@@ -23,4 +23,19 @@ export const authApi = {
       // Graceful logout even if network fails
     }
   },
+
+  changePassword: async (passwordData) => {
+    const response = await api.post('/api/auth/change-password/', passwordData);
+    return response.data;
+  },
+
+  forgotPassword: async (email) => {
+    const response = await api.post('/api/auth/forgot-password/', { email });
+    return response.data;
+  },
+
+  resetPassword: async (resetData) => {
+    const response = await api.post('/api/auth/reset-password/', resetData);
+    return response.data;
+  },
 };

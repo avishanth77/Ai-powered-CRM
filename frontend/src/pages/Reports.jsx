@@ -15,7 +15,7 @@ import {
   Filter,
   Users,
   TrendingUp,
-  DollarSign,
+  IndianRupee,
   Briefcase,
   CheckCircle,
 } from 'lucide-react';
