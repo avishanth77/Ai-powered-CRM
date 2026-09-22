@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { followupApi } from './api/followupApi';
 
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -70,44 +71,46 @@ const AppLayout = () => {
 export default function App() {
   return (
     <Router>
-      <AuthProvider>
-        <ToastProvider>
-          <Routes>
-            <Route path="/login" element={<Login />} />
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
 
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <AppLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<Navigate to="/dashboard" replace />} />
-              <Route path="dashboard" element={<Dashboard />} />
-              <Route path="leads" element={<Leads />} />
-              <Route path="leads/create" element={<LeadCreate />} />
-              <Route path="leads/:id" element={<LeadDetails />} />
-              <Route path="leads/:id/edit" element={<LeadEdit />} />
-              <Route path="pipeline" element={<Pipeline />} />
-              <Route path="follow-ups" element={<FollowUps />} />
-              <Route path="customers" element={<Customers />} />
-              <Route path="customers/:id" element={<CustomerDetails />} />
-              <Route path="reports" element={<Reports />} />
               <Route
-                path="users"
+                path="/"
                 element={
-                  <RoleGuard allowedRoles={['ADMIN', 'MANAGER']}>
-                    <Users />
-                  </RoleGuard>
+                  <ProtectedRoute>
+                    <AppLayout />
+                  </ProtectedRoute>
                 }
-              />
-              <Route path="settings" element={<Settings />} />
-              <Route path="*" element={<NotFound />} />
-            </Route>
-          </Routes>
-        </ToastProvider>
-      </AuthProvider>
+              >
+                <Route index element={<Navigate to="/dashboard" replace />} />
+                <Route path="dashboard" element={<Dashboard />} />
+                <Route path="leads" element={<Leads />} />
+                <Route path="leads/create" element={<LeadCreate />} />
+                <Route path="leads/:id" element={<LeadDetails />} />
+                <Route path="leads/:id/edit" element={<LeadEdit />} />
+                <Route path="pipeline" element={<Pipeline />} />
+                <Route path="follow-ups" element={<FollowUps />} />
+                <Route path="customers" element={<Customers />} />
+                <Route path="customers/:id" element={<CustomerDetails />} />
+                <Route path="reports" element={<Reports />} />
+                <Route
+                  path="users"
+                  element={
+                    <RoleGuard allowedRoles={['ADMIN', 'MANAGER']}>
+                      <Users />
+                    </RoleGuard>
+                  }
+                />
+                <Route path="settings" element={<Settings />} />
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+          </ToastProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </Router>
   );
 }

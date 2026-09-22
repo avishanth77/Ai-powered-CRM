@@ -70,7 +70,7 @@ export const Pipeline = () => {
     setMovingLeadId(leadId);
     try {
       await leadApi.updateLead(leadId, { status: targetStage });
-      showToast(`Lead moved to ${targetStage.replace('_', ' ')}`, 'success');
+      showToast(`Lead moved to ${targetStage === LEAD_STATUS.DEMO_SCHEDULED ? 'Demo' : targetStage.replace('_', ' ')}`, 'success');
       fetchPipeline();
     } catch (err) {
       showToast(extractErrorMessage(err, 'Move failed'), 'error');
@@ -183,7 +183,7 @@ export const Pipeline = () => {
                             <option value="" disabled>Move to...</option>
                             {stages.map((s) => (
                               <option key={s} value={s}>
-                                → {LEAD_STATUS_CONFIG[s].label}
+                                → {s === LEAD_STATUS.DEMO_SCHEDULED ? 'Demo' : LEAD_STATUS_CONFIG[s].label}
                               </option>
                             ))}
                           </select>

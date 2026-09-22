@@ -2,11 +2,18 @@
    CRM Lite — Dashboard Styles (KPIs, Charts, Visual Stats)
    ========================================================================== */
 
+/* Explicit column counts so KPI rows always wrap evenly
+   (6-card grid: 6/3/2/1; 4-card grid via .cols-4: 4/2/1).
+   Breakpoints live in responsive.css. */
 .dashboard-stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 1.25rem;
   margin-bottom: 2rem;
+}
+
+.dashboard-stats-grid.cols-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .kpi-card {
@@ -73,7 +80,7 @@
   font-family: 'Outfit', sans-serif;
   font-size: 1.875rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-main);
   line-height: 1.1;
   margin-bottom: 0.5rem;
 }
@@ -121,7 +128,7 @@
 .chart-title {
   font-size: 1.125rem;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-main);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -155,7 +162,7 @@
 
 .bar-chart-count {
   font-family: 'Outfit', sans-serif;
-  color: #ffffff;
+  color: var(--text-main);
   font-weight: 600;
 }
 

@@ -226,7 +226,7 @@ export const FollowUps = () => {
                 <th>Assigned Rep</th>
                 <th>Status</th>
                 <th>Outcome / Notes</th>
-                <th style={{ textAlign: 'right' }}>Action</th>
+                <th className="table-action-col">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -279,11 +279,11 @@ export const FollowUps = () => {
                       </span>
                     </td>
                     <td>
-                      <span className="text-muted font-sm" style={{ maxWidth: '280px', display: 'inline-block' }}>
+                      <span className="table-truncate-cell text-muted font-sm">
                         {fu.outcome || '—'}
                       </span>
                     </td>
-                    <td style={{ textAlign: 'right' }}>
+                    <td className="table-action-col">
                       {fu.status === 'PENDING' && (
                         <button
                           type="button"

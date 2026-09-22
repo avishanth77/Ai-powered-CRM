@@ -8,10 +8,31 @@
   overflow-x: auto;
   padding-bottom: 1.5rem;
   min-height: calc(100vh - 220px);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.pipeline-board::-webkit-scrollbar {
+  height: 8px;
+}
+
+.pipeline-board::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+  border-radius: var(--radius-full);
+}
+
+.pipeline-board::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: var(--radius-full);
+}
+
+.pipeline-board::-webkit-scrollbar-thumb:hover {
+  background: var(--text-dim);
 }
 
 .pipeline-column {
-  flex: 0 0 310px;
+  flex: 0 0 285px;
+  min-width: 285px;
   background-color: var(--bg-card);
   backdrop-filter: var(--backdrop-blur);
   border: 1px solid var(--border-subtle);
@@ -43,8 +64,8 @@
 
 .pipeline-stage-name {
   font-size: 0.875rem;
-  font-weight: 600;
-  color: #ffffff;
+  font-weight: 700;
+  color: var(--text-main);
 }
 
 .pipeline-column-badge {
@@ -63,10 +84,29 @@
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-subtle) transparent;
+}
+
+.pipeline-cards-container::-webkit-scrollbar {
+  width: 5px;
+}
+
+.pipeline-cards-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.pipeline-cards-container::-webkit-scrollbar-thumb {
+  background: var(--border-subtle);
+  border-radius: var(--radius-full);
+}
+
+.pipeline-cards-container::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
 }
 
 .pipeline-lead-card {
-  background-color: var(--bg-surface-elevated);
+  background-color: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 1rem;
@@ -75,11 +115,12 @@
   display: flex;
   flex-direction: column;
   gap: 0.625rem;
+  box-shadow: var(--shadow-sm);
 }
 
 .pipeline-lead-card:hover {
   transform: translateY(-2px);
-  border-color: var(--border-strong);
+  border-color: var(--primary-light);
   box-shadow: var(--shadow-md);
 }
 
@@ -92,7 +133,7 @@
 
 .pipeline-lead-name {
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-main);
   font-size: 0.9375rem;
 }
 
@@ -106,13 +147,13 @@
   align-items: center;
   justify-content: space-between;
   padding-top: 0.5rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  border-top: 1px solid var(--border-subtle);
 }
 
 .pipeline-lead-value {
   font-family: 'Outfit', sans-serif;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--primary);
   font-size: 0.9375rem;
 }
 
@@ -120,7 +161,7 @@
   width: 24px;
   height: 24px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1, #3b82f6);
+  background: linear-gradient(135deg, var(--primary-light), var(--primary));
   color: #ffffff;
   font-size: 0.625rem;
   font-weight: 700;

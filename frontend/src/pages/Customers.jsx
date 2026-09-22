@@ -71,7 +71,7 @@ export const Customers = () => {
                 <th>Lead Source</th>
                 <th>Converted Date</th>
                 <th>Converted By</th>
-                <th style={{ textAlign: 'right' }}>Actions</th>
+                <th className="table-action-col">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -119,11 +119,12 @@ export const Customers = () => {
                       {cust.created_by_details?.full_name || cust.created_by_details?.email || 'System'}
                     </span>
                   </td>
-                  <td style={{ textAlign: 'right' }}>
+                  <td className="table-action-col">
                     <Link
                       to={`/customers/${cust.id}`}
                       className="icon-action-btn"
                       title="View Customer Details"
+                      style={{ marginLeft: 'auto' }}
                     >
                       <Eye size={15} />
                     </Link>

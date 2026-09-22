@@ -85,9 +85,9 @@ export const Settings = () => {
         </div>
       </div>
 
-      <div className="dashboard-charts-grid">
+      <div className="settings-layout-grid">
         {/* Profile Card */}
-        <div className="card col-span-6">
+        <div className="card">
           <h3 style={{ fontSize: '1.125rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
             My Profile
           </h3>
@@ -155,7 +155,7 @@ export const Settings = () => {
 
         {/* Lead Sources Management (Manager & Admin) */}
         {canManageSources && (
-          <div className="card col-span-6">
+          <div className="card">
             <h3 style={{ fontSize: '1.125rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
               Lead Sources & Channels
             </h3>

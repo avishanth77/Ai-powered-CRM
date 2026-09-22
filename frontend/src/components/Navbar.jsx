@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { getInitials } from '../utils/formatters';
 import { ROLE_LABELS } from '../utils/constants';
-import { LogOut, User as UserIcon, Menu, Shield, Bell } from 'lucide-react';
+import { LogOut, User as UserIcon, Menu, Shield, Bell, Sun, Moon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0 }) => {
   const { user, logout } = useAuth();
+  const { theme, isDark, toggleTheme } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);
 
   const roleLabel = user ? ROLE_LABELS[user.role] || user.role : '';
@@ -35,6 +37,18 @@ export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0 }) => {
       </div>
 
       <div className="navbar-right">
+        {/* Theme Toggle Button */}
+        <button
+          type="button"
+          className="navbar-theme-toggle-btn"
+          onClick={toggleTheme}
+          title={isDark ? 'Switch to White & Green Light Theme' : 'Switch to Dark Mode'}
+          aria-label="Toggle color theme"
+        >
+          {isDark ? <Sun size={18} className="theme-icon-sun" /> : <Moon size={18} className="theme-icon-moon" />}
+          <span className="theme-toggle-text">{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+        </button>
+
         {overdueCount > 0 && (
           <Link to="/follow-ups" className="navbar-alert-link" title={`${overdueCount} Overdue Follow-ups`}>
             <Bell size={18} />

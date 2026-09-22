@@ -9,13 +9,13 @@
   position: fixed;
   top: 0;
   left: 0;
-  background-color: rgba(17, 24, 39, 0.95);
+  background-color: var(--bg-sidebar);
   border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   z-index: 100;
   backdrop-filter: var(--backdrop-blur);
-  transition: transform var(--transition-normal);
+  transition: transform var(--transition-normal), background-color var(--transition-normal);
 }
 
 .sidebar-brand {
@@ -46,7 +46,7 @@
 .brand-name {
   font-size: 1.125rem;
   font-weight: 700;
-  color: #ffffff;
+  color: var(--text-main);
   line-height: 1.2;
 }
 
@@ -94,6 +94,8 @@
   color: var(--text-muted);
   font-weight: 500;
   font-size: 0.875rem;
+  /* Persistent (transparent) rail so the active state never shifts icon/text */
+  border-left: 3px solid transparent;
   transition: all var(--transition-fast);
 }
 
@@ -102,21 +104,26 @@
   color: var(--text-main);
 }
 
+.sidebar-link:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: -2px;
+}
+
 .sidebar-link-active {
-  background: linear-gradient(90deg, rgba(99, 102, 241, 0.15), rgba(79, 70, 229, 0.05));
-  color: #ffffff;
-  border-left: 3px solid var(--primary-light);
+  background: var(--primary-subtle);
+  color: var(--primary);
+  border-left: 3px solid var(--primary);
   font-weight: 600;
 }
 
 .sidebar-link-active .nav-icon {
-  color: var(--primary-light);
+  color: var(--primary);
 }
 
 .sidebar-footer {
   padding: 1rem 1.25rem;
   border-top: 1px solid var(--border-subtle);
-  background-color: rgba(11, 15, 25, 0.4);
+  background-color: var(--bg-surface-elevated);
 }
 
 .sidebar-team-status {
@@ -138,7 +145,7 @@
 /* Top Navbar */
 .top-navbar {
   height: var(--navbar-height);
-  background-color: rgba(17, 24, 39, 0.75);
+  background-color: var(--bg-header);
   border-bottom: 1px solid var(--border-subtle);
   backdrop-filter: var(--backdrop-blur);
   display: flex;
@@ -148,6 +155,7 @@
   position: sticky;
   top: 0;
   z-index: 90;
+  transition: background-color var(--transition-normal);
 }
 
 .navbar-left {
@@ -172,8 +180,8 @@
 }
 
 .navbar-project-tag {
-  font-weight: 600;
-  color: #ffffff;
+  font-weight: 700;
+  color: var(--text-main);
 }
 
 .navbar-divider {
@@ -187,7 +195,42 @@
 .navbar-right {
   display: flex;
   align-items: center;
-  gap: 1.25rem;
+  gap: 1.125rem;
+}
+
+/* Theme Toggle Button */
+.navbar-theme-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4375rem 0.875rem;
+  border-radius: var(--radius-full);
+  background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  transition: all var(--transition-fast);
+}
+
+.navbar-theme-toggle-btn:hover {
+  background-color: var(--bg-surface-hover);
+  color: var(--primary);
+  border-color: var(--primary-light);
+  box-shadow: 0 0 10px var(--primary-glow);
+}
+
+.theme-icon-sun {
+  color: #f59e0b;
+}
+
+.theme-icon-moon {
+  color: var(--primary);
+}
+
+.theme-toggle-text {
+  font-size: 0.75rem;
 }
 
 .navbar-alert-link {
@@ -205,7 +248,7 @@
 }
 
 .navbar-alert-link:hover {
-  color: #ffffff;
+  color: var(--primary);
   border-color: var(--border-strong);
 }
 
@@ -234,21 +277,25 @@
 }
 
 .role-badge-admin {
-  color: #a855f7;
-  background-color: rgba(168, 85, 247, 0.12);
-  border-color: rgba(168, 85, 247, 0.3);
+  color: var(--accent-purple);
+  background-color: var(--accent-purple-subtle);
+  border-color: var(--primary-glow);
+}
+
+[data-theme="dark"] .role-badge-admin {
+  color: var(--accent-purple-soft);
 }
 
 .role-badge-manager {
-  color: #38bdf8;
-  background-color: rgba(56, 189, 248, 0.12);
-  border-color: rgba(56, 189, 248, 0.3);
+  color: var(--info);
+  background-color: var(--info-bg);
+  border-color: var(--border-strong);
 }
 
 .role-badge-executive {
-  color: #34d399;
-  background-color: rgba(52, 211, 153, 0.12);
-  border-color: rgba(52, 211, 153, 0.3);
+  color: var(--success);
+  background-color: var(--success-bg);
+  border-color: var(--border-strong);
 }
 
 .user-profile-menu {
@@ -275,14 +322,14 @@
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #6366f1, #3b82f6);
+  background: linear-gradient(135deg, var(--primary-light), var(--primary));
   color: #ffffff;
   font-weight: 700;
   font-size: 0.8125rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 2px 6px var(--primary-glow);
 }
 
 .user-details-compact {
@@ -294,7 +341,7 @@
 .user-display-name {
   font-size: 0.875rem;
   font-weight: 600;
-  color: #ffffff;
+  color: var(--text-main);
   line-height: 1.2;
 }
 
@@ -315,7 +362,7 @@
   top: calc(100% + 8px);
   right: 0;
   width: 240px;
-  background-color: var(--bg-surface-elevated);
+  background-color: var(--bg-surface);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-lg);
@@ -334,6 +381,10 @@
   padding: 0.625rem 0.75rem;
   display: flex;
   flex-direction: column;
+}
+
+.dropdown-user-header strong {
+  color: var(--text-main);
 }
 
 .dropdown-email {
@@ -365,14 +416,14 @@
 
 .dropdown-item:hover {
   background-color: var(--bg-surface-hover);
-  color: #ffffff;
+  color: var(--text-main);
 }
 
 .dropdown-logout {
-  color: #f87171;
+  color: var(--danger);
 }
 
 .dropdown-logout:hover {
   background-color: var(--danger-bg);
-  color: #ef4444;
+  color: var(--danger);
 }
