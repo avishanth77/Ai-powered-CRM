@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { extractErrorMessage } from '../utils/validation';
 import { ROLE_LABELS } from '../utils/constants';
-import { Settings as SettingsIcon, Plus, Save, Compass, Shield, Check } from 'lucide-react';
+import { Settings as SettingsIcon, Plus, Save, Compass, Shield, Check, KeyRound, Eye, EyeOff } from 'lucide-react';
 
 export const Settings = () => {
   const { user, updateUserProfile, canManageSources } = useAuth();
@@ -18,6 +18,16 @@ export const Settings = () => {
     phone: user?.phone || '',
   });
   const [savingProfile, setSavingProfile] = useState(false);
+
+  // Password Form State
+  const [passwordData, setPasswordData] = useState({
+    old_password: '',
+    new_password: '',
+    confirm_new_password: '',
+  });
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [showOldPassword, setShowOldPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
 
   // Sources State
   const [sources, setSources] = useState([]);
@@ -47,6 +57,33 @@ export const Settings = () => {
       showToast(extractErrorMessage(err, 'Failed to update profile'), 'error');
     } finally {
       setSavingProfile(false);
+    }
+  };
+
+  const handleChangePasswordSubmit = async (e) => {
+    e.preventDefault();
+    if (passwordData.new_password !== passwordData.confirm_new_password) {
+      showToast('New passwords do not match.', 'warning');
+      return;
+    }
+    if (passwordData.new_password.length < 6) {
+      showToast('New password must be at least 6 characters.', 'warning');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const res = await authApi.changePassword(passwordData);
+      showToast(res?.message || 'Password changed successfully!', 'success');
+      setPasswordData({
+        old_password: '',
+        new_password: '',
+        confirm_new_password: '',
+      });
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Failed to change password'), 'error');
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -149,6 +186,108 @@ export const Settings = () => {
             <button type="submit" className="btn btn-primary" disabled={savingProfile} style={{ alignSelf: 'flex-start' }}>
               <Save size={16} />
               <span>{savingProfile ? 'Saving...' : 'Save Profile'}</span>
+            </button>
+          </form>
+        </div>
+
+        {/* Change Password Card */}
+        <div className="card">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
+            <KeyRound size={20} color="var(--primary)" />
+            <h3 style={{ fontSize: '1.125rem', margin: 0 }}>
+              Change Password
+            </h3>
+          </div>
+
+          <form onSubmit={handleChangePasswordSubmit} className="form-layout">
+            <div className="form-group">
+              <label className="form-label" htmlFor="current-password">Current Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="current-password"
+                  type={showOldPassword ? 'text' : 'password'}
+                  className="form-control"
+                  placeholder="Enter current password"
+                  value={passwordData.old_password}
+                  onChange={(e) => setPasswordData({ ...passwordData, old_password: e.target.value })}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowOldPassword(!showOldPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-dim)',
+                    cursor: 'pointer',
+                    padding: '0.25rem'
+                  }}
+                  aria-label="Toggle current password visibility"
+                >
+                  {showOldPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="new-password">New Password</label>
+              <div style={{ position: 'relative' }}>
+                <input
+                  id="new-password"
+                  type={showNewPassword ? 'text' : 'password'}
+                  className="form-control"
+                  placeholder="At least 6 characters"
+                  value={passwordData.new_password}
+                  onChange={(e) => setPasswordData({ ...passwordData, new_password: e.target.value })}
+                  required
+                  minLength={6}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  style={{
+                    position: 'absolute',
+                    right: '0.75rem',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'none',
+                    border: 'none',
+                    color: 'var(--text-dim)',
+                    cursor: 'pointer',
+                    padding: '0.25rem'
+                  }}
+                  aria-label="Toggle new password visibility"
+                >
+                  {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="confirm-password">Confirm New Password</label>
+              <input
+                id="confirm-password"
+                type="password"
+                className="form-control"
+                placeholder="Re-enter new password"
+                value={passwordData.confirm_new_password}
+                onChange={(e) => setPasswordData({ ...passwordData, confirm_new_password: e.target.value })}
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={changingPassword || !passwordData.old_password || !passwordData.new_password}
+              style={{ alignSelf: 'flex-start' }}
+            >
+              <KeyRound size={16} />
+              <span>{changingPassword ? 'Updating Password...' : 'Update Password'}</span>
             </button>
           </form>
         </div>

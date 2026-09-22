@@ -8,7 +8,7 @@ import { extractErrorMessage } from '../utils/validation';
 import { LEAD_STATUS, LEAD_STATUS_CONFIG } from '../utils/constants';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { PriorityBadge } from '../components/PriorityBadge';
-import { Kanban, Plus, ArrowRight, User } from 'lucide-react';
+import { Kanban, Plus, ChevronLeft, ChevronRight, LayoutGrid } from 'lucide-react';
 
 export const Pipeline = () => {
   const { user } = useAuth();
@@ -18,7 +18,13 @@ export const Pipeline = () => {
   const [loading, setLoading] = useState(true);
   const [movingLeadId, setMovingLeadId] = useState(null);
 
-  const stages = [
+  // Pagination state:
+  // stagePage: 0 = Funnel 1 (New -> Negotiation), 1 = Funnel 2 (Qualified -> Lost), -1 = All Stages
+  const [stagePage, setStagePage] = useState(0);
+  const [columnPages, setColumnPages] = useState({});
+  const [cardsPerPage, setCardsPerPage] = useState(3);
+
+  const allStages = [
     LEAD_STATUS.NEW,
     LEAD_STATUS.CONTACTED,
     LEAD_STATUS.DEMO_SCHEDULED,
@@ -27,6 +33,13 @@ export const Pipeline = () => {
     LEAD_STATUS.WON,
     LEAD_STATUS.LOST,
   ];
+
+  const visibleStages =
+    stagePage === 0
+      ? allStages.slice(0, 4)
+      : stagePage === 1
+      ? allStages.slice(4)
+      : allStages;
 
   const fetchPipeline = async () => {
     try {
@@ -70,7 +83,10 @@ export const Pipeline = () => {
     setMovingLeadId(leadId);
     try {
       await leadApi.updateLead(leadId, { status: targetStage });
-      showToast(`Lead moved to ${targetStage === LEAD_STATUS.DEMO_SCHEDULED ? 'Demo' : targetStage.replace('_', ' ')}`, 'success');
+      showToast(
+        `Lead moved to ${targetStage === LEAD_STATUS.DEMO_SCHEDULED ? 'Demo' : targetStage.replace('_', ' ')}`,
+        'success'
+      );
       fetchPipeline();
     } catch (err) {
       showToast(extractErrorMessage(err, 'Move failed'), 'error');
@@ -103,15 +119,101 @@ export const Pipeline = () => {
         </div>
       </div>
 
-      <div className="pipeline-board">
-        {stages.map((stageKey) => {
+      {/* Stage Controls & Pagination Bar */}
+      <div className="pipeline-controls-bar">
+        <div className="pipeline-stage-pager">
+          <span className="pipeline-pager-label">Stage Group:</span>
+          <div className="pipeline-stage-tabs">
+            <button
+              type="button"
+              className={`pipeline-tab-pill ${stagePage === 0 ? 'active' : ''}`}
+              onClick={() => setStagePage(0)}
+            >
+              <span>1. Active Funnel</span>
+              <span className="pipeline-pill-sub">(Stages 1–4)</span>
+            </button>
+            <button
+              type="button"
+              className={`pipeline-tab-pill ${stagePage === 1 ? 'active' : ''}`}
+              onClick={() => setStagePage(1)}
+            >
+              <span>2. Closing & Won</span>
+              <span className="pipeline-pill-sub">(Stages 5–7)</span>
+            </button>
+            <button
+              type="button"
+              className={`pipeline-tab-pill ${stagePage === -1 ? 'active' : ''}`}
+              onClick={() => setStagePage(-1)}
+            >
+              <LayoutGrid size={14} />
+              <span>All Stages</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="pipeline-pager-nav">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-dim)' }}>
+            <span>Cards/Page:</span>
+            <select
+              className="pipeline-move-select"
+              value={cardsPerPage}
+              onChange={(e) => setCardsPerPage(Number(e.target.value))}
+              aria-label="Cards per column page"
+              style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem' }}
+            >
+              <option value={3}>3 cards</option>
+              <option value={5}>5 cards</option>
+              <option value={10}>10 cards</option>
+            </select>
+          </div>
+
+          {stagePage !== -1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={stagePage === 0}
+                onClick={() => setStagePage(0)}
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
+              >
+                <ChevronLeft size={14} />
+                <span>Prev</span>
+              </button>
+              <span className="pipeline-page-indicator">
+                {stagePage + 1} / 2
+              </span>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                disabled={stagePage === 1}
+                onClick={() => setStagePage(1)}
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.75rem' }}
+              >
+                <span>Next</span>
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className={`pipeline-board ${stagePage !== -1 ? 'fit-screen' : ''}`}>
+        {visibleStages.map((stageKey) => {
           const stageConfig = LEAD_STATUS_CONFIG[stageKey];
           const columnData = pipelineData ? pipelineData[stageKey] : null;
-          const leadsInStage = columnData ? columnData.leads : [];
+          const allLeadsInStage = columnData ? columnData.leads : [];
           const count = columnData ? columnData.count : 0;
+          const totalLeads = allLeadsInStage.length;
+
+          // Column Cards Pagination
+          const page = columnPages[stageKey] || 1;
+          const totalPages = Math.max(1, Math.ceil(totalLeads / cardsPerPage));
+          const safePage = Math.min(page, totalPages);
+          const startIndex = (safePage - 1) * cardsPerPage;
+          const paginatedLeads = allLeadsInStage.slice(startIndex, startIndex + cardsPerPage);
 
           // Calculate total expected value for stage
-          const totalValue = leadsInStage.reduce(
+          const totalValue = allLeadsInStage.reduce(
             (acc, curr) => acc + (parseFloat(curr.expected_value) || 0),
             0
           );
@@ -141,12 +243,12 @@ export const Pipeline = () => {
               </div>
 
               <div className="pipeline-cards-container">
-                {leadsInStage.length === 0 ? (
+                {totalLeads === 0 ? (
                   <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--text-dim)', fontSize: '0.8125rem' }}>
                     No leads in this stage
                   </div>
                 ) : (
-                  leadsInStage.map((lead) => (
+                  paginatedLeads.map((lead) => (
                     <div key={lead.id} className="pipeline-lead-card">
                       <div className="pipeline-card-top">
                         <div>
@@ -181,7 +283,7 @@ export const Pipeline = () => {
                             aria-label="Move lead stage"
                           >
                             <option value="" disabled>Move to...</option>
-                            {stages.map((s) => (
+                            {allStages.map((s) => (
                               <option key={s} value={s}>
                                 → {s === LEAD_STATUS.DEMO_SCHEDULED ? 'Demo' : LEAD_STATUS_CONFIG[s].label}
                               </option>
@@ -193,6 +295,39 @@ export const Pipeline = () => {
                   ))
                 )}
               </div>
+
+              {totalPages > 1 && (
+                <div className="pipeline-column-pagination">
+                  <span className="pipeline-page-indicator">
+                    {startIndex + 1}–{Math.min(startIndex + cardsPerPage, totalLeads)} of {totalLeads}
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <button
+                      type="button"
+                      className="pipeline-page-btn"
+                      disabled={safePage === 1}
+                      onClick={() => setColumnPages((prev) => ({ ...prev, [stageKey]: safePage - 1 }))}
+                      title="Previous leads"
+                      aria-label="Previous leads page"
+                    >
+                      <ChevronLeft size={14} />
+                    </button>
+                    <span className="pipeline-page-indicator" style={{ minWidth: '36px', textAlign: 'center' }}>
+                      {safePage}/{totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      className="pipeline-page-btn"
+                      disabled={safePage === totalPages}
+                      onClick={() => setColumnPages((prev) => ({ ...prev, [stageKey]: safePage + 1 }))}
+                      title="Next leads"
+                      aria-label="Next leads page"
+                    >
+                      <ChevronRight size={14} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           );
         })}
