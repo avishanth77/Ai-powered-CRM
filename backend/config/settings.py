@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'followups',
     'reports',
     'activity',
+    'notifications',
 ]
 
 MIDDLEWARE = [
