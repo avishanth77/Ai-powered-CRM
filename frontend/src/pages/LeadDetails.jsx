@@ -38,7 +38,6 @@ import {
   MapPin,
   CheckCircle2,
   Share2,
-  User,
   Send,
   Sparkles,
   Bot,
