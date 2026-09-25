@@ -25,6 +25,7 @@ from accounts.views import (
 
 from leads.views import LeadStageViewSet
 from leads.views_email import EmailTestView
+from followups.views_calendar import CalendarEventsView
 
 # Top-level API router for Users
 user_router = DefaultRouter()
@@ -56,6 +57,7 @@ urlpatterns = [
     path('api/leads/', include('leads.urls')),
     path('api/customers/', include('customers.urls')),
     path('api/follow-ups/', include('followups.urls')),
+    path('api/calendar/events/', CalendarEventsView.as_view(), name='crm-calendar-events'),
     path('api/activity/', include('activity.urls')),
     path('api/reports/', include('reports.urls')),
     path('api/notifications/', include('notifications.urls')),
