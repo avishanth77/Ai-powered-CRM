@@ -150,7 +150,13 @@
   border: 1px solid var(--border-subtle, #e2e8f0);
   border-radius: var(--radius-lg, 16px);
   box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.05));
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.calendar-month-wrapper {
+  min-width: 780px;
 }
 
 /* Month Grid */
@@ -163,8 +169,8 @@
 }
 
 .month-grid-header-cell {
-  padding: 12px 6px;
-  font-size: 0.8rem;
+  padding: 10px 6px;
+  font-size: 0.78rem;
   font-weight: 700;
   color: var(--text-dim, #64748b);
   text-transform: uppercase;
@@ -179,14 +185,16 @@
 }
 
 .month-cell {
-  min-height: 120px;
+  min-height: 94px;
+  height: 108px;
   background: var(--bg-surface, #ffffff);
-  padding: 8px;
+  padding: 6px 8px;
   display: flex;
   flex-direction: column;
   position: relative;
   transition: background 0.15s ease;
   cursor: pointer;
+  overflow: hidden;
 }
 
 .month-cell:hover {
@@ -199,22 +207,22 @@
 }
 
 .month-cell.is-today {
-  background: rgba(16, 185, 129, 0.03);
+  background: rgba(16, 185, 129, 0.04);
 }
 
 .month-cell-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 6px;
+  margin-bottom: 4px;
 }
 
 .month-date-number {
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--text-main, #0f172a);
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -230,9 +238,14 @@
 .month-cell-events {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  overflow: hidden;
+  gap: 3px;
+  overflow-y: auto;
+  scrollbar-width: none;
   flex: 1;
+}
+
+.month-cell-events::-webkit-scrollbar {
+  display: none;
 }
 
 /* Event Chips */
@@ -310,6 +323,7 @@
   background: var(--border-subtle, #e2e8f0);
   gap: 1px;
   min-height: 480px;
+  min-width: 780px;
 }
 
 .week-column {
@@ -319,21 +333,21 @@
 }
 
 .week-column-header {
-  padding: 12px 8px;
+  padding: 10px 8px;
   text-align: center;
   background: var(--bg-surface-elevated, #f8fafc);
   border-bottom: 1px solid var(--border-subtle, #e2e8f0);
 }
 
 .week-column-day-name {
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   font-weight: 700;
   color: var(--text-dim, #64748b);
   text-transform: uppercase;
 }
 
 .week-column-day-num {
-  font-size: 1.15rem;
+  font-size: 1.1rem;
   font-weight: 800;
   color: var(--text-main, #0f172a);
   margin-top: 2px;
@@ -344,11 +358,14 @@
 }
 
 .week-column-events {
-  padding: 10px 8px;
+  padding: 8px 6px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
   flex: 1;
+  max-height: 520px;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 /* Day View */
@@ -375,6 +392,10 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  max-height: 580px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding-right: 4px;
 }
 
 .day-event-card {

@@ -366,7 +366,7 @@ export const Calendar = () => {
           </div>
         ) : currentView === 'month' ? (
           /* ================= Month View ================= */
-          <div>
+          <div className="calendar-month-wrapper">
             <div className="month-grid-header">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
                 <div key={d} className="month-grid-header-cell">

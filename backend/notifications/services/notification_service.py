@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from notifications.models import Notification
@@ -13,8 +14,9 @@ class NotificationService:
     Ensures safe creation, avoids self-notifications, and enforces business event consistency.
     """
 
-    @staticmethod
+    @classmethod
     def create_notification(
+        cls,
         recipient,
         notification_type,
         title,
@@ -23,11 +25,12 @@ class NotificationService:
         entity_id=None,
         action_url=None,
         actor=None,
-        priority=Notification.Priority.NORMAL
+        priority=Notification.Priority.NORMAL,
+        allow_self=False
     ):
         """
         Creates an in-app notification record safely.
-        Skips if recipient is missing, inactive, or if actor == recipient.
+        Skips if recipient is missing, inactive, or if actor == recipient (unless allow_self=True).
         """
         if not recipient:
             return None
@@ -36,8 +39,8 @@ class NotificationService:
         if hasattr(recipient, 'is_active') and not recipient.is_active:
             return None
 
-        # Do not create self-notifications for own actions
-        if actor and recipient.id == actor.id:
+        # Do not create self-notifications for own actions unless explicitly allowed
+        if not allow_self and actor and recipient.id == actor.id:
             return None
 
         try:
@@ -396,3 +399,124 @@ class NotificationService:
             notification.mark_as_read()
             return notification
         return None
+
+    @classmethod
+    def sync_user_followups(cls, user):
+        """
+        Scans pending follow-ups for the user and generates overdue or due-soon notifications
+        if not already present. Also guarantees new/unseeded users receive initial system alerts.
+        """
+        if not user or not user.is_authenticated:
+            return
+
+        from followups.models import FollowUp
+        now = timezone.now()
+        upcoming_window = now + timedelta(days=2)
+
+        # 1. Overdue follow-ups
+        overdue_qs = FollowUp.objects.filter(
+            assigned_to=user,
+            status=FollowUp.Status.PENDING,
+            follow_up_at__lt=now
+        ).select_related('lead', 'customer')
+
+        for fu in overdue_qs:
+            exists = Notification.objects.filter(
+                recipient=user,
+                notification_type=Notification.NotificationType.FOLLOW_UP_OVERDUE,
+                entity_type='followup',
+                entity_id=str(fu.id)
+            ).exists()
+
+            if not exists:
+                target_name = fu.lead.name if fu.lead else (fu.customer.name if fu.customer else 'Client')
+                target_url = f"/leads/{fu.lead.id}" if fu.lead else (f"/customers/{fu.customer.id}" if fu.customer else "/follow-ups")
+                cls.create_notification(
+                    recipient=user,
+                    notification_type=Notification.NotificationType.FOLLOW_UP_OVERDUE,
+                    title="Follow-up Overdue",
+                    message=f"Overdue: {fu.purpose.capitalize()} with {target_name} was scheduled for {fu.follow_up_at.strftime('%b %d, %H:%M')}.",
+                    entity_type='followup',
+                    entity_id=fu.id,
+                    action_url=target_url,
+                    priority=Notification.Priority.URGENT,
+                    actor=None,
+                    allow_self=True
+                )
+
+        # 2. Due soon follow-ups (next 48 hours)
+        due_soon_qs = FollowUp.objects.filter(
+            assigned_to=user,
+            status=FollowUp.Status.PENDING,
+            follow_up_at__range=(now, upcoming_window)
+        ).select_related('lead', 'customer')
+
+        for fu in due_soon_qs:
+            exists = Notification.objects.filter(
+                recipient=user,
+                notification_type=Notification.NotificationType.FOLLOW_UP_DUE_SOON,
+                entity_type='followup',
+                entity_id=str(fu.id)
+            ).exists()
+
+            if not exists:
+                target_name = fu.lead.name if fu.lead else (fu.customer.name if fu.customer else 'Client')
+                target_url = f"/leads/{fu.lead.id}" if fu.lead else (f"/customers/{fu.customer.id}" if fu.customer else "/follow-ups")
+                cls.create_notification(
+                    recipient=user,
+                    notification_type=Notification.NotificationType.FOLLOW_UP_DUE_SOON,
+                    title=f"Upcoming {fu.purpose.capitalize()}",
+                    message=f"Scheduled {fu.purpose.capitalize()} with {target_name} on {fu.follow_up_at.strftime('%b %d at %H:%M')}.",
+                    entity_type='followup',
+                    entity_id=fu.id,
+                    action_url=target_url,
+                    priority=Notification.Priority.HIGH,
+                    actor=None,
+                    allow_self=True
+                )
+
+        # 3. For Admin / Manager, notify about team overdue follow-ups
+        user_role = getattr(user, 'role', '')
+        if user_role in ['ADMIN', 'MANAGER']:
+            system_overdue = FollowUp.objects.filter(
+                status=FollowUp.Status.PENDING,
+                follow_up_at__lt=now
+            ).exclude(assigned_to=user).select_related('lead', 'assigned_to')[:5]
+
+            for s_fu in system_overdue:
+                s_exists = Notification.objects.filter(
+                    recipient=user,
+                    notification_type=Notification.NotificationType.FOLLOW_UP_OVERDUE,
+                    entity_type='followup',
+                    entity_id=str(s_fu.id)
+                ).exists()
+                if not s_exists:
+                    rep_name = s_fu.assigned_to.get_full_name() or s_fu.assigned_to.email if s_fu.assigned_to else "Unassigned"
+                    target_name = s_fu.lead.name if s_fu.lead else "Client"
+                    cls.create_notification(
+                        recipient=user,
+                        notification_type=Notification.NotificationType.FOLLOW_UP_OVERDUE,
+                        title=f"Team Overdue: {s_fu.purpose.capitalize()}",
+                        message=f"{rep_name}'s {s_fu.purpose} with {target_name} is overdue ({s_fu.follow_up_at.strftime('%b %d')}).",
+                        entity_type='followup',
+                        entity_id=s_fu.id,
+                        action_url="/calendar",
+                        priority=Notification.Priority.HIGH,
+                        actor=None,
+                        allow_self=True
+                    )
+
+        # 4. Fallback welcome notification if user has zero notifications
+        if not Notification.objects.filter(recipient=user).exists():
+            cls.create_notification(
+                recipient=user,
+                notification_type=Notification.NotificationType.SYSTEM,
+                title="Welcome to CRM Lite Notification Center",
+                message="Stay informed about lead assignments, scheduled calendar events, overdue tasks, and team mentions here.",
+                entity_type='system',
+                entity_id='welcome',
+                action_url='/notifications',
+                priority=Notification.Priority.NORMAL,
+                actor=None,
+                allow_self=True
+            )

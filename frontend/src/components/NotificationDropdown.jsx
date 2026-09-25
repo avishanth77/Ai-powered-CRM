@@ -25,22 +25,31 @@ export const NotificationDropdown = ({
   const navigate = useNavigate();
 
   const getNotificationIcon = (type) => {
-    switch (type) {
+    const t = (type || '').toLowerCase();
+    switch (t) {
       case 'lead_assigned':
       case 'lead_handed_over':
         return <UserCheck size={16} />;
       case 'lead_stage_changed':
         return <Layers size={16} />;
+      case 'follow_up_due':
+      case 'follow_up_due_soon':
+      case 'follow_up_created':
+      case 'follow_up_assigned':
       case 'followup_due':
       case 'followup_created':
         return <Calendar size={16} />;
+      case 'follow_up_overdue':
       case 'followup_overdue':
         return <AlertCircle size={16} />;
+      case 'follow_up_completed':
       case 'followup_completed':
         return <Clock size={16} />;
+      case 'internal_mention':
       case 'mention':
         return <AtSign size={16} />;
       case 'internal_comment':
+      case 'comment':
         return <MessageSquare size={16} />;
       case 'customer_converted':
         return <Award size={16} />;
@@ -50,11 +59,12 @@ export const NotificationDropdown = ({
   };
 
   const getIconClass = (type) => {
-    if (type?.startsWith('lead_')) return 'lead';
-    if (type?.startsWith('followup_')) return 'followup';
-    if (type === 'mention') return 'mention';
-    if (type === 'internal_comment') return 'comment';
-    if (type === 'customer_converted') return 'customer';
+    const t = (type || '').toLowerCase();
+    if (t.startsWith('lead_')) return 'lead';
+    if (t.startsWith('follow_up') || t.startsWith('followup')) return 'followup';
+    if (t.includes('mention')) return 'mention';
+    if (t.includes('comment')) return 'comment';
+    if (t.includes('customer')) return 'customer';
     return 'stage';
   };
 

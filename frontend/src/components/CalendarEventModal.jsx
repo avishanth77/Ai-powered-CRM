@@ -117,7 +117,7 @@ export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
   });
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-backdrop" onClick={onClose}>
       <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
         <div className="modal-header">
           <div>

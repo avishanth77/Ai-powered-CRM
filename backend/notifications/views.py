@@ -28,6 +28,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
         user = self.request.user
         if not user.is_authenticated:
             return Notification.objects.none()
+        NotificationService.sync_user_followups(user)
         return Notification.objects.filter(recipient=user).select_related('actor')
 
     @action(detail=False, methods=['get'], url_path='unread-count')
@@ -36,6 +37,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
         Returns the count of unread notifications for the authenticated user.
         Format: {"count": 5}
         """
+        NotificationService.sync_user_followups(request.user)
         count = NotificationService.get_unread_count(request.user)
         return Response({'count': count}, status=status.HTTP_200_OK)
 

@@ -79,22 +79,31 @@ export const Notifications = () => {
   };
 
   const getNotificationIcon = (type) => {
-    switch (type) {
+    const t = (type || '').toLowerCase();
+    switch (t) {
       case 'lead_assigned':
       case 'lead_handed_over':
         return <UserCheck size={18} />;
       case 'lead_stage_changed':
         return <Layers size={18} />;
+      case 'follow_up_due':
+      case 'follow_up_due_soon':
+      case 'follow_up_created':
+      case 'follow_up_assigned':
       case 'followup_due':
       case 'followup_created':
         return <Calendar size={18} />;
+      case 'follow_up_overdue':
       case 'followup_overdue':
         return <AlertCircle size={18} />;
+      case 'follow_up_completed':
       case 'followup_completed':
         return <Clock size={18} />;
+      case 'internal_mention':
       case 'mention':
         return <AtSign size={18} />;
       case 'internal_comment':
+      case 'comment':
         return <MessageSquare size={18} />;
       case 'customer_converted':
         return <Award size={18} />;
@@ -104,20 +113,23 @@ export const Notifications = () => {
   };
 
   const getIconClass = (type) => {
-    if (type?.startsWith('lead_')) return 'lead';
-    if (type?.startsWith('followup_')) return 'followup';
-    if (type === 'mention') return 'mention';
-    if (type === 'internal_comment') return 'comment';
-    if (type === 'customer_converted') return 'customer';
+    const t = (type || '').toLowerCase();
+    if (t.startsWith('lead_')) return 'lead';
+    if (t.startsWith('follow_up') || t.startsWith('followup')) return 'followup';
+    if (t.includes('mention')) return 'mention';
+    if (t.includes('comment')) return 'comment';
+    if (t.includes('customer')) return 'customer';
     return 'stage';
   };
 
   const filteredNotifications = notifications.filter((notif) => {
+    const notifType = (notif.notification_type || '').toLowerCase();
+
     // Tab filter
     if (activeTab === 'unread' && notif.is_read) return false;
-    if (activeTab === 'leads' && !notif.notification_type?.startsWith('lead_')) return false;
-    if (activeTab === 'followups' && !notif.notification_type?.startsWith('followup_')) return false;
-    if (activeTab === 'mentions' && notif.notification_type !== 'mention' && notif.notification_type !== 'internal_comment') return false;
+    if (activeTab === 'leads' && !notifType.startsWith('lead_')) return false;
+    if (activeTab === 'followups' && !notifType.startsWith('follow_up') && !notifType.startsWith('followup')) return false;
+    if (activeTab === 'mentions' && !notifType.includes('mention') && !notifType.includes('comment')) return false;
 
     // Search filter
     if (searchQuery) {
