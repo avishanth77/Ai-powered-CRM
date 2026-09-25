@@ -75,16 +75,7 @@
   animation: dropdown-fade-in 0.15s ease-out;
 }
 
-@keyframes dropdown-fade-in {
-  from {
-    opacity: 0;
-    transform: translateY(-6px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
+/* NOTE: @keyframes dropdown-fade-in lives in global.css (shared with comments.css) */
 
 .notification-dropdown-header {
   display: flex;

@@ -51,7 +51,7 @@
   .dashboard-charts-grid {
     grid-template-columns: 1fr;
   }
-  .col-span-8, .col-span-7, .col-span-6, .col-span-5, .col-span-4 {
+  .col-span-7, .col-span-6, .col-span-5 {
     grid-column: span 1;
   }
   .lead-detail-layout {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -38,6 +38,8 @@ export const Calendar = () => {
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [scheduleModalDate, setScheduleModalDate] = useState(null);
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  // Guards against out-of-order responses on rapid month navigation
+  const eventsRequestId = useRef(0);
 
   // Load team members for Admin/Manager
   useEffect(() => {
@@ -103,6 +105,7 @@ export const Calendar = () => {
 
   // Fetch calendar events
   const fetchEvents = useCallback(async () => {
+    const requestId = ++eventsRequestId.current;
     setLoading(true);
     setEventsError(null);
     try {
@@ -121,12 +124,14 @@ export const Calendar = () => {
       }
 
       const res = await calendarApi.getEvents(params);
+      if (requestId !== eventsRequestId.current) return; // stale response
       setEvents(res.results || []);
     } catch (err) {
+      if (requestId !== eventsRequestId.current) return; // stale response
       console.error('Failed to fetch calendar events:', err);
       setEventsError('Could not load calendar events. Please check your connection and retry.');
     } finally {
-      setLoading(false);
+      if (requestId === eventsRequestId.current) setLoading(false);
     }
   }, [rangeStart, rangeEnd, canFilterUsers, selectedUser, selectedStatus, selectedPurpose]);
 
