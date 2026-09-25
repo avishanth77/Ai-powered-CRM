@@ -100,7 +100,7 @@
   /* Typography Colors */
   --text-main: #f0fdf4;
   --text-muted: #94a3b8;
-  --text-dim: #64748b;
+  --text-dim: #94a3b8;
 
   /* Status Colors */
   --success: #10b981;
@@ -187,6 +187,13 @@ select:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
   outline: none;
+}
+
+/* Checkboxes/radios draw no box-shadow ring — restore a visible outline */
+input[type="checkbox"]:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
 }
 
 button, input, select, textarea {
@@ -429,6 +436,16 @@ button, input, select, textarea {
   color: var(--text-muted);
   background-color: var(--bg-surface-elevated);
   border-color: var(--border-subtle);
+}
+
+.badge-purple {
+  color: var(--accent-purple);
+  background-color: var(--accent-purple-subtle);
+  border-color: var(--border-strong);
+}
+
+[data-theme="dark"] .badge-purple {
+  color: var(--accent-purple-soft);
 }
 
 /* Table Design */

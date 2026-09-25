@@ -15,11 +15,13 @@ import {
 import { calendarApi } from '../api/calendarApi';
 import { toLocalDateTimeInput } from '../utils/formatters';
 import { useToast } from '../context/ToastContext';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 import { ConfirmModal } from './ConfirmModal';
 
 export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
   const navigate = useNavigate();
   const { showToast } = useToast();
+  const dialogRef = useDialogA11y(true, onClose);
 
   const [mode, setMode] = useState('view'); // 'view', 'complete', 'reschedule'
   const [outcome, setOutcome] = useState('');
@@ -123,7 +125,15 @@ export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
 
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '520px' }}>
+      <div
+        className="modal-container"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Calendar event details"
+        onClick={(e) => e.stopPropagation()}
+        style={{ maxWidth: '520px' }}
+      >
         <div className="modal-header">
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
@@ -134,7 +144,7 @@ export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
             </div>
             <h3 style={{ margin: 0, fontSize: '1.2rem', color: 'var(--text-main)' }}>{event.title}</h3>
           </div>
-          <button type="button" className="modal-close-btn" onClick={onClose}>
+          <button type="button" className="modal-close-btn" onClick={onClose} aria-label="Close dialog">
             <X size={20} />
           </button>
         </div>
@@ -273,6 +283,7 @@ export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
                   type="datetime-local"
                   className="form-input"
                   value={newDateTime}
+                  min={toLocalDateTimeInput(new Date())}
                   onChange={(e) => setNewDateTime(e.target.value)}
                   required
                 />

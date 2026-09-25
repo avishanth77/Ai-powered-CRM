@@ -258,7 +258,7 @@ export const Reports = () => {
                       <span className="text-main font-semibold">{up.name}</span>
                     </td>
                     <td>
-                      <span className="status-badge" style={{ color: '#38bdf8', backgroundColor: 'rgba(56, 189, 248, 0.12)' }}>
+                      <span className="badge badge-primary">
                         {up.role}
                       </span>
                     </td>
@@ -271,7 +271,7 @@ export const Reports = () => {
                       </span>
                     </td>
                     <td>
-                      <span style={{ fontFamily: 'Outfit', fontWeight: 600, color: '#fbbf24' }}>
+                      <span style={{ fontFamily: 'Outfit', fontWeight: 600, color: 'var(--warning)' }}>
                         {formatCurrency(up.expected_value)}
                       </span>
                     </td>
@@ -290,7 +290,7 @@ export const Reports = () => {
       <div className="dashboard-stats-grid cols-4">
         <div className="kpi-card">
           <span className="kpi-label">Expected Revenue</span>
-          <div className="kpi-value" style={{ color: '#fbbf24' }}>
+          <div className="kpi-value" style={{ color: 'var(--warning)' }}>
             {formatCurrency(kpis?.expected_sales_value)}
           </div>
           <div className="kpi-meta text-muted">Aggregated Active Pipeline</div>

@@ -153,7 +153,7 @@ export const Dashboard = () => {
         <div className="kpi-card">
           <div className="kpi-card-header">
             <span className="kpi-label">Expected Value</span>
-            <div className="kpi-icon-circle" style={{ color: '#fbbf24' }}><IndianRupee size={18} /></div>
+            <div className="kpi-icon-circle" style={{ color: 'var(--warning)' }}><IndianRupee size={18} /></div>
           </div>
           <div className="kpi-value">{formatCurrency(kpis.expected_sales_value)}</div>
           <div className="kpi-meta text-muted">Active Pipeline Value</div>

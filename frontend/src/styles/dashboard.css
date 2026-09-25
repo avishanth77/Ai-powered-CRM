@@ -229,8 +229,12 @@
   display: flex;
   align-items: center;
   gap: 0.75rem;
-  color: #fca5a5;
+  color: var(--danger);
   font-size: 0.9375rem;
+}
+
+[data-theme="dark"] .overdue-banner-text {
+  color: #fca5a5;
 }
 
 .overdue-count-tag {

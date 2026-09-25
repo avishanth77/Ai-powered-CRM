@@ -144,6 +144,12 @@
   outline: none;
 }
 
+.calendar-select-filter:focus-visible {
+  outline: 2px solid var(--border-focus, #10b981);
+  outline-offset: 1px;
+  border-color: var(--border-focus, #10b981);
+}
+
 /* Calendar Grid Container */
 .calendar-board-card {
   background: var(--bg-surface, #ffffff);
@@ -302,6 +308,28 @@
   color: #64748b;
   border-left-color: #64748b;
   opacity: 0.6;
+}
+
+/* Dark theme: lift hardcoded chip colors to readable equivalents */
+[data-theme="dark"] .calendar-event-chip.pending {
+  color: #38bdf8;
+  border-left-color: #38bdf8;
+}
+
+[data-theme="dark"] .calendar-event-chip.overdue {
+  color: #fb7185;
+  border-left-color: #fb7185;
+}
+
+[data-theme="dark"] .calendar-event-chip.completed {
+  color: #34d399;
+  border-left-color: #34d399;
+}
+
+[data-theme="dark"] .calendar-event-chip.cancelled {
+  color: #94a3b8;
+  border-left-color: #94a3b8;
+  opacity: 0.75;
 }
 
 .calendar-chip-time {

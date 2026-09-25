@@ -2,22 +2,19 @@ import React, { useState, useEffect, useMemo } from 'react';
 import {
   X,
   Calendar,
-  Clock,
-  User,
   Users,
   PhoneCall,
   MonitorPlay,
   Mail,
   CheckSquare,
   Search,
-  Building,
-  Check,
-  Sparkles
+  Building
 } from 'lucide-react';
 import { leadApi } from '../api/leadApi';
 import { calendarApi } from '../api/calendarApi';
 import { toLocalDateKey } from '../utils/formatters';
 import { useToast } from '../context/ToastContext';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 // `id` values are the backend FollowUp.Purpose choices — they are sent verbatim,
 // so they must match the server-side choice values exactly.
@@ -66,6 +63,7 @@ const EVENT_PURPOSES = [
 
 export const CalendarScheduleModal = ({ initialDate, onClose, onSuccess }) => {
   const { showToast } = useToast();
+  const dialogRef = useDialogA11y(true, onClose);
 
   const [leads, setLeads] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(true);
@@ -169,6 +167,10 @@ export const CalendarScheduleModal = ({ initialDate, onClose, onSuccess }) => {
     <div className="modal-backdrop" onClick={onClose}>
       <div
         className="modal-container"
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Schedule calendar event"
         onClick={(e) => e.stopPropagation()}
         style={{ maxWidth: '580px', borderRadius: '16px' }}
       >
@@ -225,6 +227,8 @@ export const CalendarScheduleModal = ({ initialDate, onClose, onSuccess }) => {
                       key={item.id}
                       type="button"
                       onClick={() => setSelectedPurpose(item.id)}
+                      aria-pressed={isSelected}
+                      aria-label={`Event type: ${item.label}`}
                       style={{
                         padding: '10px 8px',
                         borderRadius: '10px',
@@ -428,6 +432,7 @@ export const CalendarScheduleModal = ({ initialDate, onClose, onSuccess }) => {
                     type="date"
                     className="form-input"
                     value={selectedDate}
+                    min={toLocalDateKey(new Date())}
                     onChange={(e) => setSelectedDate(e.target.value)}
                     required
                     style={{ height: '40px', fontSize: '0.88rem' }}

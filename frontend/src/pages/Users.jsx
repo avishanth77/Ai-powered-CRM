@@ -3,7 +3,9 @@ import { userApi } from '../api/userApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatDate } from '../utils/formatters';
-import { extractErrorMessage, isValidEmail } from '../utils/validation';
+import { extractErrorMessage, normalizeServerErrors, isValidEmail } from '../utils/validation';
+import { FieldError } from '../components/FieldError';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 import { USER_ROLES, ROLE_LABELS } from '../utils/constants';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
@@ -33,6 +35,9 @@ export const Users = () => {
   });
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+
+  // Dialog accessibility: Escape to close, focus trap, body scroll lock
+  const inviteDialogRef = useDialogA11y(modalOpen, () => setModalOpen(false));
 
   const fetchUsers = async (page = 1) => {
     setLoading(true);
@@ -94,7 +99,11 @@ export const Users = () => {
       const msg = extractErrorMessage(err, 'Failed to create user');
       showToast(msg, 'error');
       if (err.response?.data?.errors) {
-        setErrors(err.response.data.errors);
+        const { fieldErrors, summary } = normalizeServerErrors(err.response.data.errors);
+        setErrors(fieldErrors);
+        if (summary.length > 0) {
+          showToast(summary.join(' '), 'error');
+        }
       }
     } finally {
       setSaving(false);
@@ -174,21 +183,13 @@ export const Users = () => {
                   </td>
                   <td>
                     <span
-                      className="status-badge"
-                      style={{
-                        color:
-                          u.role === 'ADMIN'
-                            ? '#a855f7'
-                            : u.role === 'MANAGER'
-                            ? '#38bdf8'
-                            : '#34d399',
-                        backgroundColor:
-                          u.role === 'ADMIN'
-                            ? 'rgba(168, 85, 247, 0.12)'
-                            : u.role === 'MANAGER'
-                            ? 'rgba(56, 189, 248, 0.12)'
-                            : 'rgba(52, 211, 153, 0.12)',
-                      }}
+                      className={`badge ${
+                        u.role === 'ADMIN'
+                          ? 'badge-purple'
+                          : u.role === 'MANAGER'
+                          ? 'badge-primary'
+                          : 'badge-success'
+                      }`}
                     >
                       <Shield size={12} />
                       {ROLE_LABELS[u.role] || u.role}
@@ -225,10 +226,10 @@ export const Users = () => {
       {/* Add User Modal */}
       {modalOpen && (
         <div className="modal-backdrop" onClick={() => setModalOpen(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-container" ref={inviteDialogRef} role="dialog" aria-modal="true" aria-label="Create new user account" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Create New User Account</h3>
-              <button className="modal-close-btn" onClick={() => setModalOpen(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setModalOpen(false)} aria-label="Close dialog">✕</button>
             </div>
             <form onSubmit={handleCreateUser}>
               <div className="modal-body form-layout">
@@ -268,8 +269,10 @@ export const Users = () => {
                     value={formData.email}
                     onChange={handleChange}
                     required
+                    aria-invalid={Boolean(errors.email)}
+                    aria-describedby={errors.email ? 'user-email-error' : undefined}
                   />
-                  {errors.email && <span className="form-error-msg">{errors.email}</span>}
+                  <FieldError id="user-email-error" message={errors.email} />
                 </div>
 
                 <div className="form-group">
@@ -310,8 +313,10 @@ export const Users = () => {
                     value={formData.password}
                     onChange={handleChange}
                     required
+                    aria-invalid={Boolean(errors.password)}
+                    aria-describedby={errors.password ? 'user-password-error' : undefined}
                   />
-                  {errors.password && <span className="form-error-msg">{errors.password}</span>}
+                  <FieldError id="user-password-error" message={errors.password} />
                 </div>
               </div>
               <div className="modal-footer">

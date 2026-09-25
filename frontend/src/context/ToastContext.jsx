@@ -26,7 +26,12 @@ export const ToastProvider = ({ children }) => {
       {children}
       <div className="toast-container" role="region" aria-label="Notifications">
         {toasts.map((toast) => (
-          <div key={toast.id} className={`toast-item toast-${toast.type}`}>
+          <div
+            key={toast.id}
+            className={`toast-item toast-${toast.type}`}
+            role="status"
+            aria-live="polite"
+          >
             <div className="toast-icon">
               {toast.type === 'success' && <CheckCircle2 size={18} />}
               {toast.type === 'error' && <AlertCircle size={18} />}

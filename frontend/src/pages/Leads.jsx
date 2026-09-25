@@ -9,6 +9,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatCurrency, formatDate, formatDateTime, toLocalDateTimeInput } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 import { LEAD_STATUS, LEAD_PRIORITY, FOLLOWUP_PURPOSES } from '../utils/constants';
 
 import { StatusBadge } from '../components/StatusBadge';
@@ -97,6 +98,12 @@ export const Leads = () => {
 
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [scheduling, setScheduling] = useState(false);
+
+  // Dialog accessibility: Escape to close, focus trap, body scroll lock
+  const scheduleDialogRef = useDialogA11y(scheduleModalOpen, () => setScheduleModalOpen(false));
+  const importDialogRef = useDialogA11y(importModalOpen, () => setImportModalOpen(false));
+  const bulkDialogRef = useDialogA11y(bulkModalOpen, () => setBulkModalOpen(false));
+
   const [newFollowup, setNewFollowup] = useState({
     lead: '',
     purpose: 'Phone Call',
@@ -646,17 +653,19 @@ export const Leads = () => {
         <div className="mini-pipeline-track">
           {pipelineStages.map((stg, idx) => (
             <React.Fragment key={stg.key}>
-              <div
+              <button
+                type="button"
                 className={`mini-pipeline-step ${statusFilter === stg.key ? 'active' : ''}`}
                 onClick={() => handleStageClick(stg.key)}
                 title={`Filter table to show only ${stg.label} leads`}
+                aria-pressed={statusFilter === stg.key}
               >
                 <div className="mini-step-info">
                   <span className="mini-step-name">{stg.label}</span>
                   <span className="mini-step-sub">{stg.sub}</span>
                 </div>
                 <span className="mini-step-count">{stg.count}</span>
-              </div>
+              </button>
               {idx < pipelineStages.length - 1 && (
                 <ChevronRight size={18} className="mini-pipeline-arrow" />
               )}
@@ -886,6 +895,7 @@ export const Leads = () => {
                         type="button"
                         className="icon-action-btn"
                         title="Schedule Follow-up"
+                        aria-label={`Schedule follow-up for ${lead.name}`}
                         onClick={() => handleOpenScheduleForLead(lead)}
                       >
                         <CalendarPlus size={15} />
@@ -894,6 +904,7 @@ export const Leads = () => {
                         to={`/leads/${lead.id}`}
                         className="icon-action-btn"
                         title="View Lead Details"
+                        aria-label={`View details for ${lead.name}`}
                       >
                         <Eye size={15} />
                       </Link>
@@ -901,6 +912,7 @@ export const Leads = () => {
                         to={`/leads/${lead.id}/edit`}
                         className="icon-action-btn"
                         title="Edit Lead"
+                        aria-label={`Edit ${lead.name}`}
                       >
                         <Edit size={15} />
                       </Link>
@@ -909,6 +921,7 @@ export const Leads = () => {
                           type="button"
                           className="icon-action-btn icon-action-btn-danger"
                           title="Delete Lead (Admin Only)"
+                          aria-label={`Delete ${lead.name}`}
                           onClick={() => handleOpenDelete(lead)}
                         >
                           <Trash2 size={15} />
@@ -922,12 +935,14 @@ export const Leads = () => {
           </table>
         )}
 
-        <Pagination
-          currentPage={currentPage}
-          totalCount={totalCount}
-          pageSize={pageSize}
-          onPageChange={(page) => setCurrentPage(page)}
-        />
+        {!loading && (
+          <Pagination
+            currentPage={currentPage}
+            totalCount={totalCount}
+            pageSize={pageSize}
+            onPageChange={(page) => setCurrentPage(page)}
+          />
+        )}
       </div>
 
       {/* 2 & 3. 2-COLUMN BOTTOM GRID (Upcoming Follow-ups + Recent Activity) */}
@@ -1029,13 +1044,13 @@ export const Leads = () => {
       {/* Modal: Quick Schedule Follow-up */}
       {scheduleModalOpen && (
         <div className="modal-backdrop" onClick={() => setScheduleModalOpen(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-container" ref={scheduleDialogRef} role="dialog" aria-modal="true" aria-label="Schedule follow-up" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title-row">
                 <CalendarPlus size={18} color="var(--primary)" />
                 <h3>Quick Schedule Follow-up</h3>
               </div>
-              <button className="modal-close-btn" onClick={() => setScheduleModalOpen(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setScheduleModalOpen(false)} aria-label="Close dialog">✕</button>
             </div>
             <form onSubmit={handleQuickScheduleSubmit}>
               <div className="modal-body form-layout">
@@ -1104,13 +1119,13 @@ export const Leads = () => {
       {/* Modal: Import Leads CSV */}
       {importModalOpen && (
         <div className="modal-backdrop" onClick={() => setImportModalOpen(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-container" ref={importDialogRef} role="dialog" aria-modal="true" aria-label="Import leads from CSV" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title-row">
                 <UploadCloud size={18} color="var(--primary)" />
                 <h3>Import Prospect Leads from CSV</h3>
               </div>
-              <button className="modal-close-btn" onClick={() => setImportModalOpen(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setImportModalOpen(false)} aria-label="Close dialog">✕</button>
             </div>
             <form onSubmit={handleImportSubmit}>
               <div className="modal-body form-layout">
@@ -1224,13 +1239,13 @@ export const Leads = () => {
       {/* Modal: Bulk Handover Leads */}
       {bulkModalOpen && (
         <div className="modal-backdrop" onClick={() => setBulkModalOpen(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+          <div className="modal-container" ref={bulkDialogRef} role="dialog" aria-modal="true" aria-label="Bulk handover leads" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
             <div className="modal-header">
               <div className="modal-title-row">
                 <Share2 size={18} color="var(--primary)" />
                 <h3>Bulk Handover Leads</h3>
               </div>
-              <button className="modal-close-btn" onClick={() => setBulkModalOpen(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setBulkModalOpen(false)} aria-label="Close dialog">✕</button>
             </div>
             <form onSubmit={handleConfirmBulkHandover}>
               <div className="modal-body form-layout">

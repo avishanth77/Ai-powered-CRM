@@ -4,7 +4,8 @@ import { leadApi } from '../api/leadApi';
 import { userApi } from '../api/userApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { extractErrorMessage, isValidEmail, isValidPhone } from '../utils/validation';
+import { extractErrorMessage, normalizeServerErrors, isValidEmail, isValidPhone } from '../utils/validation';
+import { FieldError } from '../components/FieldError';
 import { LEAD_PRIORITY } from '../utils/constants';
 import { ArrowLeft, Save, UserPlus } from 'lucide-react';
 
@@ -32,6 +33,7 @@ export const LeadCreate = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState(null);
 
   useEffect(() => {
     // Load dynamic lead stages
@@ -86,7 +88,10 @@ export const LeadCreate = () => {
       newErrors.email = 'Please enter a valid email address.';
     }
 
-    if (parseFloat(formData.expected_value) < 0) {
+    const expectedNum = parseFloat(formData.expected_value);
+    if (Number.isNaN(expectedNum)) {
+      newErrors.expected_value = 'Please enter a valid deal value.';
+    } else if (expectedNum < 0) {
       newErrors.expected_value = 'Expected value cannot be negative.';
     }
 
@@ -128,7 +133,9 @@ export const LeadCreate = () => {
       const msg = extractErrorMessage(err, 'Failed to create lead.');
       showToast(msg, 'error');
       if (err.response?.data?.errors) {
-        setErrors(err.response.data.errors);
+        const { fieldErrors, summary } = normalizeServerErrors(err.response.data.errors);
+        setErrors(fieldErrors);
+        setFormError(summary.length > 0 ? summary : null);
       }
     } finally {
       setLoading(false);
@@ -152,6 +159,15 @@ export const LeadCreate = () => {
 
       <div className="card" style={{ maxWidth: '840px' }}>
         <form onSubmit={handleSubmit} className="form-layout">
+          {formError && (
+            <div className="toast-item toast-error" role="alert" style={{ marginBottom: '0.5rem' }}>
+              <div className="toast-message">
+                {formError.map((msg, i) => (
+                  <div key={i}>{msg}</div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="form-grid-2">
             <div className="form-group">
               <label className="form-label form-label-required" htmlFor="lead-name">
@@ -166,8 +182,10 @@ export const LeadCreate = () => {
                 value={formData.name}
                 onChange={handleChange}
                 required
+                aria-invalid={Boolean(errors.name)}
+                aria-describedby={errors.name ? 'lead-name-error' : undefined}
               />
-              {errors.name && <span className="form-error-msg">{errors.name}</span>}
+              <FieldError id="lead-name-error" message={errors.name} />
             </div>
 
             <div className="form-group">
@@ -200,8 +218,10 @@ export const LeadCreate = () => {
                 value={formData.phone}
                 onChange={handleChange}
                 required
+                aria-invalid={Boolean(errors.phone)}
+                aria-describedby={errors.phone ? 'lead-phone-error' : undefined}
               />
-              {errors.phone && <span className="form-error-msg">{errors.phone}</span>}
+              <FieldError id="lead-phone-error" message={errors.phone} />
             </div>
 
             <div className="form-group">
@@ -216,8 +236,10 @@ export const LeadCreate = () => {
                 placeholder="e.g. john@acme.com"
                 value={formData.email}
                 onChange={handleChange}
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? 'lead-email-error' : undefined}
               />
-              {errors.email && <span className="form-error-msg">{errors.email}</span>}
+              <FieldError id="lead-email-error" message={errors.email} />
             </div>
           </div>
 
@@ -269,6 +291,8 @@ export const LeadCreate = () => {
                 value={formData.stage}
                 onChange={handleChange}
                 required
+                aria-invalid={Boolean(errors.stage)}
+                aria-describedby={errors.stage ? 'lead-stage-error' : undefined}
               >
                 {stages.map((st) => (
                   <option key={st.id} value={st.id}>
@@ -276,7 +300,7 @@ export const LeadCreate = () => {
                   </option>
                 ))}
               </select>
-              {errors.stage && <span className="form-error-msg">{errors.stage}</span>}
+              <FieldError id="lead-stage-error" message={errors.stage} />
             </div>
 
             <div className="form-group">
@@ -290,8 +314,10 @@ export const LeadCreate = () => {
                 className="form-control"
                 value={formData.expected_value}
                 onChange={handleChange}
+                aria-invalid={Boolean(errors.expected_value)}
+                aria-describedby={errors.expected_value ? 'lead-value-error' : undefined}
               />
-              {errors.expected_value && <span className="form-error-msg">{errors.expected_value}</span>}
+              <FieldError id="lead-value-error" message={errors.expected_value} />
             </div>
           </div>
 
@@ -344,8 +370,10 @@ export const LeadCreate = () => {
                 value={formData.lost_reason}
                 onChange={handleChange}
                 required
+                aria-invalid={Boolean(errors.lost_reason)}
+                aria-describedby={errors.lost_reason ? 'lead-lost-reason-error' : undefined}
               />
-              {errors.lost_reason && <span className="form-error-msg">{errors.lost_reason}</span>}
+              <FieldError id="lead-lost-reason-error" message={errors.lost_reason} />
             </div>
           )}
 

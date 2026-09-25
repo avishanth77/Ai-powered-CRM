@@ -5,6 +5,7 @@ import { useToast } from '../context/ToastContext';
 import { authApi } from '../api/authApi';
 import { Compass, Lock, Mail, ArrowRight, KeyRound, X } from 'lucide-react';
 import { extractErrorMessage } from '../utils/validation';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 export const Login = () => {
   const [email, setEmail] = useState('');
@@ -26,6 +27,9 @@ export const Login = () => {
   const { showToast } = useToast();
   const navigate = useNavigate();
   const location = useLocation();
+
+  // Dialog accessibility: Escape to close, focus trap, body scroll lock
+  const forgotDialogRef = useDialogA11y(forgotModalOpen, () => setForgotModalOpen(false));
 
   const from = location.state?.from?.pathname || '/dashboard';
 
@@ -236,7 +240,7 @@ export const Login = () => {
       {/* Forgot Password Modal */}
       {forgotModalOpen && (
         <div className="modal-backdrop" onClick={() => setForgotModalOpen(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+          <div className="modal-container" ref={forgotDialogRef} role="dialog" aria-modal="true" aria-label={forgotStep === 1 ? 'Forgot password' : 'Set new password'} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
             <div className="modal-header">
               <div className="modal-title-row">
                 <KeyRound size={20} color="var(--primary)" />

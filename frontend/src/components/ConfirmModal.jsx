@@ -1,5 +1,6 @@
 import React from 'react';
 import { AlertTriangle, X } from 'lucide-react';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 export const ConfirmModal = ({
   isOpen,
@@ -12,11 +13,13 @@ export const ConfirmModal = ({
   onConfirm,
   onCancel,
 }) => {
+  const dialogRef = useDialogA11y(isOpen, onCancel);
+
   if (!isOpen) return null;
 
   return (
-    <div className="modal-backdrop" onClick={onCancel} role="dialog" aria-modal="true">
-      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+    <div className="modal-backdrop" onClick={onCancel} role="dialog" aria-modal="true" aria-label={title}>
+      <div className="modal-container" ref={dialogRef} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title-row">
             {isDestructive && (

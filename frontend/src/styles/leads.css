@@ -437,10 +437,25 @@
   gap: 0.25rem;
   padding: 0.125rem 0.5rem;
   border-radius: var(--radius-sm);
-  background-color: var(--primary-glow);
-  color: var(--primary-light);
+  background-color: rgba(5, 150, 105, 0.14);
+  color: #047857;
   font-size: 0.75rem;
   font-weight: 600;
+}
+
+[data-theme="dark"] .note-type-pill {
+  background-color: var(--primary-glow);
+  color: var(--primary-light);
+}
+
+/* Lost-reason text: readable red in both themes */
+.lost-reason-text {
+  font-size: 0.875rem;
+  color: var(--danger);
+}
+
+[data-theme="dark"] .lost-reason-text {
+  color: #fca5a5;
 }
 
 .note-body-text {
@@ -591,6 +606,12 @@
   justify-content: space-between;
   cursor: pointer;
   transition: all var(--transition-fast);
+}
+
+button.mini-pipeline-step {
+  font: inherit;
+  color: inherit;
+  text-align: left;
 }
 
 .mini-pipeline-step:hover, .mini-pipeline-step.active {

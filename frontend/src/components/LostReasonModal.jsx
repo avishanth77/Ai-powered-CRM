@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { AlertCircle, X } from 'lucide-react';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 
 const COMMON_REASONS = [
   'Competitor Chosen',
@@ -20,6 +21,9 @@ export const LostReasonModal = ({
   const [reason, setReason] = useState('');
   const [error, setError] = useState('');
   const textareaRef = useRef(null);
+  const dialogRef = useDialogA11y(isOpen, () => {
+    if (!loading) onCancel();
+  });
 
   useEffect(() => {
     if (isOpen) {
@@ -51,29 +55,15 @@ export const LostReasonModal = ({
     textareaRef.current?.focus();
   };
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Escape' && !loading) {
-      onCancel();
-    }
-  };
-
-  const handleTextareaKeyDown = (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-      e.preventDefault();
-      handleSubmit();
-    }
-  };
-
   return (
     <div
       className="modal-backdrop"
       onClick={!loading ? onCancel : undefined}
-      onKeyDown={handleKeyDown}
       role="dialog"
       aria-modal="true"
       aria-labelledby="lost-modal-title"
     >
-      <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-container" ref={dialogRef} onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
           <div className="modal-title-row">
             <div className="modal-warning-icon" style={{ color: 'var(--danger)' }}>
@@ -125,7 +115,14 @@ export const LostReasonModal = ({
               >
                 {COMMON_REASONS.map((qr) => {
                   const isSelected = reason === qr;
-                  return (
+  const handleTextareaKeyDown = (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleSubmit();
+    }
+  };
+
+  return (
                     <button
                       key={qr}
                       type="button"

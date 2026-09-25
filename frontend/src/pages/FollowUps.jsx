@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatDateTime, toLocalDateTimeInput } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
 import { StatusBadge } from '../components/StatusBadge';
@@ -60,6 +61,10 @@ export const FollowUps = () => {
     follow_up_at: '',
   });
   const [scheduling, setScheduling] = useState(false);
+
+  // Dialog accessibility: Escape to close, focus trap, body scroll lock
+  const completeDialogRef = useDialogA11y(completeModalOpen, () => setCompleteModalOpen(false));
+  const scheduleDialogRef = useDialogA11y(scheduleModalOpen, () => setScheduleModalOpen(false));
 
   const fetchFollowups = useCallback(async () => {
     setLoading(true);
@@ -494,7 +499,7 @@ export const FollowUps = () => {
       {/* Complete / Outcome Modal */}
       {completeModalOpen && (
         <div className="modal-backdrop" onClick={() => setCompleteModalOpen(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-container" ref={completeDialogRef} role="dialog" aria-modal="true" aria-label="Log follow-up outcome" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 {selectedFollowup?.status === 'COMPLETED' ? (
@@ -508,7 +513,7 @@ export const FollowUps = () => {
                     : 'Log Follow-up Outcome'}
                 </h3>
               </div>
-              <button className="modal-close-btn" onClick={() => setCompleteModalOpen(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setCompleteModalOpen(false)} aria-label="Close dialog">✕</button>
             </div>
             <form onSubmit={handleConfirmComplete}>
               <div className="modal-body form-layout">
@@ -601,10 +606,10 @@ export const FollowUps = () => {
       {/* Schedule Modal */}
       {scheduleModalOpen && (
         <div className="modal-backdrop" onClick={() => setScheduleModalOpen(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-container" ref={scheduleDialogRef} role="dialog" aria-modal="true" aria-label="Schedule new follow-up" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Schedule New Follow-up</h3>
-              <button className="modal-close-btn" onClick={() => setScheduleModalOpen(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setScheduleModalOpen(false)} aria-label="Close dialog">✕</button>
             </div>
             <form onSubmit={handleScheduleSubmit}>
               <div className="modal-body form-layout">

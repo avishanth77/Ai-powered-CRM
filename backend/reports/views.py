@@ -242,6 +242,7 @@ class ReportExportView(APIView):
         assigned_to_param = request.query_params.get('assigned_to')
         from_date = request.query_params.get('from_date')
         to_date = request.query_params.get('to_date')
+        keyword_param = request.query_params.get('keyword')
 
         if status_param:
             qs = qs.filter(Q(stage__slug__iexact=status_param) | Q(stage__name__iexact=status_param))
@@ -255,6 +256,13 @@ class ReportExportView(APIView):
             qs = qs.filter(created_at__gte=from_date)
         if to_date:
             qs = qs.filter(created_at__lte=to_date)
+        if keyword_param:
+            qs = qs.filter(
+                Q(name__icontains=keyword_param) |
+                Q(phone__icontains=keyword_param) |
+                Q(email__icontains=keyword_param) |
+                Q(company_name__icontains=keyword_param)
+            )
 
         response = HttpResponse(content_type='text/csv')
         filename = f"crm_lite_leads_report_{timezone.now():%Y%m%d_%H%M%S}.csv"

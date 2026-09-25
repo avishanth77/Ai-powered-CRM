@@ -4,6 +4,7 @@ import { authApi } from '../api/authApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { extractErrorMessage } from '../utils/validation';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 import { ROLE_LABELS } from '../utils/constants';
 import {
   Settings as SettingsIcon,
@@ -81,6 +82,11 @@ export const Settings = () => {
   const [stageToDelete, setStageToDelete] = useState(null);
   const [replacementStageId, setReplacementStageId] = useState('');
   const [deletingStage, setDeletingStage] = useState(false);
+
+  // Dialog accessibility: Escape to close, focus trap, body scroll lock
+  const createStageDialogRef = useDialogA11y(createStageModalOpen, () => setCreateStageModalOpen(false));
+  const editStageDialogRef = useDialogA11y(editStageModalOpen, () => setEditStageModalOpen(false));
+  const deleteStageDialogRef = useDialogA11y(deleteStageModalOpen, () => setDeleteStageModalOpen(false));
 
   const fetchStages = async () => {
     setLoadingStages(true);
@@ -809,7 +815,7 @@ export const Settings = () => {
       {/* CREATE STAGE MODAL */}
       {createStageModalOpen && (
         <div className="modal-backdrop">
-          <div className="modal-container">
+          <div className="modal-container" ref={createStageDialogRef} role="dialog" aria-modal="true" aria-label="Add new lead stage">
             <div className="modal-header">
               <div className="modal-title-row">
                 <Kanban size={20} color="var(--primary)" />
@@ -819,6 +825,7 @@ export const Settings = () => {
                 type="button"
                 className="modal-close-btn"
                 onClick={() => setCreateStageModalOpen(false)}
+                aria-label="Close dialog"
               >
                 <X size={18} />
               </button>
@@ -949,7 +956,7 @@ export const Settings = () => {
       {/* EDIT / RENAME STAGE MODAL */}
       {editStageModalOpen && stageToEdit && (
         <div className="modal-backdrop">
-          <div className="modal-container">
+          <div className="modal-container" ref={editStageDialogRef} role="dialog" aria-modal="true" aria-label="Edit lead stage">
             <div className="modal-header">
               <div className="modal-title-row">
                 <Edit size={20} color="var(--primary)" />
@@ -959,6 +966,7 @@ export const Settings = () => {
                 type="button"
                 className="modal-close-btn"
                 onClick={() => setEditStageModalOpen(false)}
+                aria-label="Close dialog"
               >
                 <X size={18} />
               </button>
@@ -1086,7 +1094,7 @@ export const Settings = () => {
       {/* SAFE DELETE / MIGRATE STAGE MODAL */}
       {deleteStageModalOpen && stageToDelete && (
         <div className="modal-backdrop">
-          <div className="modal-container">
+          <div className="modal-container" ref={deleteStageDialogRef} role="dialog" aria-modal="true" aria-label="Delete lead stage">
             <div className="modal-header">
               <div className="modal-title-row">
                 <AlertTriangle size={20} color="var(--danger)" />
@@ -1096,6 +1104,7 @@ export const Settings = () => {
                 type="button"
                 className="modal-close-btn"
                 onClick={() => setDeleteStageModalOpen(false)}
+                aria-label="Close dialog"
               >
                 <X size={18} />
               </button>

@@ -7,6 +7,7 @@ import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatCurrency, formatDateTime, formatDate, formatRelativeTime, toLocalDateTimeInput } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
+import { useDialogA11y } from '../hooks/useDialogA11y';
 import {
   LEAD_STATUS,
   NOTE_TYPES,
@@ -106,6 +107,14 @@ export const LeadDetails = () => {
   const [loadingAi, setLoadingAi] = useState(false);
   const [copiedAction, setCopiedAction] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
+
+  // Dialog accessibility: Escape to close, focus trap, body scroll lock
+  const assignDialogRef = useDialogA11y(assignModalOpen, () => setAssignModalOpen(false));
+  const handoverDialogRef = useDialogA11y(handoverModalOpen, () => setHandoverModalOpen(false));
+  const noteDialogRef = useDialogA11y(newNoteModalOpen, () => setNewNoteModalOpen(false));
+  const scheduleDialogRef = useDialogA11y(scheduleModalOpen, () => setScheduleModalOpen(false));
+  const completeDialogRef = useDialogA11y(completeModalOpen, () => setCompleteModalOpen(false));
+  const aiDialogRef = useDialogA11y(aiModalOpen, () => setAiModalOpen(false));
 
   const handleCopy = async (text, type) => {
     if (!text) return;
@@ -604,7 +613,7 @@ export const LeadDetails = () => {
 
               <div className="lead-info-item">
                 <span className="lead-info-label">Expected Deal Value</span>
-                <span className="lead-info-value" style={{ fontFamily: 'Outfit', fontSize: '1.25rem', color: '#fbbf24' }}>
+                <span className="lead-info-value" style={{ fontFamily: 'Outfit', fontSize: '1.25rem', color: 'var(--warning)' }}>
                   {formatCurrency(lead.expected_value)}
                 </span>
               </div>
@@ -627,7 +636,7 @@ export const LeadDetails = () => {
               {lead.lost_reason && (
                 <div className="lead-info-item" style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
                   <span className="lead-info-label" style={{ color: 'var(--danger)' }}>Lost Reason</span>
-                  <span style={{ fontSize: '0.875rem', color: '#fca5a5' }}>{lead.lost_reason}</span>
+                  <span className="lost-reason-text">{lead.lost_reason}</span>
                 </div>
               )}
             </div>
@@ -636,9 +645,11 @@ export const LeadDetails = () => {
 
         {/* Right Column: Tabbed Communication Notes, Follow-ups, and Activity Timeline */}
         <div className="lead-detail-main">
-          <div className="tabs-navigation">
+          <div className="tabs-navigation" role="tablist" aria-label="Lead detail views">
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === 'notes'}
               className={`tab-btn ${activeTab === 'notes' ? 'tab-btn-active' : ''}`}
               onClick={() => setActiveTab('notes')}
             >
@@ -649,6 +660,8 @@ export const LeadDetails = () => {
 
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === 'followups'}
               className={`tab-btn ${activeTab === 'followups' ? 'tab-btn-active' : ''}`}
               onClick={() => setActiveTab('followups')}
             >
@@ -659,6 +672,8 @@ export const LeadDetails = () => {
 
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === 'handovers'}
               className={`tab-btn ${activeTab === 'handovers' ? 'tab-btn-active' : ''}`}
               onClick={() => setActiveTab('handovers')}
             >
@@ -669,6 +684,8 @@ export const LeadDetails = () => {
 
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === 'timeline'}
               className={`tab-btn ${activeTab === 'timeline' ? 'tab-btn-active' : ''}`}
               onClick={() => setActiveTab('timeline')}
             >
@@ -679,6 +696,8 @@ export const LeadDetails = () => {
 
             <button
               type="button"
+              role="tab"
+              aria-selected={activeTab === 'comments'}
               className={`tab-btn ${activeTab === 'comments' ? 'tab-btn-active' : ''}`}
               onClick={() => setActiveTab('comments')}
             >
@@ -954,10 +973,10 @@ export const LeadDetails = () => {
       {/* Assign Lead Modal */}
       {assignModalOpen && (
         <div className="modal-backdrop" onClick={() => setAssignModalOpen(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-container" ref={assignDialogRef} role="dialog" aria-modal="true" aria-label="Assign lead" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Reassign Lead</h3>
-              <button className="modal-close-btn" onClick={() => setAssignModalOpen(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setAssignModalOpen(false)} aria-label="Close dialog">✕</button>
             </div>
             <div className="modal-body">
               <label className="form-label" htmlFor="reassign-select">Select Sales Representative</label>
@@ -991,10 +1010,10 @@ export const LeadDetails = () => {
       {/* Handover Lead Modal */}
       {handoverModalOpen && (
         <div className="modal-backdrop" onClick={() => setHandoverModalOpen(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+          <div className="modal-container" ref={handoverDialogRef} role="dialog" aria-modal="true" aria-label="Handover lead" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
             <div className="modal-header">
               <h3>Handover Lead</h3>
-              <button className="modal-close-btn" onClick={() => setHandoverModalOpen(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setHandoverModalOpen(false)} aria-label="Close dialog">✕</button>
             </div>
             <form onSubmit={handleConfirmHandover}>
               <div className="modal-body form-layout">
@@ -1063,10 +1082,10 @@ export const LeadDetails = () => {
       {/* Add Note Modal */}
       {newNoteModalOpen && (
         <div className="modal-backdrop" onClick={() => setNewNoteModalOpen(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-container" ref={noteDialogRef} role="dialog" aria-modal="true" aria-label="Add communication note" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Add Communication Note</h3>
-              <button className="modal-close-btn" onClick={() => setNewNoteModalOpen(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setNewNoteModalOpen(false)} aria-label="Close dialog">✕</button>
             </div>
             <form onSubmit={handleAddNote}>
               <div className="modal-body form-layout">
@@ -1113,10 +1132,10 @@ export const LeadDetails = () => {
       {/* Schedule Follow-up Modal */}
       {scheduleModalOpen && (
         <div className="modal-backdrop" onClick={() => setScheduleModalOpen(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-container" ref={scheduleDialogRef} role="dialog" aria-modal="true" aria-label="Schedule follow-up" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Schedule Follow-up</h3>
-              <button className="modal-close-btn" onClick={() => setScheduleModalOpen(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setScheduleModalOpen(false)} aria-label="Close dialog">✕</button>
             </div>
             <form onSubmit={handleScheduleFollowup}>
               <div className="modal-body form-layout">
@@ -1160,7 +1179,7 @@ export const LeadDetails = () => {
       {/* Complete Follow-up / Outcome Modal */}
       {completeModalOpen && (
         <div className="modal-backdrop" onClick={() => setCompleteModalOpen(false)}>
-          <div className="modal-container" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-container" ref={completeDialogRef} role="dialog" aria-modal="true" aria-label="Log follow-up outcome" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 {selectedFollowup?.status === 'COMPLETED' ? (
@@ -1174,7 +1193,7 @@ export const LeadDetails = () => {
                     : 'Complete Follow-up'}
                 </h3>
               </div>
-              <button className="modal-close-btn" onClick={() => setCompleteModalOpen(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setCompleteModalOpen(false)} aria-label="Close dialog">✕</button>
             </div>
             <form onSubmit={handleCompleteFollowup}>
               <div className="modal-body form-layout">
@@ -1243,13 +1262,13 @@ export const LeadDetails = () => {
       {/* AI Synthesis Modal */}
       {aiModalOpen && (
         <div className="modal-backdrop" onClick={() => setAiModalOpen(false)}>
-          <div className="modal-container modal-container-lg" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-container modal-container-lg" ref={aiDialogRef} role="dialog" aria-modal="true" aria-label="AI lead synthesis" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title-row">
                 <Sparkles size={20} color="var(--accent-purple, #7c3aed)" />
                 <h3 style={{ margin: 0 }}>AI Lead Synthesis & Recommendations</h3>
               </div>
-              <button className="modal-close-btn" onClick={() => setAiModalOpen(false)}>✕</button>
+              <button className="modal-close-btn" onClick={() => setAiModalOpen(false)} aria-label="Close dialog">✕</button>
             </div>
             <div className="modal-body">
               {loadingAi ? (

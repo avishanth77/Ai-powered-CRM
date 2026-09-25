@@ -4,7 +4,8 @@ import { leadApi } from '../api/leadApi';
 import { userApi } from '../api/userApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { extractErrorMessage, isValidEmail, isValidPhone } from '../utils/validation';
+import { extractErrorMessage, normalizeServerErrors, isValidEmail, isValidPhone } from '../utils/validation';
+import { FieldError } from '../components/FieldError';
 import { LEAD_PRIORITY } from '../utils/constants';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ConfirmModal } from '../components/ConfirmModal';
@@ -38,6 +39,7 @@ export const LeadEdit = () => {
   const [loadError, setLoadError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+  const [formError, setFormError] = useState(null);
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
 
   const loadData = async () => {
@@ -116,7 +118,10 @@ export const LeadEdit = () => {
       newErrors.email = 'Please enter a valid email address.';
     }
 
-    if (parseFloat(formData.expected_value) < 0) {
+    const expectedNum = parseFloat(formData.expected_value);
+    if (Number.isNaN(expectedNum)) {
+      newErrors.expected_value = 'Please enter a valid deal value.';
+    } else if (expectedNum < 0) {
       newErrors.expected_value = 'Expected value cannot be negative.';
     }
 
@@ -152,7 +157,9 @@ export const LeadEdit = () => {
       const msg = extractErrorMessage(err, 'Failed to update lead.');
       showToast(msg, 'error');
       if (err.response?.data?.errors) {
-        setErrors(err.response.data.errors);
+        const { fieldErrors, summary } = normalizeServerErrors(err.response.data.errors);
+        setErrors(fieldErrors);
+        setFormError(summary.length > 0 ? summary : null);
       }
     } finally {
       setSaving(false);
@@ -208,6 +215,15 @@ export const LeadEdit = () => {
 
       <div className="card" style={{ maxWidth: '840px' }}>
         <form onSubmit={handleSubmit} className="form-layout">
+          {formError && (
+            <div className="toast-item toast-error" role="alert" style={{ marginBottom: '0.5rem' }}>
+              <div className="toast-message">
+                {formError.map((msg, i) => (
+                  <div key={i}>{msg}</div>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="form-grid-2">
             <div className="form-group">
               <label className="form-label form-label-required" htmlFor="edit-name">
@@ -221,8 +237,10 @@ export const LeadEdit = () => {
                 value={formData.name}
                 onChange={handleChange}
                 required
+                aria-invalid={Boolean(errors.name)}
+                aria-describedby={errors.name ? 'edit-name-error' : undefined}
               />
-              {errors.name && <span className="form-error-msg">{errors.name}</span>}
+              <FieldError id="edit-name-error" message={errors.name} />
             </div>
 
             <div className="form-group">
@@ -251,8 +269,10 @@ export const LeadEdit = () => {
                 value={formData.phone}
                 onChange={handleChange}
                 required
+                aria-invalid={Boolean(errors.phone)}
+                aria-describedby={errors.phone ? 'edit-phone-error' : undefined}
               />
-              {errors.phone && <span className="form-error-msg">{errors.phone}</span>}
+              <FieldError id="edit-phone-error" message={errors.phone} />
             </div>
 
             <div className="form-group">
@@ -264,8 +284,10 @@ export const LeadEdit = () => {
                 className="form-control"
                 value={formData.email}
                 onChange={handleChange}
+                aria-invalid={Boolean(errors.email)}
+                aria-describedby={errors.email ? 'edit-email-error' : undefined}
               />
-              {errors.email && <span className="form-error-msg">{errors.email}</span>}
+              <FieldError id="edit-email-error" message={errors.email} />
             </div>
           </div>
 
@@ -316,6 +338,8 @@ export const LeadEdit = () => {
                 value={formData.stage}
                 onChange={handleChange}
                 required
+                aria-invalid={Boolean(errors.stage)}
+                aria-describedby={errors.stage ? 'edit-stage-error' : undefined}
               >
                 {stages.map((st) => (
                   <option key={st.id} value={st.id}>
@@ -323,7 +347,7 @@ export const LeadEdit = () => {
                   </option>
                 ))}
               </select>
-              {errors.stage && <span className="form-error-msg">{errors.stage}</span>}
+              <FieldError id="edit-stage-error" message={errors.stage} />
             </div>
 
             <div className="form-group">
@@ -337,8 +361,10 @@ export const LeadEdit = () => {
                 className="form-control"
                 value={formData.expected_value}
                 onChange={handleChange}
+                aria-invalid={Boolean(errors.expected_value)}
+                aria-describedby={errors.expected_value ? 'edit-value-error' : undefined}
               />
-              {errors.expected_value && <span className="form-error-msg">{errors.expected_value}</span>}
+              <FieldError id="edit-value-error" message={errors.expected_value} />
             </div>
           </div>
 
@@ -375,8 +401,10 @@ export const LeadEdit = () => {
                 onChange={handleChange}
                 placeholder="Specify why the deal was lost..."
                 required
+                aria-invalid={Boolean(errors.lost_reason)}
+                aria-describedby={errors.lost_reason ? 'edit-lost-reason-error' : undefined}
               />
-              {errors.lost_reason && <span className="form-error-msg">{errors.lost_reason}</span>}
+              <FieldError id="edit-lost-reason-error" message={errors.lost_reason} />
             </div>
           )}
 

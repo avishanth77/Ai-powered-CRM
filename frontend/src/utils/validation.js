@@ -27,6 +27,22 @@ export function extractErrorMessage(error, defaultMessage = 'An unexpected error
   return error.message || defaultMessage;
 }
 
+// Split a DRF error payload into per-field messages plus a form-level
+// summary for keys that belong to no rendered field (non_field_errors…).
+export function normalizeServerErrors(errors) {
+  const fieldErrors = {};
+  const summary = [];
+  if (!errors || typeof errors !== 'object') return { fieldErrors, summary };
+  for (const [key, value] of Object.entries(errors)) {
+    const text = Array.isArray(value) ? value.join(', ') : String(value);
+    if (['non_field_errors', 'detail', 'message'].includes(key)) {
+      summary.push(text);
+    } else {
+      fieldErrors[key] = text;
+    }
+  }
+  return { fieldErrors, summary };
+}
 // Blob-aware variant for endpoints requested with responseType: 'blob'
 // (e.g. CSV exports) where error payloads also arrive as Blobs.
 export async function extractBlobErrorMessage(error, defaultMessage = 'An unexpected error occurred') {

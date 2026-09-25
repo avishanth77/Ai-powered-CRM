@@ -267,6 +267,7 @@ export const Calendar = () => {
             className="calendar-nav-btn"
             onClick={handlePrev}
             title="Previous"
+            aria-label="Previous period"
           >
             <ChevronLeft size={18} />
           </button>
@@ -274,6 +275,7 @@ export const Calendar = () => {
             type="button"
             className="calendar-today-btn"
             onClick={handleToday}
+            aria-label="Go to today"
           >
             Today
           </button>
@@ -282,6 +284,7 @@ export const Calendar = () => {
             className="calendar-nav-btn"
             onClick={handleNext}
             title="Next"
+            aria-label="Next period"
           >
             <ChevronRight size={18} />
           </button>
@@ -297,6 +300,7 @@ export const Calendar = () => {
               value={selectedUser}
               onChange={(e) => setSelectedUser(e.target.value)}
               title="Filter by Team Member"
+              aria-label="Filter by team member"
             >
               <option value="">All Team Members</option>
               {teamMembers.map((m) => (
@@ -313,6 +317,7 @@ export const Calendar = () => {
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
             title="Filter by Status"
+            aria-label="Filter by status"
           >
             <option value="ALL">All Statuses</option>
             <option value="PENDING">Scheduled (Pending)</option>
@@ -326,6 +331,7 @@ export const Calendar = () => {
             value={selectedPurpose}
             onChange={(e) => setSelectedPurpose(e.target.value)}
             title="Filter by Type"
+            aria-label="Filter by event type"
           >
             <option value="ALL">All Event Types</option>
             {FOLLOWUP_PURPOSES.map((p) => (
@@ -336,9 +342,11 @@ export const Calendar = () => {
           </select>
 
           {/* View Mode Toggle */}
-          <div className="calendar-view-toggle">
+          <div className="calendar-view-toggle" role="tablist" aria-label="Calendar view">
             <button
               type="button"
+              role="tab"
+              aria-selected={currentView === 'month'}
               className={`calendar-view-btn ${currentView === 'month' ? 'active' : ''}`}
               onClick={() => setCurrentView('month')}
             >
@@ -346,6 +354,8 @@ export const Calendar = () => {
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={currentView === 'week'}
               className={`calendar-view-btn ${currentView === 'week' ? 'active' : ''}`}
               onClick={() => setCurrentView('week')}
             >
@@ -353,6 +363,8 @@ export const Calendar = () => {
             </button>
             <button
               type="button"
+              role="tab"
+              aria-selected={currentView === 'day'}
               className={`calendar-view-btn ${currentView === 'day' ? 'active' : ''}`}
               onClick={() => setCurrentView('day')}
             >
@@ -403,7 +415,17 @@ export const Calendar = () => {
                 <div
                   key={idx}
                   className={`month-cell ${!cell.isCurrentMonth ? 'outside-month' : ''} ${cell.isToday ? 'is-today' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${cell.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}${cell.events.length > 0 ? `, ${cell.events.length} scheduled event${cell.events.length > 1 ? 's' : ''}` : ''}`}
+                  aria-current={cell.isToday ? 'date' : undefined}
                   onClick={() => handleCellClick(cell.dateStr)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleCellClick(cell.dateStr);
+                    }
+                  }}
                 >
                   <div className="month-cell-header">
                     <span className="month-date-number">{cell.dayNum}</span>
@@ -419,9 +441,19 @@ export const Calendar = () => {
                       <div
                         key={ev.id}
                         className={`calendar-event-chip ${ev.status.toLowerCase()} ${ev.is_overdue ? 'overdue' : ''}`}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`View event: ${ev.title}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedEvent(ev);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setSelectedEvent(ev);
+                          }
                         }}
                         title={ev.title}
                       >
@@ -434,10 +466,21 @@ export const Calendar = () => {
                     {cell.events.length > 3 && (
                       <div
                         className="calendar-more-events"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`Show all ${cell.events.length} events for this day`}
                         onClick={(e) => {
                           e.stopPropagation();
                           setCurrentDate(cell.date);
                           setCurrentView('day');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setCurrentDate(cell.date);
+                            setCurrentView('day');
+                          }
                         }}
                       >
                         +{cell.events.length - 3} more
@@ -455,7 +498,17 @@ export const Calendar = () => {
               <div
                 key={idx}
                 className={`week-column ${col.isToday ? 'is-today' : ''}`}
+                role="button"
+                tabIndex={0}
+                aria-label={`${col.date.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' })}${col.events.length > 0 ? `, ${col.events.length} scheduled event${col.events.length > 1 ? 's' : ''}` : ''}`}
+                aria-current={col.isToday ? 'date' : undefined}
                 onClick={() => handleCellClick(col.dateStr)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleCellClick(col.dateStr);
+                  }
+                }}
               >
                 <div className="week-column-header">
                   <div className="week-column-day-name">{col.dayName}</div>
@@ -472,9 +525,19 @@ export const Calendar = () => {
                       <div
                         key={ev.id}
                         className={`calendar-event-chip ${ev.status.toLowerCase()} ${ev.is_overdue ? 'overdue' : ''}`}
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`View event: ${ev.title}`}
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedEvent(ev);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setSelectedEvent(ev);
+                          }
                         }}
                         style={{ padding: '6px 10px', fontSize: '0.76rem' }}
                       >

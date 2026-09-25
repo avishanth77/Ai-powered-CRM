@@ -1,8 +1,15 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Compass, ArrowLeft } from 'lucide-react';
 
 export const NotFound = () => {
+  useEffect(() => {
+    const prev = document.title;
+    document.title = '404 — Page Not Found';
+    return () => {
+      document.title = prev;
+    };
+  }, []);
   return (
     <div className="auth-page-container">
       <div className="auth-card" style={{ textAlign: 'center' }}>

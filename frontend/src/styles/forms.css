@@ -79,7 +79,7 @@ textarea.form-textarea {
 
 .form-error-msg {
   font-size: 0.75rem;
-  color: #f87171;
+  color: var(--danger);
   margin-top: 0.25rem;
 }
 
