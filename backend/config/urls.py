@@ -58,6 +58,7 @@ urlpatterns = [
     path('api/follow-ups/', include('followups.urls')),
     path('api/activity/', include('activity.urls')),
     path('api/reports/', include('reports.urls')),
+    path('api/notifications/', include('notifications.urls')),
 
     # Email Testing Endpoint
     path('api/email/test/', EmailTestView.as_view(), name='email-test'),

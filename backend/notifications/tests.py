@@ -125,3 +125,108 @@ class NotificationModelAndServiceTests(TestCase):
         self.assertEqual(notif.recipient, self.user1)
         self.assertEqual(notif.notification_type, Notification.NotificationType.LEAD_HANDED_OVER)
         self.assertIn('Territory realignment', notif.message)
+
+
+from rest_framework.test import APITestCase
+from rest_framework import status
+
+
+class NotificationAPITests(APITestCase):
+    def setUp(self):
+        self.user1 = User.objects.create_user(
+            email='alice@crmlite.local',
+            password='password123',
+            first_name='Alice',
+            last_name='Cooper',
+            role=User.Role.EXECUTIVE
+        )
+        self.user2 = User.objects.create_user(
+            email='bob@crmlite.local',
+            password='password123',
+            first_name='Bob',
+            last_name='Builder',
+            role=User.Role.MANAGER
+        )
+        self.notif_user1_a = Notification.objects.create(
+            recipient=self.user1,
+            actor=self.user2,
+            notification_type=Notification.NotificationType.LEAD_ASSIGNED,
+            title='Lead 1 Assigned',
+            message='Lead 1 assigned to Alice',
+            is_read=False
+        )
+        self.notif_user1_b = Notification.objects.create(
+            recipient=self.user1,
+            actor=self.user2,
+            notification_type=Notification.NotificationType.LEAD_STAGE_CHANGED,
+            title='Stage Changed',
+            message='Stage changed for Lead 2',
+            is_read=False
+        )
+        self.notif_user2 = Notification.objects.create(
+            recipient=self.user2,
+            actor=self.user1,
+            notification_type=Notification.NotificationType.SYSTEM,
+            title='System Alert',
+            message='Alert for Bob',
+            is_read=False
+        )
+
+    def test_unauthenticated_requests_blocked(self):
+        resp = self.client.get('/api/notifications/')
+        self.assertEqual(resp.status_code, status.HTTP_401_UNAUTHORIZED)
+
+    def test_list_notifications_user_scoped(self):
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get('/api/notifications/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        results = resp.data.get('results', resp.data)
+        ids = [item['id'] for item in results]
+        self.assertIn(self.notif_user1_a.id, ids)
+        self.assertIn(self.notif_user1_b.id, ids)
+        self.assertNotIn(self.notif_user2.id, ids)
+
+    def test_unread_count_api(self):
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get('/api/notifications/unread-count/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data.get('count'), 2)
+
+    def test_mark_as_read_api(self):
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.patch(f'/api/notifications/{self.notif_user1_a.id}/read/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.notif_user1_a.refresh_from_db()
+        self.assertTrue(self.notif_user1_a.is_read)
+        self.assertIsNotNone(self.notif_user1_a.read_at)
+
+    def test_cannot_access_or_modify_other_user_notification(self):
+        self.client.force_authenticate(user=self.user1)
+        # Trying to read Bob's notification
+        resp = self.client.patch(f'/api/notifications/{self.notif_user2.id}/read/')
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+        # Trying to delete Bob's notification
+        resp = self.client.delete(f'/api/notifications/{self.notif_user2.id}/')
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_mark_all_read_api(self):
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.patch('/api/notifications/mark-all-read/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data.get('updated_count'), 2)
+
+        # Verify in DB
+        self.notif_user1_a.refresh_from_db()
+        self.notif_user1_b.refresh_from_db()
+        self.notif_user2.refresh_from_db()
+        self.assertTrue(self.notif_user1_a.is_read)
+        self.assertTrue(self.notif_user1_b.is_read)
+        self.assertFalse(self.notif_user2.is_read)
+
+    def test_delete_own_notification(self):
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.delete(f'/api/notifications/{self.notif_user1_a.id}/')
+        self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+        self.assertFalse(Notification.objects.filter(id=self.notif_user1_a.id).exists())
+
