@@ -28,6 +28,7 @@ from activity.serializers import ActivityLogSerializer
 from customers.models import Customer
 from customers.serializers import CustomerSerializer
 from .services import send_lead_stage_update_email
+from notifications.services import NotificationService
 
 User = get_user_model()
 
@@ -255,6 +256,11 @@ def ensure_customer_for_won_lead(lead, user=None):
         performed_by=user,
         notes=f"Customer record created from Won Lead #{lead.id} ({customer.name})"
     )
+    NotificationService.notify_customer_conversion(
+        customer=customer,
+        lead=lead,
+        actor=user
+    )
     return customer
 
 
@@ -314,6 +320,12 @@ class LeadViewSet(viewsets.ModelViewSet):
             performed_by=self.request.user,
             notes=f"Lead created by {self.request.user.get_full_name() or self.request.user.email}"
         )
+        if lead.assigned_to:
+            NotificationService.notify_lead_assigned(
+                lead=lead,
+                assignee=lead.assigned_to,
+                actor=self.request.user
+            )
         if lead.stage and (lead.stage.slug == 'won' or lead.stage.name.lower() == 'won'):
             ensure_customer_for_won_lead(lead, self.request.user)
 
@@ -349,6 +361,12 @@ class LeadViewSet(viewsets.ModelViewSet):
             transaction.on_commit(
                 lambda l=lead, os=old_stage, ns=lead.stage: send_lead_stage_update_email(lead=l, old_stage=os, new_stage=ns)
             )
+            NotificationService.notify_stage_change(
+                lead=lead,
+                old_stage=old_stage,
+                new_stage=lead.stage,
+                actor=self.request.user
+            )
 
         # Assignment change logging
         if old_assigned != lead.assigned_to:
@@ -362,6 +380,12 @@ class LeadViewSet(viewsets.ModelViewSet):
                 performed_by=self.request.user,
                 notes=f"Assigned to {lead.assigned_to.get_full_name() if lead.assigned_to else 'None'}"
             )
+            if lead.assigned_to:
+                NotificationService.notify_lead_assigned(
+                    lead=lead,
+                    assignee=lead.assigned_to,
+                    actor=self.request.user
+                )
 
         # General update logging if no specific change logged
         if old_stage == lead.stage and old_assigned == lead.assigned_to:
@@ -502,6 +526,12 @@ class LeadViewSet(viewsets.ModelViewSet):
             notes=f"Lead assigned to {new_user.get_full_name() or new_user.email}"
         )
 
+        NotificationService.notify_lead_assigned(
+            lead=lead,
+            assignee=new_user,
+            actor=user
+        )
+
         return Response({
             'success': True,
             'message': f'Lead assigned to {new_user.get_full_name() or new_user.email}.',
@@ -560,6 +590,14 @@ class LeadViewSet(viewsets.ModelViewSet):
                 new_value={'assigned_to': new_name, 'user_id': new_user.id, 'reason': reason},
                 performed_by=user,
                 notes=f"Lead handed over from {old_name} to {new_name}. Reason: {reason}"
+            )
+
+            NotificationService.notify_lead_handed_over(
+                lead=lead,
+                new_assignee=new_user,
+                old_assignee=old_user,
+                handed_over_by=user,
+                reason=reason
             )
 
         return Response({
@@ -637,6 +675,13 @@ class LeadViewSet(viewsets.ModelViewSet):
                     new_value={'assigned_to': new_name, 'user_id': new_user.id, 'reason': reason},
                     performed_by=user,
                     notes=f"Lead handed over from {old_name} to {new_name}. Reason: {reason}"
+                )
+                NotificationService.notify_lead_handed_over(
+                    lead=lead,
+                    new_assignee=new_user,
+                    old_assignee=old_user,
+                    handed_over_by=user,
+                    reason=reason
                 )
                 updated_count += 1
 

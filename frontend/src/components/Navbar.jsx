@@ -5,6 +5,7 @@ import { getInitials } from '../utils/formatters';
 import { ROLE_LABELS } from '../utils/constants';
 import { LogOut, User as UserIcon, Menu, Shield, Bell, Sun, Moon } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { NotificationBell } from './NotificationBell';
 
 export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0 }) => {
   const { user, logout } = useAuth();
@@ -49,12 +50,8 @@ export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0 }) => {
           <span className="theme-toggle-text">{isDark ? 'Light Mode' : 'Dark Mode'}</span>
         </button>
 
-        {overdueCount > 0 && (
-          <Link to="/follow-ups" className="navbar-alert-link" title={`${overdueCount} Overdue Follow-ups`}>
-            <Bell size={18} />
-            <span className="alert-count-pill">{overdueCount}</span>
-          </Link>
-        )}
+        {/* Live Notification Center Bell */}
+        <NotificationBell />
 
         <div className={`navbar-role-pill ${getRoleBadgeClass()}`}>
           <Shield size={13} />

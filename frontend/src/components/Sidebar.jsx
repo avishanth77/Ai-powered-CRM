@@ -12,6 +12,8 @@ import {
   Settings,
   X,
   Compass,
+  Calendar,
+  Bell,
 } from 'lucide-react';
 
 export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
@@ -37,6 +39,12 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
       show: true,
     },
     {
+      label: 'Calendar',
+      path: '/calendar',
+      icon: Calendar,
+      show: true,
+    },
+    {
       label: isExecutive ? 'My Follow-ups' : 'Follow-ups',
       path: '/follow-ups',
       icon: Clock,
@@ -59,6 +67,12 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
       path: '/users',
       icon: UserCog,
       show: isAdmin || isManager,
+    },
+    {
+      label: 'Notifications',
+      path: '/notifications',
+      icon: Bell,
+      show: true,
     },
     {
       label: 'Settings',

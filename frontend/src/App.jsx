@@ -23,6 +23,7 @@ import { CustomerDetails } from './pages/CustomerDetails';
 import { Reports } from './pages/Reports';
 import { Users } from './pages/Users';
 import { Settings } from './pages/Settings';
+import { Notifications } from './pages/Notifications';
 import { NotFound } from './pages/NotFound';
 
 import './styles/global.css';
@@ -33,6 +34,7 @@ import './styles/pipeline.css';
 import './styles/forms.css';
 import './styles/modal.css';
 import './styles/responsive.css';
+import './styles/notifications.css';
 
 
 const AppLayout = () => {
@@ -106,6 +108,7 @@ export default function App() {
                   }
                 />
                 <Route path="settings" element={<Settings />} />
+                <Route path="notifications" element={<Notifications />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>

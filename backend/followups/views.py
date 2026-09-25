@@ -11,6 +11,7 @@ from .permissions import FollowUpPermission
 from .filters import FollowUpFilter
 from activity.services import log_activity
 from activity.models import ActivityLog
+from notifications.services import NotificationService
 
 class FollowUpViewSet(viewsets.ModelViewSet):
     """
@@ -65,6 +66,10 @@ class FollowUpViewSet(viewsets.ModelViewSet):
             performed_by=self.request.user,
             notes=f"Scheduled {followup.purpose} for {followup.follow_up_at:%Y-%m-%d %H:%M}"
         )
+        NotificationService.notify_followup_created(
+            followup=followup,
+            actor=self.request.user
+        )
 
     def perform_update(self, serializer):
         followup = serializer.save()
@@ -107,6 +112,10 @@ class FollowUpViewSet(viewsets.ModelViewSet):
             performed_by=request.user,
             notes=f"Completed {followup.purpose}. Outcome: {followup.outcome}"
         )
+        NotificationService.notify_followup_completed(
+            followup=followup,
+            actor=request.user
+        )
 
         # Handle optional next follow-up
         next_followup_data = None
@@ -120,6 +129,10 @@ class FollowUpViewSet(viewsets.ModelViewSet):
                 follow_up_at=next_date,
                 purpose=next_purpose,
                 status=FollowUp.Status.PENDING
+            )
+            NotificationService.notify_followup_created(
+                followup=next_fu,
+                actor=request.user
             )
             next_followup_data = FollowUpSerializer(next_fu).data
 
