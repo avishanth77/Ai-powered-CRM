@@ -107,7 +107,7 @@ export const Customers = () => {
       </div>
 
       {/* Metric Summary Cards */}
-      <div className="leads-summary-grid" style={{ gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', marginBottom: '1.25rem' }}>
+      <div className="leads-summary-grid cols-3" style={{ marginBottom: '1.25rem' }}>
         {/* Total Accounts */}
         <div
           className={`lead-summary-card summary-card-accent-blue ${originFilter === '' ? 'summary-card-active' : ''}`}
@@ -286,7 +286,7 @@ export const Customers = () => {
             <tbody>
               {customers.map((cust) => (
                 <tr key={cust.id}>
-                  <td>
+                  <td className="table-truncate-cell">
                     <div className="lead-name-cell">
                       <Link to={`/customers/${cust.id}`} className="lead-primary-name">
                         {cust.name}
@@ -296,7 +296,7 @@ export const Customers = () => {
                       </span>
                     </div>
                   </td>
-                  <td>
+                  <td className="table-truncate-cell">
                     <div className="lead-contact-cell">
                       <span className="contact-item">
                         <Phone size={13} className="text-dim" /> {cust.phone || '—'}

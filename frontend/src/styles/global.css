@@ -832,8 +832,10 @@ button, input, select, textarea {
 
 .toast-message {
   flex: 1;
+  min-width: 0;
   font-size: 0.875rem;
   color: var(--text-main);
+  overflow-wrap: anywhere;
 }
 
 .toast-close {

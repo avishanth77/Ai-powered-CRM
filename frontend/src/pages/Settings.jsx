@@ -416,7 +416,7 @@ export const Settings = () => {
             </button>
           </div>
 
-          <div className="table-responsive">
+          <div className="table-responsive embedded">
             <table className="crm-table">
               <thead>
                 <tr>

@@ -230,7 +230,7 @@ export const Reports = () => {
           <div className="chart-card-header">
             <h3 className="chart-title"><Users size={18} /> Representative Performance Report</h3>
           </div>
-          <div className="table-responsive">
+          <div className="table-responsive embedded">
             <table className="crm-table">
               <thead>
                 <tr>
@@ -278,7 +278,7 @@ export const Reports = () => {
       )}
 
       {/* Summary KPI Cards */}
-      <div className="dashboard-stats-grid">
+      <div className="dashboard-stats-grid cols-4">
         <div className="kpi-card">
           <span className="kpi-label">Expected Revenue</span>
           <div className="kpi-value" style={{ color: '#fbbf24' }}>

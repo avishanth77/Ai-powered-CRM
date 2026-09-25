@@ -422,7 +422,7 @@ export const CalendarScheduleModal = ({ initialDate, onClose, onSuccess }) => {
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: '10px' }}>
+              <div className="schedule-datetime-grid">
                 <div>
                   <input
                     type="date"

@@ -143,7 +143,7 @@ export const Users = () => {
                       </span>
                     </div>
                   </td>
-                  <td>
+                  <td className="table-truncate-cell">
                     <span className="contact-item">
                       <Mail size={13} className="text-dim" /> {u.email}
                     </span>

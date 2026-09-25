@@ -390,6 +390,7 @@
 .dropdown-email {
   font-size: 0.75rem;
   color: var(--text-dim);
+  overflow-wrap: anywhere;
 }
 
 .dropdown-divider {

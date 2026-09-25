@@ -811,7 +811,7 @@ export const Leads = () => {
                       />
                     </td>
                   )}
-                  <td>
+                  <td className="table-truncate-cell">
                     <div className="lead-name-cell">
                       <Link to={`/leads/${lead.id}`} className="lead-primary-name">
                         {lead.name}
@@ -821,7 +821,7 @@ export const Leads = () => {
                       </span>
                     </div>
                   </td>
-                  <td>
+                  <td className="table-truncate-cell">
                     <div className="lead-contact-cell">
                       <span className="contact-item">
                         <Phone size={13} className="text-dim" /> {lead.phone}

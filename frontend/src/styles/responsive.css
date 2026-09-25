@@ -60,11 +60,43 @@
   .leads-bottom-grid {
     grid-template-columns: 1fr;
   }
+  /* Kanban columns keep a usable width and scroll instead of clipping */
+  .pipeline-board.fit-screen .pipeline-column {
+    flex: 0 0 240px;
+    min-width: 240px;
+  }
+
+  /* Tablet navbar: trim the role pill and theme-toggle text early so the
+     breadcrumb + bell + avatar never squeeze between 769–1024px */
+  .navbar-role-pill {
+    display: none;
+  }
+
+  .theme-toggle-text {
+    display: none;
+  }
+
+  .navbar-theme-toggle-btn {
+    padding: 0.375rem;
+  }
 }
 
 @media (max-width: 768px) {
   :root {
     --navbar-height: 60px;
+  }
+
+  .navbar-breadcrumb {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  /* Inner page containers stack on .page-container padding — reduce them */
+  .calendar-page-container,
+  .notifications-page-container {
+    padding: 0;
   }
 
   .main-sidebar {
@@ -103,17 +135,8 @@
     padding: 0 1rem;
   }
 
-  .user-details-compact, .navbar-role-pill {
+  .user-details-compact {
     display: none;
-  }
-
-  .theme-toggle-text {
-    display: none;
-  }
-
-  .navbar-theme-toggle-btn {
-    padding: 0.375rem;
-    border-radius: var(--radius-full);
   }
 
   .filter-toolbar {
@@ -141,8 +164,7 @@
 }
 
 /* Small phones: compact the navbar so nothing overflows 375px */
-@media (max-width: 480px) {
-  .navbar-portal-title,
+@media (max-width: 480px) {  .navbar-portal-title,
   .navbar-divider {
     display: none;
   }
@@ -170,6 +192,10 @@
 
   .summary-card-value {
     font-size: 1.5rem;
+  }
+
+  .schedule-datetime-grid {
+    grid-template-columns: 1fr;
   }
 }
 

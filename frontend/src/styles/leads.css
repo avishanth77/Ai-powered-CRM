@@ -239,9 +239,17 @@
 /* Lead Detail View */
 .lead-detail-layout {
   display: grid;
-  grid-template-columns: 360px 1fr;
+  grid-template-columns: 360px minmax(0, 1fr);
   gap: 1.5rem;
   align-items: start;
+}
+
+.lead-detail-layout > * {
+  min-width: 0;
+}
+
+.lead-detail-main {
+  min-width: 0;
 }
 
 .lead-profile-sidebar {
@@ -275,6 +283,7 @@
 .lead-info-value {
   color: var(--text-main);
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 /* Tabs Navigation */
@@ -282,6 +291,9 @@
   display: flex;
   gap: 0.5rem;
   border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
   margin-bottom: 1.5rem;
 }
 
@@ -297,6 +309,8 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 0;
+  white-space: nowrap;
   transition: all var(--transition-fast);
 }
 
@@ -433,6 +447,7 @@
   font-size: 0.875rem;
   color: var(--text-main);
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   line-height: 1.5;
 }
 
@@ -446,6 +461,11 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 1rem;
   margin-bottom: 1.25rem;
+}
+
+/* 3-card summary strips (e.g. Customers) that wrap naturally at small widths */
+.leads-summary-grid.cols-3 {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
 .lead-summary-card {
