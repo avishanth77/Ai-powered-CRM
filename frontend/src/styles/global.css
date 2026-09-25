@@ -347,6 +347,12 @@ button, input, select, textarea {
   border-radius: var(--radius-sm);
 }
 
+.btn-xs {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.75rem;
+  border-radius: var(--radius-sm);
+}
+
 .btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
@@ -385,6 +391,44 @@ button, input, select, textarea {
   width: 6px;
   height: 6px;
   border-radius: 50%;
+}
+
+/* Generic badge pills (calendar, notifications, settings chips) */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.badge-primary {
+  color: var(--info);
+  background-color: var(--info-bg);
+  border-color: var(--border-strong);
+}
+
+.badge-success {
+  color: var(--success);
+  background-color: var(--success-bg);
+  border-color: var(--border-strong);
+}
+
+.badge-danger {
+  color: var(--danger);
+  background-color: var(--danger-bg);
+  border-color: var(--border-strong);
+}
+
+.badge-neutral {
+  color: var(--text-muted);
+  background-color: var(--bg-surface-elevated);
+  border-color: var(--border-subtle);
 }
 
 /* Table Design */
