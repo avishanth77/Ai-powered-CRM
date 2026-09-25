@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { leadApi } from '../api/leadApi';
 import { followupApi } from '../api/followupApi';
 import { userApi } from '../api/userApi';
@@ -18,6 +18,8 @@ import { PriorityBadge } from '../components/PriorityBadge';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { LostReasonModal } from '../components/LostReasonModal';
+import { InternalCommentsSection } from '../components/InternalCommentsSection';
+import '../styles/comments.css';
 
 import {
   ArrowLeft,
@@ -25,6 +27,7 @@ import {
   UserCheck,
   CalendarPlus,
   MessageSquarePlus,
+  MessageSquare,
   Clock,
   Activity,
   Phone,
@@ -48,12 +51,13 @@ import {
 export const LeadDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, canAssignLeads, canConvertLeads, canHandoverLeads } = useAuth();
   const { showToast } = useToast();
 
   const [lead, setLead] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('notes'); // notes | followups | handovers | timeline
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'notes'); // notes | followups | handovers | timeline | comments
 
   // Data for tabs & dropdowns
   const [stages, setStages] = useState([]);
@@ -661,6 +665,18 @@ export const LeadDetails = () => {
               <span>Activity Audit Trail</span>
               <span className="tab-badge">{timeline.length}</span>
             </button>
+
+            <button
+              type="button"
+              className={`tab-btn ${activeTab === 'comments' ? 'tab-btn-active' : ''}`}
+              onClick={() => setActiveTab('comments')}
+            >
+              <MessageSquare size={16} />
+              <span>Internal Discussion</span>
+              <span className="tab-badge" style={{ background: 'rgba(124, 58, 237, 0.15)', color: 'var(--accent-purple)' }}>
+                Team
+              </span>
+            </button>
           </div>
 
           {/* TAB 1: Communication Notes */}
@@ -889,6 +905,13 @@ export const LeadDetails = () => {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* TAB 5: Internal Team Discussion & Mentions */}
+          {activeTab === 'comments' && (
+            <div>
+              <InternalCommentsSection leadId={lead.id} />
             </div>
           )}
         </div>

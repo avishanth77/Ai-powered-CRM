@@ -292,20 +292,26 @@ class NotificationService:
             )
 
     @classmethod
-    def notify_mention(cls, mentioned_user, actor, lead, comment_text, comment_id=None):
+    def notify_mention(cls, mentioned_user=None, actor=None, lead=None, comment_text=None, comment_id=None, comment=None):
         """
         Notifies a user when they are @mentioned in an internal team comment.
         """
+        if comment:
+            lead = lead or comment.lead
+            actor = actor or comment.author
+            comment_text = comment_text or comment.content
+            comment_id = comment_id or comment.id
+
         if not mentioned_user:
             return None
 
         actor_name = actor.get_full_name() or actor.email if actor else "A team member"
-        lead_name = lead.name if hasattr(lead, 'name') else f"Lead #{lead.id if hasattr(lead, 'id') else ''}"
+        lead_name = lead.name if hasattr(lead, 'name') else f"Lead #{getattr(lead, 'id', '')}"
 
-        title = f"You were mentioned by {actor_name}"
-        snippet = f'"{comment_text[:120]}..."' if len(comment_text) > 120 else f'"{comment_text}"'
+        title = f"{actor_name} mentioned you in a comment"
+        snippet = f'"{comment_text[:120]}..."' if comment_text and len(comment_text) > 120 else f'"{comment_text or ""}"'
         message = f"{actor_name} mentioned you in an internal comment on {lead_name}: {snippet}"
-        action_url = f"/leads/{lead.id}?tab=comments"
+        action_url = f"/leads/{lead.id}?tab=comments" if lead else "/leads"
 
         return cls.create_notification(
             recipient=mentioned_user,
@@ -313,26 +319,37 @@ class NotificationService:
             title=title,
             message=message,
             entity_type='lead',
-            entity_id=lead.id,
+            entity_id=getattr(lead, 'id', None),
             action_url=action_url,
             actor=actor,
             priority=Notification.Priority.HIGH
         )
 
     @classmethod
-    def notify_internal_comment(cls, lead, actor, comment_text, comment_id=None):
+    def notify_internal_comment(cls, lead=None, actor=None, comment_text=None, comment_id=None, comment=None, parent_comment=None, recipient=None):
         """
-        Notifies the lead assignee when another team member adds an internal comment.
+        Notifies the lead assignee or parent comment author when another team member adds/replies with an internal comment.
         """
-        recipient = getattr(lead, 'assigned_to', None)
+        if comment:
+            lead = lead or comment.lead
+            actor = actor or comment.author
+            comment_text = comment_text or comment.content
+            comment_id = comment_id or comment.id
+            if parent_comment and not recipient:
+                recipient = parent_comment.author
+
+        if not recipient and lead:
+            recipient = getattr(lead, 'assigned_to', None)
+
         if not recipient or (actor and recipient.id == actor.id):
             return None
 
         actor_name = actor.get_full_name() or actor.email if actor else "A team member"
-        title = f"New Internal Comment on {lead.name}"
-        snippet = f'"{comment_text[:120]}..."' if len(comment_text) > 120 else f'"{comment_text}"'
-        message = f"{actor_name} commented on your lead {lead.name}: {snippet}"
-        action_url = f"/leads/{lead.id}?tab=comments"
+        lead_name = getattr(lead, 'name', f"Lead #{getattr(lead, 'id', '')}") if lead else "Lead"
+        title = f"New Internal Comment from {actor_name}"
+        snippet = f'"{comment_text[:120]}..."' if comment_text and len(comment_text) > 120 else f'"{comment_text or ""}"'
+        message = f"{actor_name} commented on {lead_name}: {snippet}"
+        action_url = f"/leads/{lead.id}?tab=comments" if lead else "/leads"
 
         return cls.create_notification(
             recipient=recipient,
@@ -340,7 +357,7 @@ class NotificationService:
             title=title,
             message=message,
             entity_type='lead',
-            entity_id=lead.id,
+            entity_id=getattr(lead, 'id', None),
             action_url=action_url,
             actor=actor
         )

@@ -26,6 +26,7 @@ from accounts.views import (
 from leads.views import LeadStageViewSet
 from leads.views_email import EmailTestView
 from followups.views_calendar import CalendarEventsView
+from leads.views_comments import InternalCommentDetailView, MentionSuggestionsView
 
 # Top-level API router for Users
 user_router = DefaultRouter()
@@ -46,6 +47,10 @@ urlpatterns = [
     path('api/auth/change-password/', ChangePasswordView.as_view(), name='auth-change-password'),
     path('api/auth/forgot-password/', ForgotPasswordView.as_view(), name='auth-forgot-password'),
     path('api/auth/reset-password/', ResetPasswordView.as_view(), name='auth-reset-password'),
+
+    # Mention Suggestions & Comments
+    path('api/users/mention-suggestions/', MentionSuggestionsView.as_view(), name='mention-suggestions'),
+    path('api/comments/<int:pk>/', InternalCommentDetailView.as_view(), name='root-comment-detail'),
 
     # System Users Management
     path('api/users/', include(user_router.urls)),

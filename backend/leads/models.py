@@ -232,3 +232,66 @@ class LeadHandover(models.Model):
         new = self.new_assignee.get_full_name() if self.new_assignee else 'None'
         return f"Handover for Lead #{self.lead_id}: {prev} -> {new}"
 
+
+class InternalComment(models.Model):
+    """
+    Internal discussion system for team members on leads.
+    Completely separated from customer communication notes (LeadNote).
+    Supports threaded replies, editing, soft-deletion, and mentions.
+    """
+    lead = models.ForeignKey(
+        Lead,
+        on_delete=models.CASCADE,
+        related_name='internal_comments'
+    )
+    author = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='internal_comments'
+    )
+    parent = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='replies'
+    )
+    content = models.TextField()
+    is_edited = models.BooleanField(default=False)
+    is_deleted = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Internal Comment'
+        verbose_name_plural = 'Internal Comments'
+
+    def __str__(self):
+        return f"Comment #{self.id} on Lead #{self.lead_id} by {self.author}"
+
+
+class CommentMention(models.Model):
+    """
+    Tracks internal @mentions within comments for active team members.
+    """
+    comment = models.ForeignKey(
+        InternalComment,
+        on_delete=models.CASCADE,
+        related_name='mentions'
+    )
+    mentioned_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='comment_mentions'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ('comment', 'mentioned_user')
+        verbose_name = 'Comment Mention'
+        verbose_name_plural = 'Comment Mentions'
+
+    def __str__(self):
+        return f"Mention of {self.mentioned_user} in Comment #{self.comment_id}"
+
