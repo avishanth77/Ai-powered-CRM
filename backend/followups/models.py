@@ -43,6 +43,7 @@ class FollowUp(models.Model):
     follow_up_at = models.DateTimeField(db_index=True)
     purpose = models.CharField(max_length=50, choices=Purpose.choices, default=Purpose.PHONE_CALL)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True)
+    notes = models.TextField(blank=True, null=True)
     outcome = models.TextField(blank=True, null=True)
     completed_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)

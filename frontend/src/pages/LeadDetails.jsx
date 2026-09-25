@@ -16,6 +16,7 @@ import {
 import { StatusBadge } from '../components/StatusBadge';
 import { PriorityBadge } from '../components/PriorityBadge';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { EmptyState } from '../components/EmptyState';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { LostReasonModal } from '../components/LostReasonModal';
 import { InternalCommentsSection } from '../components/InternalCommentsSection';
@@ -35,10 +36,8 @@ import {
   Building2,
   MapPin,
   CheckCircle2,
-  XCircle,
   Share2,
   User,
-  ShieldCheck,
   Send,
   Sparkles,
   Bot,
@@ -108,9 +107,18 @@ export const LeadDetails = () => {
   const [copiedAction, setCopiedAction] = useState(false);
   const [copiedSummary, setCopiedSummary] = useState(false);
 
-  const handleCopy = (text, type) => {
+  const handleCopy = async (text, type) => {
     if (!text) return;
-    navigator.clipboard?.writeText(text);
+    if (!navigator.clipboard?.writeText) {
+      showToast('Copy is not supported in this browser.', 'warning');
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      showToast('Copy failed — clipboard access was blocked.', 'error');
+      return;
+    }
     if (type === 'action') {
       setCopiedAction(true);
       setTimeout(() => setCopiedAction(false), 2000);
@@ -157,31 +165,34 @@ export const LeadDetails = () => {
     } catch {}
   }, []);
 
+  // Normalize list-shaped responses; a non-array payload must not blank the page.
+  const asList = (value) => (Array.isArray(value) ? value : []);
+
   const fetchNotes = useCallback(async () => {
     try {
       const res = await leadApi.getNotes(id);
-      setNotes(res.data || res);
+      setNotes(asList(res.data ?? res));
     } catch {}
   }, [id]);
 
   const fetchTimeline = useCallback(async () => {
     try {
       const res = await leadApi.getTimeline(id);
-      setTimeline(res.data || res);
+      setTimeline(asList(res.data ?? res));
     } catch {}
   }, [id]);
 
   const fetchFollowups = useCallback(async () => {
     try {
       const res = await followupApi.getFollowUps({ lead: id });
-      setFollowups(res.results || res);
+      setFollowups(asList(res.results ?? res));
     } catch {}
   }, [id]);
 
   const fetchHandovers = useCallback(async () => {
     try {
       const res = await leadApi.getLeadHandovers(id);
-      setHandovers(res.data || (Array.isArray(res) ? res : []));
+      setHandovers(asList(res.data ?? res));
     } catch {}
   }, [id]);
 
@@ -194,14 +205,17 @@ export const LeadDetails = () => {
     fetchHandovers();
 
     if (canAssignLeads || canHandoverLeads) {
-      userApi.getUsers().then((res) => setUsersList(res.results || res)).catch(() => {});
+      userApi.getUsers().then((res) => setUsersList(asList(res.results ?? res))).catch(() => {});
     }
   }, [fetchLeadDetails, fetchStages, fetchNotes, fetchTimeline, fetchFollowups, fetchHandovers, canAssignLeads, canHandoverLeads]);
 
   // Handle Quick Stage Change
   const handleStageChange = async (newStageId) => {
     const targetStageObj = stages.find((s) => s.id === parseInt(newStageId));
-    if (!targetStageObj) return;
+    if (!targetStageObj) {
+      showToast('Could not update stage — the stage list is unavailable.', 'error');
+      return;
+    }
     const isLost = targetStageObj.slug === 'lost' || targetStageObj.name.toLowerCase() === 'lost';
 
     if (isLost) {
@@ -479,9 +493,10 @@ export const LeadDetails = () => {
             className="btn btn-secondary"
             onClick={handleOpenAiSummary}
             title="Generate AI Lead Analysis"
+            disabled={loadingAi}
           >
             <Sparkles size={16} color="#c084fc" />
-            <span>AI Synthesis</span>
+            <span>{loadingAi ? 'Analyzing…' : 'AI Synthesis'}</span>
           </button>
 
           <Link to={`/leads/${id}/edit`} className="btn btn-secondary">
@@ -513,7 +528,11 @@ export const LeadDetails = () => {
                 value={lead.stage || lead.stage_details?.id || ''}
                 onChange={(e) => handleStageChange(e.target.value)}
                 aria-label="Change Lead Stage"
+                disabled={stages.length === 0}
               >
+                {lead.stage_details && !stages.some((s) => s.id === lead.stage_details.id) && (
+                  <option value={lead.stage_details.id}>{lead.stage_details.name}</option>
+                )}
                 {stages.map((st) => (
                   <option key={st.id} value={st.id}>
                     {st.name}
@@ -559,11 +578,11 @@ export const LeadDetails = () => {
                   )}
                 </div>
               </div>
-              <div className="lead-info-item">
+                <div className="lead-info-item">
                 <span className="lead-info-label">Phone</span>
                 <span className="lead-info-value contact-item">
                   <Phone size={14} className="text-dim" />
-                  <a href={`tel:${lead.phone}`}>{lead.phone}</a>
+                  {lead.phone ? <a href={`tel:${lead.phone}`}>{lead.phone}</a> : '—'}
                 </span>
               </div>
 
@@ -593,14 +612,6 @@ export const LeadDetails = () => {
               <div className="lead-info-item">
                 <span className="lead-info-label">Lead Source</span>
                 <span className="lead-info-value">{lead.source_details?.name || 'N/A'}</span>
-              </div>
-
-              <div className="lead-info-item">
-                <span className="lead-info-label">Assigned Representative</span>
-                <span className="lead-info-value contact-item">
-                  <User size={14} className="text-dim" />
-                  {lead.assigned_to_details?.full_name || lead.assigned_to_details?.email || 'Unassigned'}
-                </span>
               </div>
 
               {lead.address && (
@@ -1343,7 +1354,15 @@ export const LeadDetails = () => {
                     </p>
                   </div>
                 </div>
-              ) : null}
+              ) : (
+                <EmptyState
+                  icon={Sparkles}
+                  title="Summary unavailable"
+                  message="The AI summary could not be generated. Please try again."
+                  actionLabel="Retry"
+                  onAction={handleOpenAiSummary}
+                />
+              )}
             </div>
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={() => setAiModalOpen(false)}>Close</button>

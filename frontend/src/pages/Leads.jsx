@@ -94,6 +94,7 @@ export const Leads = () => {
   const [importModalOpen, setImportModalOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
 
   const [scheduleModalOpen, setScheduleModalOpen] = useState(false);
   const [scheduling, setScheduling] = useState(false);
@@ -272,6 +273,10 @@ export const Leads = () => {
   };
 
   // Pipeline stage click filter
+  // Stage keys use the uppercase-with-underscores form ('NEW', 'DEMO_SCHEDULED'),
+  // matching the report API and the <select> option values below.
+  const normalizeStageKey = (value) => (value || '').toUpperCase().replace(/[- ]/g, '_');
+
   const handleStageClick = (stageKey) => {
     if (statusFilter === stageKey) {
       setStatusFilter(''); // Toggle off
@@ -356,22 +361,70 @@ export const Leads = () => {
     }
   };
 
-  // Import Leads Simulation
-  const handleImportSubmit = (e) => {
+  // Import Leads via CSV upload
+  const MAX_IMPORT_SIZE = 10 * 1024 * 1024;
+
+  const handleImportFile = (file) => {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.csv')) {
+      showToast('Invalid file type. Please select a .csv file.', 'error');
+      return;
+    }
+    if (file.size > MAX_IMPORT_SIZE) {
+      showToast('File is too large. Maximum allowed size is 10MB.', 'error');
+      return;
+    }
+    setImportResult(null);
+    setSelectedFile(file);
+  };
+
+  const handleDownloadTemplate = () => {
+    const headers = ['Name', 'Phone', 'Email', 'Company', 'Source', 'Priority', 'Expected Value', 'Address'];
+    const rows = [
+      ['Aarav Sharma', '+919876543210', 'aarav@example.com', 'Apex Traders', 'Website', 'HIGH', '75000', 'Mumbai'],
+      ['Sara Khan', '+919123456780', 'sara@example.com', 'Bright Retail', 'Referral', 'MEDIUM', '25000', 'Delhi'],
+    ];
+    const escapeCell = (cell) => `"${String(cell).replace(/"/g, '""')}"`;
+    const csv = [headers, ...rows].map((r) => r.map(escapeCell).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'crm_lite_leads_import_template.csv';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    showToast('Sample template downloaded!', 'info');
+  };
+
+  const handleImportSubmit = async (e) => {
     e.preventDefault();
     if (!selectedFile) {
       showToast('Please select a valid CSV file to import.', 'warning');
       return;
     }
     setImporting(true);
-    setTimeout(() => {
-      setImporting(false);
-      setImportModalOpen(false);
-      setSelectedFile(null);
-      showToast(`Successfully processed "${selectedFile.name}"! 8 leads parsed.`, 'success');
+    setImportResult(null);
+    try {
+      const res = await leadApi.importLeads(selectedFile);
+      const data = res.data || { imported: 0, skipped: 0, total: 0, errors: [] };
+      setImportResult(data);
+      showToast(
+        res.message || `Imported ${data.imported || 0} lead(s).`,
+        data.skipped ? 'warning' : 'success'
+      );
       fetchLeads();
       fetchKpis();
-    }, 1200);
+      if (!data.skipped) {
+        setImportModalOpen(false);
+        setSelectedFile(null);
+      }
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'CSV import failed'), 'error');
+    } finally {
+      setImporting(false);
+    }
   };
 
   // Dynamic KPI numbers with realistic defaults
@@ -380,8 +433,10 @@ export const Leads = () => {
   const priorityCharts = kpis?.charts?.by_priority || [];
 
   const totalLeadsCount = kpiData.total_leads ?? totalCount ?? leads.length;
-  const newLeadsCount = kpiData.new_leads ?? leads.filter((l) => l.status === 'NEW').length;
-  const qualifiedLeadsCount = kpiData.qualified_leads ?? leads.filter((l) => l.status === 'QUALIFIED').length;
+  // `lead.status` is serialized as the stage *name*; normalize via the stage slug.
+  const leadStageKey = (l) => normalizeStageKey(l.stage_details?.slug || l.status);
+  const newLeadsCount = kpiData.new_leads ?? leads.filter((l) => leadStageKey(l) === 'NEW').length;
+  const qualifiedLeadsCount = kpiData.qualified_leads ?? leads.filter((l) => leadStageKey(l) === 'QUALIFIED').length;
   const highPriorityCount =
     priorityCharts.find((p) => p.priority === 'HIGH')?.count ??
     leads.filter((l) => l.priority === 'HIGH').length;
@@ -391,7 +446,7 @@ export const Leads = () => {
   const getStageCount = (stageKey) => {
     const found = statusCharts.find((s) => s.status === stageKey);
     if (found) return found.count;
-    return leads.filter((l) => l.status === stageKey).length;
+    return leads.filter((l) => leadStageKey(l) === stageKey).length;
   };
 
   const pipelineStages = [
@@ -406,7 +461,7 @@ export const Leads = () => {
     if (action.includes('CONVERT')) return <CheckCircle2 size={14} color="#10b981" />;
     if (action.includes('CREATE')) return <UserPlus size={14} color="#06b6d4" />;
     if (action.includes('STATUS')) return <TrendingUp size={14} color="#3b82f6" />;
-    if (action.includes('FOLLOWUP')) return <Clock size={14} color="#f59e0b" />;
+    if (action.includes('FOLLOW_UP')) return <Clock size={14} color="#f59e0b" />;
     return <Activity size={14} color="var(--primary)" />;
   };
 
@@ -611,7 +666,7 @@ export const Leads = () => {
               <option value="">All Stages</option>
               {stages.length > 0 ? (
                 stages.map((st) => (
-                  <option key={st.id} value={st.slug || st.name}>
+                  <option key={st.id} value={normalizeStageKey(st.slug || st.name)}>
                     {st.name}
                   </option>
                 ))
@@ -931,11 +986,11 @@ export const Leads = () => {
                     <p className="activity-compact-text">{act.notes}</p>
                     <div className="activity-compact-meta">
                       <span>{formatDateTime(act.created_at)}</span>
-                      {act.performed_by_name && (
+                      {act.performer_name && (
                         <>
                           <span>•</span>
                           <span style={{ color: 'var(--primary-light)', fontWeight: 600 }}>
-                            {act.performed_by_name}
+                            {act.performer_name}
                           </span>
                         </>
                       )}
@@ -1039,9 +1094,23 @@ export const Leads = () => {
                   Bulk upload prospective contacts, company details, phone numbers, and initial stages.
                 </p>
 
-                <div
+                <label
+                  htmlFor="csv-file-input"
                   className="import-drop-zone"
-                  onClick={() => document.getElementById('csv-file-input').click()}
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Select a CSV file to import"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      document.getElementById('csv-file-input').click();
+                    }
+                  }}
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    if (e.dataTransfer.files?.[0]) handleImportFile(e.dataTransfer.files[0]);
+                  }}
                 >
                   <FileSpreadsheet size={36} className="import-drop-icon" />
                   <div>
@@ -1060,21 +1129,56 @@ export const Leads = () => {
                     accept=".csv"
                     style={{ display: 'none' }}
                     onChange={(e) => {
-                      if (e.target.files?.[0]) setSelectedFile(e.target.files[0]);
+                      handleImportFile(e.target.files?.[0]);
+                      e.target.value = '';
                     }}
                   />
-                </div>
+                </label>
 
                 <div
                   className="import-template-download"
-                  onClick={() => {
-                    reportApi.downloadExportCsv();
-                    showToast('Sample template downloaded!', 'info');
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Download sample CSV template"
+                  onClick={handleDownloadTemplate}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      handleDownloadTemplate();
+                    }
                   }}
                 >
                   <Download size={14} />
                   <span>Download Sample Leads CSV Template</span>
                 </div>
+
+                {importResult && (
+                  <div
+                    role="status"
+                    style={{
+                      padding: '0.875rem 1rem',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      border: '1px solid var(--border-subtle)',
+                      fontSize: '0.875rem',
+                      color: 'var(--text-main)',
+                    }}
+                  >
+                    <strong>
+                      Imported {importResult.imported} of {importResult.total} lead(s).
+                      {importResult.skipped > 0 && ` ${importResult.skipped} row(s) skipped.`}
+                    </strong>
+                    {importResult.errors?.length > 0 && (
+                      <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', color: 'var(--danger)', fontSize: '0.8125rem' }}>
+                        {importResult.errors.map((rowErr, i) => (
+                          <li key={`${rowErr.row}-${i}`}>
+                            Row {rowErr.row}: {rowErr.message}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => setImportModalOpen(false)}>

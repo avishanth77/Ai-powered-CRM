@@ -491,6 +491,27 @@ export const FollowUps = () => {
                     {selectedFollowup?.status}
                   </span>
                 </div>
+                {selectedFollowup?.notes && (
+                  <div
+                    style={{
+                      padding: '0.75rem 1rem',
+                      borderRadius: 'var(--radius-md)',
+                      backgroundColor: 'var(--bg-surface-elevated)',
+                      border: '1px solid var(--border-subtle)',
+                      marginBottom: '0.5rem',
+                    }}
+                  >
+                    <p
+                      className="text-dim font-sm"
+                      style={{ margin: '0 0 0.25rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                    >
+                      Agenda / Notes
+                    </p>
+                    <p style={{ margin: 0, color: 'var(--text-main)', overflowWrap: 'anywhere', whiteSpace: 'pre-wrap' }}>
+                      {selectedFollowup.notes}
+                    </p>
+                  </div>
+                )}
                 <div className="form-group">
                   <label className="form-label form-label-required" htmlFor="modal-outcome">
                     Result & Next Step Summary

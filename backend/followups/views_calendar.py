@@ -125,6 +125,7 @@ class CalendarEventsView(APIView):
                 'status': fu.status,
                 'purpose': fu.purpose,
                 'outcome': fu.outcome,
+                'notes': fu.notes,
                 'is_overdue': is_overdue,
                 'lead': lead_data,
                 'customer': customer_data,

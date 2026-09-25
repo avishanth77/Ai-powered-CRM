@@ -54,3 +54,21 @@ export function getInitials(name) {
   }
   return name.slice(0, 2).toUpperCase();
 }
+
+// Local-timezone YYYY-MM-DD key (avoids the UTC day-shift of toISOString().slice(0,10))
+export function toLocalDateKey(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return '';
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// Local-timezone value for <input type="datetime-local"> (YYYY-MM-DDTHH:mm)
+export function toLocalDateTimeInput(date) {
+  const d = date instanceof Date ? date : new Date(date);
+  if (isNaN(d.getTime())) return '';
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${toLocalDateKey(d)}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}

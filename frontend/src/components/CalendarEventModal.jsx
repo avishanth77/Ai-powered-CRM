@@ -3,28 +3,27 @@ import { useNavigate } from 'react-router-dom';
 import {
   X,
   Calendar,
-  Clock,
   User,
   Building,
   Phone,
   Mail,
   CheckCircle2,
   CalendarClock,
-  Ban,
   ExternalLink,
   AlertCircle
 } from 'lucide-react';
 import { calendarApi } from '../api/calendarApi';
+import { toLocalDateTimeInput } from '../utils/formatters';
 import { useToast } from '../context/ToastContext';
 
 export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
   const navigate = useNavigate();
-  const { addToast } = useToast();
+  const { showToast } = useToast();
 
   const [mode, setMode] = useState('view'); // 'view', 'complete', 'reschedule'
   const [outcome, setOutcome] = useState('');
   const [newDateTime, setNewDateTime] = useState(
-    event?.start ? new Date(event.start).toISOString().slice(0, 16) : ''
+    event?.start ? toLocalDateTimeInput(event.start) : ''
   );
   const [submitting, setSubmitting] = useState(false);
 
@@ -33,18 +32,18 @@ export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
   const handleComplete = async (e) => {
     e.preventDefault();
     if (!outcome.trim()) {
-      addToast('Please provide an outcome or notes for this follow-up.', 'error');
+      showToast('Please provide an outcome or notes for this follow-up.', 'error');
       return;
     }
     setSubmitting(true);
     try {
       await calendarApi.completeEvent(event.id, { outcome: outcome.trim() });
-      addToast('Event marked as completed!', 'success');
+      showToast('Event marked as completed!', 'success');
       onRefresh();
       onClose();
     } catch (err) {
       console.error('Failed to complete event:', err);
-      addToast(err.response?.data?.message || 'Failed to complete follow-up.', 'error');
+      showToast(err.response?.data?.message || 'Failed to complete follow-up.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -53,18 +52,18 @@ export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
   const handleReschedule = async (e) => {
     e.preventDefault();
     if (!newDateTime) {
-      addToast('Please select a new date and time.', 'error');
+      showToast('Please select a new date and time.', 'error');
       return;
     }
     setSubmitting(true);
     try {
       await calendarApi.updateEvent(event.id, { follow_up_at: new Date(newDateTime).toISOString() });
-      addToast('Event rescheduled successfully!', 'success');
+      showToast('Event rescheduled successfully!', 'success');
       onRefresh();
       onClose();
     } catch (err) {
       console.error('Failed to reschedule event:', err);
-      addToast(err.response?.data?.message || 'Failed to reschedule follow-up.', 'error');
+      showToast(err.response?.data?.message || 'Failed to reschedule follow-up.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -75,12 +74,12 @@ export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
     setSubmitting(true);
     try {
       await calendarApi.cancelEvent(event.id);
-      addToast('Event cancelled.', 'info');
+      showToast('Event cancelled.', 'info');
       onRefresh();
       onClose();
     } catch (err) {
       console.error('Failed to cancel event:', err);
-      addToast('Failed to cancel event.', 'error');
+      showToast('Failed to cancel event.', 'error');
     } finally {
       setSubmitting(false);
     }
@@ -174,6 +173,25 @@ export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
                         <span>{event.lead?.email || event.customer?.email}</span>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Agenda / Notes */}
+              {event.notes && (
+                <div className="calendar-modal-field">
+                  <div className="calendar-modal-label">Agenda / Notes</div>
+                  <div
+                    className="calendar-modal-value"
+                    style={{
+                      background: 'var(--bg-surface-elevated)',
+                      padding: '10px',
+                      borderRadius: '6px',
+                      whiteSpace: 'pre-wrap',
+                      overflowWrap: 'anywhere',
+                    }}
+                  >
+                    {event.notes}
                   </div>
                 </div>
               )}

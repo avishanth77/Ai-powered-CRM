@@ -17,7 +17,7 @@ import { getInitials } from '../utils/formatters';
 
 export const InternalCommentsSection = ({ leadId }) => {
   const { user, isAdmin, isManager } = useAuth();
-  const { addToast } = useToast();
+  const { showToast } = useToast();
 
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,9 +72,9 @@ export const InternalCommentsSection = ({ leadId }) => {
         mentioned_user_ids,
       });
       setComments((prev) => [...prev, created]);
-      addToast('Internal comment posted', 'success');
+      showToast('Internal comment posted', 'success');
     } catch (err) {
-      addToast(err.response?.data?.message || 'Failed to post comment', 'error');
+      showToast(err.response?.data?.message || 'Failed to post comment', 'error');
       throw err;
     }
   };
@@ -89,9 +89,9 @@ export const InternalCommentsSection = ({ leadId }) => {
       });
       setComments((prev) => [...prev, created]);
       setReplyingToId(null);
-      addToast('Reply posted', 'success');
+      showToast('Reply posted', 'success');
     } catch (err) {
-      addToast(err.response?.data?.message || 'Failed to post reply', 'error');
+      showToast(err.response?.data?.message || 'Failed to post reply', 'error');
       throw err;
     }
   };
@@ -107,9 +107,9 @@ export const InternalCommentsSection = ({ leadId }) => {
         prev.map((c) => (c.id === commentId ? updated : c))
       );
       setEditingCommentId(null);
-      addToast('Comment updated', 'success');
+      showToast('Comment updated', 'success');
     } catch (err) {
-      addToast(err.response?.data?.message || 'Failed to update comment', 'error');
+      showToast(err.response?.data?.message || 'Failed to update comment', 'error');
       throw err;
     }
   };
@@ -126,9 +126,9 @@ export const InternalCommentsSection = ({ leadId }) => {
             : c
         )
       );
-      addToast('Comment deleted', 'info');
+      showToast('Comment deleted', 'info');
     } catch (err) {
-      addToast('Failed to delete comment', 'error');
+      showToast('Failed to delete comment', 'error');
     }
   };
 

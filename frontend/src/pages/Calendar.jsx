@@ -4,19 +4,18 @@ import {
   ChevronRight,
   Plus,
   Filter,
-  Calendar as CalendarIcon,
-  Clock,
-  CheckCircle,
-  AlertCircle
+  Calendar as CalendarIcon
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { calendarApi } from '../api/calendarApi';
 import { userApi } from '../api/userApi';
+import { toLocalDateKey } from '../utils/formatters';
+import { FOLLOWUP_PURPOSES } from '../utils/constants';
 import { CalendarEventModal } from '../components/CalendarEventModal';
 import { CalendarScheduleModal } from '../components/CalendarScheduleModal';
 
 export const Calendar = () => {
-  const { user, isAdmin, isManager } = useAuth();
+  const { isAdmin, isManager } = useAuth();
   const canFilterUsers = isAdmin || isManager;
 
   // View state: 'month', 'week', 'day'
@@ -61,6 +60,7 @@ export const Calendar = () => {
       const startBuffer = new Date(year, month, 1 - firstDay.getDay());
       // Month end: last day of month plus buffer days to fill 42 cells
       const endBuffer = new Date(year, month, 42 - firstDay.getDay());
+      endBuffer.setHours(23, 59, 59, 999);
 
       return {
         rangeStart: startBuffer.toISOString(),
@@ -163,7 +163,7 @@ export const Calendar = () => {
   const eventsByDate = useMemo(() => {
     const map = {};
     events.forEach((ev) => {
-      const dateKey = new Date(ev.start).toISOString().slice(0, 10);
+      const dateKey = toLocalDateKey(new Date(ev.start));
       if (!map[dateKey]) map[dateKey] = [];
       map[dateKey].push(ev);
     });
@@ -189,7 +189,7 @@ export const Calendar = () => {
     // 42 cells (6 rows x 7 cols)
     for (let i = 0; i < 42; i++) {
       const cellDate = new Date(year, month, 1 - startDayOfWeek + i);
-      const dateStr = cellDate.toISOString().slice(0, 10);
+      const dateStr = toLocalDateKey(cellDate);
       const isCurrentMonth = cellDate.getMonth() === month;
       const isToday = cellDate.toDateString() === new Date().toDateString();
 
@@ -216,7 +216,7 @@ export const Calendar = () => {
     for (let i = 0; i < 7; i++) {
       const d = new Date(sunday);
       d.setDate(sunday.getDate() + i);
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = toLocalDateKey(d);
       days.push({
         date: d,
         dateStr,
@@ -245,7 +245,7 @@ export const Calendar = () => {
           className="btn btn-primary"
           style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
           onClick={() => {
-            setScheduleModalDate(new Date().toISOString().slice(0, 10));
+            setScheduleModalDate(toLocalDateKey(new Date()));
             setIsScheduleOpen(true);
           }}
         >
@@ -324,11 +324,11 @@ export const Calendar = () => {
             title="Filter by Type"
           >
             <option value="ALL">All Event Types</option>
-            <option value="meeting">Meetings</option>
-            <option value="call">Phone Calls</option>
-            <option value="demo">Product Demos</option>
-            <option value="email">Emails</option>
-            <option value="follow_up">General Follow-ups</option>
+            {FOLLOWUP_PURPOSES.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
           </select>
 
           {/* View Mode Toggle */}
@@ -489,7 +489,7 @@ export const Calendar = () => {
                   className="btn btn-secondary"
                   style={{ marginTop: '8px' }}
                   onClick={() => {
-                    setScheduleModalDate(currentDate.toISOString().slice(0, 10));
+                    setScheduleModalDate(toLocalDateKey(currentDate));
                     setIsScheduleOpen(true);
                   }}
                 >

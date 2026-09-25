@@ -1,11 +1,14 @@
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework import parsers
 from django.db import transaction
 from django.db.models import Count, Q
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from drf_spectacular.utils import extend_schema, OpenApiParameter
+import csv
+import io
 
 from .models import Lead, LeadStage, LeadSource, LeadNote, LeadHandover
 from .serializers import (
@@ -690,6 +693,152 @@ class LeadViewSet(viewsets.ModelViewSet):
             'message': f"Successfully handed over {updated_count} lead(s) to {new_name}.",
             'updated_count': updated_count
         })
+
+    @action(
+        detail=False,
+        methods=['post'],
+        url_path='import',
+        parser_classes=[parsers.MultiPartParser, parsers.FormParser],
+    )
+    def import_leads(self, request):
+        """
+        Bulk Lead Import API:
+        Accepts a CSV file upload and creates leads row by row.
+        Expected columns (case-insensitive): Name, Phone, Email, Company,
+        Source, Priority, Expected Value, Address.
+        Rows that fail validation are skipped and reported per row.
+        """
+        upload = request.FILES.get('file')
+        if not upload:
+            return Response({
+                'success': False,
+                'message': 'No CSV file was provided. Attach the file as "file".'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if not upload.name.lower().endswith('.csv'):
+            return Response({
+                'success': False,
+                'message': 'Invalid file type. Please upload a .csv file.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        max_size = 10 * 1024 * 1024
+        if upload.size > max_size:
+            return Response({
+                'success': False,
+                'message': 'File is too large. Maximum allowed size is 10MB.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            text = upload.read().decode('utf-8-sig')
+        except (UnicodeDecodeError, ValueError):
+            return Response({
+                'success': False,
+                'message': 'Could not read the file. Please upload a UTF-8 encoded CSV.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        reader = csv.DictReader(io.StringIO(text))
+        if not reader.fieldnames:
+            return Response({
+                'success': False,
+                'message': 'The CSV is empty or missing a header row.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        header_aliases = {
+            'name': 'name',
+            'phone': 'phone',
+            'email': 'email',
+            'company': 'company_name',
+            'company name': 'company_name',
+            'company_name': 'company_name',
+            'source': 'source',
+            'lead source': 'source',
+            'priority': 'priority',
+            'expected value': 'expected_value',
+            'expected_value': 'expected_value',
+            'expectedvalue': 'expected_value',
+            'value': 'expected_value',
+            'address': 'address',
+        }
+        column_map = {}
+        for header in reader.fieldnames:
+            key = (header or '').strip().lower()
+            if key in header_aliases:
+                column_map[header] = header_aliases[key]
+
+        if 'name' not in column_map.values() or 'phone' not in column_map.values():
+            return Response({
+                'success': False,
+                'message': 'The CSV must contain at least "Name" and "Phone" columns.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        rows = list(reader)
+        max_rows = 1000
+        if len(rows) > max_rows:
+            return Response({
+                'success': False,
+                'message': f'Too many rows. Maximum {max_rows} leads per import.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        imported = 0
+        skipped = 0
+        row_errors = []
+
+        for index, row in enumerate(rows, start=2):  # header is row 1
+            values = {}
+            for header, field in column_map.items():
+                cell = row.get(header)
+                values[field] = cell.strip() if isinstance(cell, str) else cell
+
+            if not any(values.values()):
+                continue  # silently skip blank rows
+
+            if values.get('source'):
+                source = LeadSource.objects.filter(name__iexact=values['source']).first()
+                if not source:
+                    skipped += 1
+                    row_errors.append({
+                        'row': index,
+                        'message': f"Source '{values['source']}' was not found. Create it first or leave it blank."
+                    })
+                    continue
+                values['source'] = source.id
+            else:
+                values.pop('source', None)
+
+            if values.get('priority'):
+                values['priority'] = values['priority'].upper()
+            else:
+                values.pop('priority', None)
+
+            for optional in ('email', 'company_name', 'address', 'expected_value'):
+                if not values.get(optional):
+                    values.pop(optional, None)
+
+            serializer = LeadCreateUpdateSerializer(
+                data=values, context={'request': request}
+            )
+            if serializer.is_valid():
+                serializer.save()
+                imported += 1
+            else:
+                skipped += 1
+                messages = []
+                for field, field_errors in serializer.errors.items():
+                    detail = '; '.join(str(e) for e in field_errors)
+                    messages.append(f'{field}: {detail}')
+                row_errors.append({'row': index, 'message': ' | '.join(messages)})
+
+        total = imported + skipped
+        return Response({
+            'success': True,
+            'message': f'Imported {imported} of {total} lead(s).' + (f' {skipped} row(s) skipped.' if skipped else ''),
+            'data': {
+                'imported': imported,
+                'skipped': skipped,
+                'total': total,
+                'errors': row_errors[:50],
+            }
+        }, status=status.HTTP_200_OK)
 
     @action(detail=True, methods=['get'], url_path='handovers')
     def handovers(self, request, pk=None):

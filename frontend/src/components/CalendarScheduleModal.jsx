@@ -16,11 +16,14 @@ import {
 } from 'lucide-react';
 import { leadApi } from '../api/leadApi';
 import { calendarApi } from '../api/calendarApi';
+import { toLocalDateKey } from '../utils/formatters';
 import { useToast } from '../context/ToastContext';
 
+// `id` values are the backend FollowUp.Purpose choices — they are sent verbatim,
+// so they must match the server-side choice values exactly.
 const EVENT_PURPOSES = [
   {
-    id: 'meeting',
+    id: 'Meeting',
     label: 'Meeting',
     sub: 'Client sync / video',
     icon: Users,
@@ -28,7 +31,7 @@ const EVENT_PURPOSES = [
     bg: 'rgba(2, 132, 199, 0.08)'
   },
   {
-    id: 'call',
+    id: 'Phone Call',
     label: 'Phone Call',
     sub: 'Direct audio call',
     icon: PhoneCall,
@@ -36,7 +39,7 @@ const EVENT_PURPOSES = [
     bg: 'rgba(5, 150, 105, 0.08)'
   },
   {
-    id: 'demo',
+    id: 'Demo',
     label: 'Product Demo',
     sub: 'Platform walkthrough',
     icon: MonitorPlay,
@@ -44,7 +47,7 @@ const EVENT_PURPOSES = [
     bg: 'rgba(124, 58, 237, 0.08)'
   },
   {
-    id: 'email',
+    id: 'Email',
     label: 'Email Follow-up',
     sub: 'Proposal / check-in',
     icon: Mail,
@@ -52,7 +55,7 @@ const EVENT_PURPOSES = [
     bg: 'rgba(217, 119, 6, 0.08)'
   },
   {
-    id: 'follow_up',
+    id: 'Other',
     label: 'General Task',
     sub: 'Action item reminder',
     icon: CheckSquare,
@@ -62,18 +65,22 @@ const EVENT_PURPOSES = [
 ];
 
 export const CalendarScheduleModal = ({ initialDate, onClose, onSuccess }) => {
-  const { addToast } = useToast();
+  const { showToast } = useToast();
 
   const [leads, setLeads] = useState([]);
   const [loadingLeads, setLoadingLeads] = useState(true);
   const [leadSearch, setLeadSearch] = useState('');
 
   // Initial date computation
-  const baseDate = initialDate || new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  const baseDate = initialDate || (() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return toLocalDateKey(d);
+  })();
   const [selectedDate, setSelectedDate] = useState(baseDate);
   const [selectedTime, setSelectedTime] = useState('10:00');
 
-  const [selectedPurpose, setSelectedPurpose] = useState('meeting');
+  const [selectedPurpose, setSelectedPurpose] = useState('Meeting');
   const [selectedLeadId, setSelectedLeadId] = useState('');
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -113,7 +120,7 @@ export const CalendarScheduleModal = ({ initialDate, onClose, onSuccess }) => {
   const handleDatePreset = (daysOffset) => {
     const d = new Date();
     d.setDate(d.getDate() + daysOffset);
-    setSelectedDate(d.toISOString().slice(0, 10));
+    setSelectedDate(toLocalDateKey(d));
   };
 
   const handleNextMonday = () => {
@@ -121,13 +128,13 @@ export const CalendarScheduleModal = ({ initialDate, onClose, onSuccess }) => {
     const day = d.getDay();
     const diff = d.getDate() + ((7 - day + 1) % 7 || 7);
     d.setDate(diff);
-    setSelectedDate(d.toISOString().slice(0, 10));
+    setSelectedDate(toLocalDateKey(d));
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedLeadId) {
-      addToast('Please select a target lead for this event.', 'error');
+      showToast('Please select a target lead for this event.', 'error');
       return;
     }
 
@@ -142,12 +149,12 @@ export const CalendarScheduleModal = ({ initialDate, onClose, onSuccess }) => {
         notes: notes.trim() || undefined,
       });
 
-      addToast('Calendar event scheduled successfully!', 'success');
+      showToast('Calendar event scheduled successfully!', 'success');
       onSuccess();
       onClose();
     } catch (err) {
       console.error('Failed to schedule event:', err);
-      addToast(
+      showToast(
         err.response?.data?.message ||
           err.response?.data?.non_field_errors?.[0] ||
           'Failed to schedule event.',

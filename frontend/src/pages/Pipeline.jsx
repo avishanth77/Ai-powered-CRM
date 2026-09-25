@@ -1,22 +1,21 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { leadApi } from '../api/leadApi';
-import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatCurrency, getInitials } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
-import { LEAD_STATUS, LEAD_STATUS_CONFIG } from '../utils/constants';
+import { LEAD_STATUS_CONFIG } from '../utils/constants';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { PriorityBadge } from '../components/PriorityBadge';
 import { LostReasonModal } from '../components/LostReasonModal';
 import { Kanban, Plus, ChevronLeft, ChevronRight, LayoutGrid, GripVertical } from 'lucide-react';
 
 export const Pipeline = () => {
-  const { user } = useAuth();
   const { showToast } = useToast();
 
   const [pipelineData, setPipelineData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [movingLeadId, setMovingLeadId] = useState(null);
   const [lostModalData, setLostModalData] = useState(null);
   const [lostSubmitting, setLostSubmitting] = useState(false);
@@ -37,7 +36,10 @@ export const Pipeline = () => {
 
   // Dynamic stages loaded from pipeline endpoint
   const allStages = pipelineData ? Object.keys(pipelineData) : [];
-  const midpoint = Math.ceil(allStages.length / 2) || 4;
+  const midpoint = allStages.length === 0 ? 0 : Math.ceil(allStages.length / 2);
+
+  // Pipeline keys are lowercase slugs; LEAD_STATUS_CONFIG uses uppercase keys.
+  const normalizeStatusKey = (value) => (value || '').toUpperCase().replace(/-/g, '_');
 
   const visibleStages =
     stagePage === 0
@@ -47,12 +49,18 @@ export const Pipeline = () => {
       : allStages;
 
   const fetchPipeline = async () => {
+    setLoading(true);
+    setError(null);
     try {
       const res = await leadApi.getPipeline();
       if (res.success && res.data) {
         setPipelineData(res.data);
+        setColumnPages({});
+      } else {
+        setError('No pipeline data was returned.');
       }
     } catch (err) {
+      setError(extractErrorMessage(err, 'Failed to fetch pipeline stages'));
       showToast(extractErrorMessage(err, 'Failed to fetch pipeline stages'), 'error');
     } finally {
       setLoading(false);
@@ -85,7 +93,6 @@ export const Pipeline = () => {
     const targetStageObj = pipelineData ? pipelineData[targetStage] : null;
     const targetStageId = targetStageObj?.id;
     const isLost =
-      targetStage === LEAD_STATUS.LOST ||
       targetStage === 'lost' ||
       targetStageObj?.label?.toLowerCase() === 'lost';
 
@@ -359,6 +366,18 @@ export const Pipeline = () => {
     return <LoadingSpinner text="Loading sales pipeline stages..." />;
   }
 
+  if (!pipelineData) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
+        <h3>Unable to load pipeline</h3>
+        <p className="text-muted" style={{ margin: '0.5rem 0 1.5rem' }}>{error || 'No pipeline data was returned.'}</p>
+        <button className="btn btn-primary" onClick={fetchPipeline}>
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="pipeline-page">
       <div className="page-header">
@@ -527,7 +546,7 @@ export const Pipeline = () => {
         >
         {visibleStages.map((stageKey) => {
           const columnData = pipelineData ? pipelineData[stageKey] : null;
-          const stageConfig = columnData || LEAD_STATUS_CONFIG[stageKey] || { label: stageKey, color: '#6366F1' };
+          const stageConfig = columnData || LEAD_STATUS_CONFIG[normalizeStatusKey(stageKey)] || { label: stageKey, color: '#6366F1' };
           const allLeadsInStage = columnData ? columnData.leads : [];
           const count = columnData ? columnData.count : 0;
           const totalLeads = allLeadsInStage.length;
@@ -646,12 +665,12 @@ export const Pipeline = () => {
                               disabled={movingLeadId === lead.id}
                               onChange={(e) => handleMoveStage(lead.id, e.target.value, currentLeadStageKey)}
                               onClick={(e) => e.stopPropagation()}
-                              aria-label="Move lead stage"
+                              aria-label={`Move ${lead.name} to another stage`}
                             >
                               <option value="" disabled>Move to...</option>
                               {allStages.map((s) => {
                                 const col = pipelineData ? pipelineData[s] : null;
-                                const label = col?.label || LEAD_STATUS_CONFIG[s]?.label || s;
+                                const label = col?.label || LEAD_STATUS_CONFIG[normalizeStatusKey(s)]?.label || s;
                                 return (
                                   <option key={s} value={s}>
                                     → {label}

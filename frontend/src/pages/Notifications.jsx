@@ -21,7 +21,7 @@ import { useToast } from '../context/ToastContext';
 
 export const Notifications = () => {
   const navigate = useNavigate();
-  const { addToast } = useToast();
+  const { showToast } = useToast();
 
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,11 +36,11 @@ export const Notifications = () => {
       setNotifications(Array.isArray(items) ? items : []);
     } catch (err) {
       console.error('Error fetching notifications:', err);
-      addToast('Failed to load notifications', 'error');
+      showToast('Failed to load notifications', 'error');
     } finally {
       setLoading(false);
     }
-  }, [addToast]);
+  }, [showToast]);
 
   useEffect(() => {
     fetchNotifications();
@@ -52,9 +52,9 @@ export const Notifications = () => {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
       );
-      addToast('Notification marked as read', 'success');
+      showToast('Notification marked as read', 'success');
     } catch (err) {
-      addToast('Failed to update notification', 'error');
+      showToast('Failed to update notification', 'error');
     }
   };
 
@@ -62,9 +62,9 @@ export const Notifications = () => {
     try {
       await notificationApi.markAllAsRead();
       setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-      addToast('All notifications marked as read', 'success');
+      showToast('All notifications marked as read', 'success');
     } catch (err) {
-      addToast('Failed to mark all as read', 'error');
+      showToast('Failed to mark all as read', 'error');
     }
   };
 
@@ -72,9 +72,9 @@ export const Notifications = () => {
     try {
       await notificationApi.deleteNotification(id);
       setNotifications((prev) => prev.filter((n) => n.id !== id));
-      addToast('Notification deleted', 'info');
+      showToast('Notification deleted', 'info');
     } catch (err) {
-      addToast('Failed to delete notification', 'error');
+      showToast('Failed to delete notification', 'error');
     }
   };
 

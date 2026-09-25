@@ -46,6 +46,25 @@ export const leadApi = {
     return response.data;
   },
 
+  importLeads: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const response = await api.post('/api/leads/import/', formData, {
+      // Let the browser set the multipart boundary for FormData
+      transformRequest: [
+        (data, headers) => {
+          if (headers && typeof headers.delete === 'function') {
+            headers.delete('Content-Type');
+          } else if (headers) {
+            delete headers['Content-Type'];
+          }
+          return data;
+        },
+      ],
+    });
+    return response.data;
+  },
+
   getLeadHandovers: async (id) => {
     const response = await api.get(`/api/leads/${id}/handovers/`);
     return response.data;

@@ -24,6 +24,7 @@ class FollowUpSerializer(serializers.ModelSerializer):
             'follow_up_at',
             'purpose',
             'status',
+            'notes',
             'outcome',
             'completed_at',
             'is_overdue',

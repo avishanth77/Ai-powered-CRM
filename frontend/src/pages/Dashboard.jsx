@@ -14,7 +14,6 @@ import {
   IndianRupee,
   Percent,
   CheckCircle,
-  XCircle,
   BarChart2,
   ArrowUpRight,
   Sparkles,
@@ -55,7 +54,7 @@ export const Dashboard = () => {
       <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
         <AlertCircle size={40} color="var(--danger)" style={{ margin: '0 auto 1rem' }} />
         <h3>Unable to load dashboard</h3>
-        <p className="text-muted" style={{ margin: '0.5rem 0 1.5rem' }}>{error}</p>
+        <p className="text-muted" style={{ margin: '0.5rem 0 1.5rem' }}>{error || 'No dashboard data was returned.'}</p>
         <button className="btn btn-primary" onClick={loadDashboard}>
           Retry Connection
         </button>
@@ -63,7 +62,17 @@ export const Dashboard = () => {
     );
   }
 
-  const { kpis, charts, user_performance } = data;
+  const { kpis = {}, charts = {} } = data || {};
+  const {
+    by_status: byStatus = [],
+    by_source: bySource = [],
+    by_priority: byPriority = [],
+    won_vs_lost: wonVsLost = {},
+  } = charts;
+  const statusMax = Math.max(...byStatus.map((s) => s.count), 1);
+  const sourceMax = Math.max(...bySource.map((s) => s.count), 1);
+  const priorityMax = Math.max(...byPriority.map((p) => p.count), 1);
+  const execMax = Math.max(...(data.leads_by_executive || []).map((e) => e.count), 1);
 
   return (
     <div className="dashboard-page">
@@ -147,7 +156,7 @@ export const Dashboard = () => {
             <div className="kpi-icon-circle" style={{ color: '#fbbf24' }}><IndianRupee size={18} /></div>
           </div>
           <div className="kpi-value">{formatCurrency(kpis.expected_sales_value)}</div>
-          <div className="kpi-meta text-muted">Active Pipeline Pipeline Value</div>
+          <div className="kpi-meta text-muted">Active Pipeline Value</div>
         </div>
 
         <div className="kpi-card">
@@ -179,10 +188,12 @@ export const Dashboard = () => {
             <h3 className="chart-title"><BarChart2 size={18} /> Leads by Stage</h3>
           </div>
           <div className="bar-chart-container">
-            {charts.by_status.map((item) => {
-              const maxCount = Math.max(...charts.by_status.map((s) => s.count), 1);
-              const pct = (item.count / maxCount) * 100;
-              return (
+            {byStatus.length === 0 ? (
+              <p className="text-muted" style={{ padding: '1rem' }}>No stage data recorded yet.</p>
+            ) : (
+              byStatus.map((item) => {
+                const pct = (item.count / statusMax) * 100;
+                return (
                 <div key={item.status} className="bar-chart-row">
                   <div className="bar-chart-info">
                     <span className="bar-chart-label">{item.label}</span>
@@ -204,7 +215,8 @@ export const Dashboard = () => {
                   </div>
                 </div>
               );
-            })}
+              })
+            )}
           </div>
         </div>
 
@@ -214,12 +226,11 @@ export const Dashboard = () => {
             <h3 className="chart-title"><TrendingUp size={18} /> Leads by Source</h3>
           </div>
           <div className="bar-chart-container">
-            {charts.by_source.length === 0 ? (
+            {bySource.length === 0 ? (
               <p className="text-muted" style={{ padding: '1rem' }}>No source data recorded yet.</p>
             ) : (
-              charts.by_source.map((item) => {
-                const maxCount = Math.max(...charts.by_source.map((s) => s.count), 1);
-                const pct = (item.count / maxCount) * 100;
+              bySource.map((item) => {
+                const pct = (item.count / sourceMax) * 100;
                 return (
                   <div key={item.source} className="bar-chart-row">
                     <div className="bar-chart-info">
@@ -247,17 +258,17 @@ export const Dashboard = () => {
           <div className="funnel-comparison-container">
             <div className="funnel-stat-box">
               <span className="kpi-label">Won</span>
-              <div className="funnel-stat-value funnel-won">{charts.won_vs_lost.won}</div>
+              <div className="funnel-stat-value funnel-won">{wonVsLost.won ?? 0}</div>
               <span className="text-dim font-sm">Converted to Customers</span>
             </div>
             <div className="funnel-stat-box">
               <span className="kpi-label">Lost</span>
-              <div className="funnel-stat-value funnel-lost">{charts.won_vs_lost.lost}</div>
+              <div className="funnel-stat-value funnel-lost">{wonVsLost.lost ?? 0}</div>
               <span className="text-dim font-sm">Archived with reason</span>
             </div>
             <div className="funnel-stat-box">
               <span className="kpi-label">Active</span>
-              <div className="funnel-stat-value funnel-active">{charts.won_vs_lost.active}</div>
+              <div className="funnel-stat-value funnel-active">{wonVsLost.active ?? 0}</div>
               <span className="text-dim font-sm">In Pipeline</span>
             </div>
           </div>
@@ -269,9 +280,8 @@ export const Dashboard = () => {
             <h3 className="chart-title"><TrendingUp size={18} /> Lead Priorities</h3>
           </div>
           <div className="bar-chart-container">
-            {charts.by_priority.map((item) => {
-              const maxCount = Math.max(...charts.by_priority.map((p) => p.count), 1);
-              const pct = (item.count / maxCount) * 100;
+            {byPriority.map((item) => {
+              const pct = (item.count / priorityMax) * 100;
               const color =
                 item.priority === 'URGENT'
                   ? 'var(--danger)'
@@ -313,10 +323,9 @@ export const Dashboard = () => {
                 </p>
               ) : (
                 data.leads_by_executive.map((item) => {
-                  const maxCount = Math.max(...data.leads_by_executive.map((e) => e.count), 1);
-                  const pct = (item.count / maxCount) * 100;
+                  const pct = (item.count / execMax) * 100;
                   return (
-                    <div key={item.id} className="bar-chart-row">
+                    <div key={item.user_id} className="bar-chart-row">
                       <div className="bar-chart-info">
                         <span className="bar-chart-label" style={{ fontWeight: 500 }}>
                           {item.name}
