@@ -4,7 +4,7 @@ import { followupApi } from '../api/followupApi';
 import { leadApi } from '../api/leadApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { formatDateTime } from '../utils/formatters';
+import { formatDateTime, toLocalDateTimeInput } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
@@ -647,6 +647,7 @@ export const FollowUps = () => {
                     type="datetime-local"
                     className="form-control"
                     value={newFollowup.follow_up_at}
+                    min={toLocalDateTimeInput(new Date())}
                     onChange={(e) => setNewFollowup({ ...newFollowup, follow_up_at: e.target.value })}
                     required
                   />

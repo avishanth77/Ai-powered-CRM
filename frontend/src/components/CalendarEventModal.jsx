@@ -15,6 +15,7 @@ import {
 import { calendarApi } from '../api/calendarApi';
 import { toLocalDateTimeInput } from '../utils/formatters';
 import { useToast } from '../context/ToastContext';
+import { ConfirmModal } from './ConfirmModal';
 
 export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
   const navigate = useNavigate();
@@ -22,6 +23,7 @@ export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
 
   const [mode, setMode] = useState('view'); // 'view', 'complete', 'reschedule'
   const [outcome, setOutcome] = useState('');
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
   const [newDateTime, setNewDateTime] = useState(
     event?.start ? toLocalDateTimeInput(event.start) : ''
   );
@@ -70,7 +72,11 @@ export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
   };
 
   const handleCancel = async () => {
-    if (!window.confirm('Are you sure you want to cancel this event?')) return;
+    setConfirmDeleteOpen(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    setConfirmDeleteOpen(false);
     setSubmitting(true);
     try {
       await calendarApi.cancelEvent(event.id);
@@ -311,7 +317,7 @@ export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
               )}
             </div>
 
-            <div style={{ display: 'flex', gap: '8px' }}>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
               {event.status === 'PENDING' && (
                 <>
                   <button
@@ -332,6 +338,16 @@ export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
                     <CheckCircle2 size={14} />
                     <span>Mark Completed</span>
                   </button>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ fontSize: '0.82rem', color: 'var(--danger)' }}
+                    onClick={handleCancel}
+                    disabled={submitting}
+                  >
+                    <X size={14} />
+                    <span>Cancel Event</span>
+                  </button>
                 </>
               )}
               <button type="button" className="btn btn-secondary" onClick={onClose} style={{ fontSize: '0.82rem' }}>
@@ -341,6 +357,18 @@ export const CalendarEventModal = ({ event, onClose, onRefresh }) => {
           </div>
         )}
       </div>
+
+      <ConfirmModal
+        isOpen={confirmDeleteOpen}
+        title="Cancel this event?"
+        message={`The "${event.title}" follow-up will be marked as Cancelled. You can reschedule it later if needed.`}
+        confirmText="Yes, Cancel Event"
+        cancelText="Keep Event"
+        isDestructive={true}
+        loading={submitting}
+        onConfirm={handleConfirmCancel}
+        onCancel={() => setConfirmDeleteOpen(false)}
+      />
     </div>
   );
 };

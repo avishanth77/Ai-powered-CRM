@@ -5,7 +5,7 @@ import { userApi } from '../api/userApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatCurrency } from '../utils/formatters';
-import { extractErrorMessage } from '../utils/validation';
+import { extractErrorMessage, extractBlobErrorMessage } from '../utils/validation';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { LEAD_STATUS, LEAD_PRIORITY } from '../utils/constants';
 
@@ -14,14 +14,10 @@ import {
   Download,
   Filter,
   Users,
-  TrendingUp,
-  IndianRupee,
-  Briefcase,
-  CheckCircle,
 } from 'lucide-react';
 
 export const Reports = () => {
-  const { user, canExportReports, isManagerOrAdmin } = useAuth();
+  const { canExportReports, isManagerOrAdmin } = useAuth();
   const { showToast } = useToast();
 
   const [summary, setSummary] = useState(null);
@@ -71,22 +67,30 @@ export const Reports = () => {
   };
 
   const handleExportCsv = async () => {
+    if (isDateRangeInvalid) {
+      showToast('The "From Date" must be earlier than the "To Date".', 'warning');
+      return;
+    }
     setExporting(true);
     try {
       await reportApi.downloadExportCsv(filters);
       showToast('CSV report generated and downloaded successfully!', 'success');
     } catch (err) {
-      showToast(extractErrorMessage(err, 'Failed to export CSV report'), 'error');
+      const msg = await extractBlobErrorMessage(err, 'Failed to export CSV report');
+      showToast(msg, 'error');
     } finally {
       setExporting(false);
     }
   };
 
+  const isDateRangeInvalid =
+    Boolean(filters.from_date) && Boolean(filters.to_date) && filters.from_date > filters.to_date;
+
   if (loading) {
     return <LoadingSpinner text="Compiling analytical reports and team metrics..." />;
   }
 
-  const { kpis, charts, user_performance } = summary || {};
+  const { kpis, user_performance } = summary || {};
 
   return (
     <div className="reports-page">
@@ -107,7 +111,7 @@ export const Reports = () => {
               type="button"
               className="btn btn-primary"
               onClick={handleExportCsv}
-              disabled={exporting}
+              disabled={exporting || isDateRangeInvalid}
             >
               <Download size={16} />
               <span>{exporting ? 'Generating CSV...' : 'Export Filtered CSV'}</span>
@@ -219,6 +223,11 @@ export const Reports = () => {
                 value={filters.to_date}
                 onChange={handleFilterChange}
               />
+              {isDateRangeInvalid && (
+                <span className="form-error-msg" role="alert">
+                  The "To Date" must be later than the "From Date".
+                </span>
+              )}
             </div>
           </div>
         </div>

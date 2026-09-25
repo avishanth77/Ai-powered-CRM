@@ -34,6 +34,7 @@ export const Customers = () => {
   const [sources, setSources] = useState([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
+  const [loadError, setLoadError] = useState(null);
   const [metrics, setMetrics] = useState({ total: 0, wonCount: 0, directCount: 0, totalWonValue: 0 });
   const pageSize = 20;
   // Upper bound for the single metrics snapshot (one extra request, no pagination UI).
@@ -52,6 +53,7 @@ export const Customers = () => {
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
       const params = { page: currentPage, page_size: pageSize };
       if (search.trim()) params.search = search.trim();
@@ -81,7 +83,9 @@ export const Customers = () => {
         totalWonValue: snapRows.reduce((sum, c) => sum + (parseFloat(c.lead_expected_value) || 0), 0),
       });
     } catch (err) {
-      showToast(extractErrorMessage(err, 'Failed to fetch customer accounts'), 'error');
+      const msg = extractErrorMessage(err, 'Failed to fetch customer accounts');
+      setLoadError(msg);
+      showToast(msg, 'error');
     } finally {
       setLoading(false);
     }
@@ -316,6 +320,13 @@ export const Customers = () => {
       <div className="table-responsive">
         {loading ? (
           <LoadingSpinner text="Retrieving customer records..." />
+        ) : loadError ? (
+          <EmptyState
+            title="Could not load customers"
+            message={loadError}
+            actionLabel="Retry"
+            onAction={() => fetchCustomers()}
+          />
         ) : customers.length === 0 ? (
           <EmptyState
             title="No customer accounts match your criteria"
@@ -412,7 +423,7 @@ export const Customers = () => {
         )}
       </div>
 
-      {!loading && customers.length > 0 && (
+      {!loading && !loadError && customers.length > 0 && (
         <Pagination
           currentPage={currentPage}
           totalCount={totalCount}

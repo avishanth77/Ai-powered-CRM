@@ -6,6 +6,7 @@ export const SearchBar = ({
   value = '',
   onChange,
   debounceMs = 350,
+  ariaLabel,
 }) => {
   const [localValue, setLocalValue] = useState(value);
 
@@ -32,9 +33,10 @@ export const SearchBar = ({
     <div className="search-bar-container">
       <Search size={18} className="search-icon" />
       <input
-        type="text"
+        type="search"
         className="search-input"
         placeholder={placeholder}
+        aria-label={ariaLabel || placeholder}
         value={localValue}
         onChange={(e) => setLocalValue(e.target.value)}
       />

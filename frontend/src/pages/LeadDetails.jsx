@@ -5,7 +5,7 @@ import { followupApi } from '../api/followupApi';
 import { userApi } from '../api/userApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { formatCurrency, formatDateTime, formatDate, formatRelativeTime } from '../utils/formatters';
+import { formatCurrency, formatDateTime, formatDate, formatRelativeTime, toLocalDateTimeInput } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
 import {
   LEAD_STATUS,
@@ -969,11 +969,13 @@ export const LeadDetails = () => {
                 onChange={(e) => setSelectedAssignee(e.target.value)}
               >
                 <option value="">Select User</option>
-                {usersList.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.full_name || u.email} ({u.role})
-                  </option>
-                ))}
+                {usersList
+                  .filter((u) => u.is_active && u.role === 'EXECUTIVE')
+                  .map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.full_name || u.email} ({u.role})
+                    </option>
+                  ))}
               </select>
             </div>
             <div className="modal-footer">
@@ -1138,6 +1140,7 @@ export const LeadDetails = () => {
                     type="datetime-local"
                     className="form-control"
                     value={followupData.follow_up_at}
+                    min={toLocalDateTimeInput(new Date())}
                     onChange={(e) => setFollowupData({ ...followupData, follow_up_at: e.target.value })}
                     required
                   />

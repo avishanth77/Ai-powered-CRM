@@ -11,6 +11,7 @@ import { calendarApi } from '../api/calendarApi';
 import { userApi } from '../api/userApi';
 import { toLocalDateKey } from '../utils/formatters';
 import { FOLLOWUP_PURPOSES } from '../utils/constants';
+import { LoadingSpinner } from '../components/LoadingSpinner';
 import { CalendarEventModal } from '../components/CalendarEventModal';
 import { CalendarScheduleModal } from '../components/CalendarScheduleModal';
 
@@ -31,6 +32,7 @@ export const Calendar = () => {
   // Events data state
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [eventsError, setEventsError] = useState(null);
 
   // Modal states
   const [selectedEvent, setSelectedEvent] = useState(null);
@@ -102,6 +104,7 @@ export const Calendar = () => {
   // Fetch calendar events
   const fetchEvents = useCallback(async () => {
     setLoading(true);
+    setEventsError(null);
     try {
       const params = {
         start: rangeStart,
@@ -121,6 +124,7 @@ export const Calendar = () => {
       setEvents(res.results || []);
     } catch (err) {
       console.error('Failed to fetch calendar events:', err);
+      setEventsError('Could not load calendar events. Please check your connection and retry.');
     } finally {
       setLoading(false);
     }
@@ -359,11 +363,30 @@ export const Calendar = () => {
       </div>
 
       {/* Calendar Grid View */}
+      {eventsError && !loading && (
+        <div
+          role="alert"
+          className="card"
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '1rem',
+            flexWrap: 'wrap',
+            padding: '1rem 1.25rem',
+            marginBottom: '1rem',
+            borderColor: 'var(--danger)',
+          }}
+        >
+          <span style={{ color: 'var(--text-main)', fontSize: '0.875rem' }}>{eventsError}</span>
+          <button type="button" className="btn btn-secondary btn-sm" onClick={fetchEvents}>
+            Retry
+          </button>
+        </div>
+      )}
       <div className="calendar-board-card">
         {loading ? (
-          <div style={{ padding: '60px 20px', textAlign: 'center', color: 'var(--text-dim)' }}>
-            Loading calendar events...
-          </div>
+          <LoadingSpinner text="Loading calendar events..." />
         ) : currentView === 'month' ? (
           /* ================= Month View ================= */
           <div className="calendar-month-wrapper">

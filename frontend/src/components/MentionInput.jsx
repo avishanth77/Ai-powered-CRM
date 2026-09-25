@@ -1,5 +1,5 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { AtSign, Send, X } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { AtSign, Send } from 'lucide-react';
 import { commentApi } from '../api/commentApi';
 import { getInitials } from '../utils/formatters';
 
@@ -22,7 +22,12 @@ export const MentionInput = ({
   const [submitting, setSubmitting] = useState(false);
 
   const textareaRef = useRef(null);
-  const dropdownRef = useRef(null);
+
+  const suggestionsOpen = showSuggestions && suggestions.length > 0;
+  const activeOptionId =
+    suggestionsOpen && suggestions[selectedIndex]
+      ? `mention-option-${suggestions[selectedIndex].id}`
+      : undefined;
 
   // Fetch suggestions when query changes
   useEffect(() => {
@@ -116,6 +121,7 @@ export const MentionInput = ({
         return;
       }
       if (e.key === 'Escape') {
+        e.stopPropagation(); // keep parent dialogs open while dismissing suggestions
         setShowSuggestions(false);
         return;
       }
@@ -151,12 +157,16 @@ export const MentionInput = ({
   return (
     <div className="mention-input-wrapper">
       {/* Floating Suggestions List */}
-      {showSuggestions && suggestions.length > 0 && (
-        <div className="mention-suggestions-dropdown" ref={dropdownRef}>
+      {suggestionsOpen && (
+        <div className="mention-suggestions-dropdown" role="listbox" id="mention-suggestions-list" aria-label="Mention suggestions">
           {suggestions.map((u, idx) => (
             <div
               key={u.id}
+              id={`mention-option-${u.id}`}
+              role="option"
+              aria-selected={idx === selectedIndex}
               className={`mention-suggestion-item ${idx === selectedIndex ? 'selected' : ''}`}
+              ref={idx === selectedIndex ? (el) => el?.scrollIntoView({ block: 'nearest' }) : undefined}
               onMouseDown={(e) => {
                 e.preventDefault();
                 insertMention(u);
@@ -184,6 +194,12 @@ export const MentionInput = ({
         autoFocus={autoFocus}
         disabled={submitting}
         rows={3}
+        role="combobox"
+        aria-expanded={suggestionsOpen}
+        aria-controls="mention-suggestions-list"
+        aria-activedescendant={activeOptionId}
+        aria-autocomplete="list"
+        aria-label={placeholder}
       />
 
       <div className="comment-input-footer">

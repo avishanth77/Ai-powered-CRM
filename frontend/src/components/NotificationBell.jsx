@@ -37,11 +37,25 @@ export const NotificationBell = () => {
     fetchUnreadCount();
     // Poll every 30 seconds for background updates
     intervalRef.current = setInterval(fetchUnreadCount, 30000);
+    // Refresh the badge when the tab regains focus
+    const onFocus = () => fetchUnreadCount();
+    window.addEventListener('focus', onFocus);
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
+      window.removeEventListener('focus', onFocus);
     };
   }, [fetchUnreadCount]);
+
+  // Close the dropdown on Escape
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [isOpen]);
 
   const toggleDropdown = async () => {
     if (!isOpen) {
@@ -81,6 +95,8 @@ export const NotificationBell = () => {
         className={`notification-bell-btn ${unreadCount > 0 ? 'has-unread' : ''}`}
         onClick={toggleDropdown}
         aria-label="View notifications"
+        aria-haspopup="menu"
+        aria-expanded={isOpen}
         title={unreadCount > 0 ? `${unreadCount} unread notification(s)` : 'Notifications'}
       >
         <Bell size={18} />

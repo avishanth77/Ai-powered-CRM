@@ -9,9 +9,7 @@ import {
   Settings as SettingsIcon,
   Plus,
   Save,
-  Compass,
   Shield,
-  Check,
   KeyRound,
   Eye,
   EyeOff,
@@ -103,7 +101,9 @@ export const Settings = () => {
     try {
       const res = await leadApi.getSources();
       setSources(res.results || (Array.isArray(res) ? res : []));
-    } catch {}
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Failed to load lead sources'), 'error');
+    }
   };
 
   useEffect(() => {
@@ -357,10 +357,12 @@ export const Settings = () => {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="tabs-navigation" style={{ marginBottom: '1.5rem' }}>
+      <div className="tabs-navigation" style={{ marginBottom: '1.5rem' }} role="tablist" aria-label="Settings sections">
         {canManageStages && (
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'stages'}
             className={`tab-btn ${activeTab === 'stages' ? 'tab-btn-active' : ''}`}
             onClick={() => setActiveTab('stages')}
           >
@@ -372,6 +374,8 @@ export const Settings = () => {
 
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === 'profile'}
           className={`tab-btn ${activeTab === 'profile' ? 'tab-btn-active' : ''}`}
           onClick={() => setActiveTab('profile')}
         >
@@ -382,6 +386,8 @@ export const Settings = () => {
         {canManageSources && (
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'sources'}
             className={`tab-btn ${activeTab === 'sources' ? 'tab-btn-active' : ''}`}
             onClick={() => setActiveTab('sources')}
           >
@@ -431,7 +437,14 @@ export const Settings = () => {
                 </tr>
               </thead>
               <tbody>
-                {stages.map((st, idx) => (
+                {loadingStages ? (
+                  <tr>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-dim)' }}>
+                      Loading lead stages...
+                    </td>
+                  </tr>
+                ) : (
+                  stages.map((st, idx) => (
                   <tr key={st.id} style={{ opacity: st.is_active ? 1 : 0.65 }}>
                     <td>
                       <span className="font-semibold text-main font-sm" style={{ padding: '0.25rem 0.5rem', background: 'var(--bg-surface-elevated)', borderRadius: 'var(--radius-sm)' }}>
@@ -490,6 +503,7 @@ export const Settings = () => {
                           type="button"
                           className="icon-action-btn"
                           title="Move Up"
+                          aria-label={`Move stage ${st.name} up`}
                           disabled={idx === 0}
                           onClick={() => handleMoveStage(st, 'up')}
                         >
@@ -501,6 +515,7 @@ export const Settings = () => {
                           type="button"
                           className="icon-action-btn"
                           title="Move Down"
+                          aria-label={`Move stage ${st.name} down`}
                           disabled={idx === stages.length - 1}
                           onClick={() => handleMoveStage(st, 'down')}
                         >
@@ -512,6 +527,7 @@ export const Settings = () => {
                           type="button"
                           className="icon-action-btn"
                           title="Edit Stage"
+                          aria-label={`Edit stage ${st.name}`}
                           onClick={() => handleOpenEditStage(st)}
                         >
                           <Edit size={15} />
@@ -522,6 +538,7 @@ export const Settings = () => {
                           type="button"
                           className="icon-action-btn"
                           title={st.is_active ? 'Deactivate Stage' : 'Activate Stage'}
+                          aria-label={`${st.is_active ? 'Deactivate' : 'Activate'} stage ${st.name}`}
                           onClick={() => handleToggleStageActive(st)}
                           style={{ color: st.is_active ? 'var(--warning)' : 'var(--success)' }}
                         >
@@ -533,6 +550,7 @@ export const Settings = () => {
                           type="button"
                           className="icon-action-btn icon-delete"
                           title={st.is_system ? 'System stages cannot be deleted' : 'Delete Stage'}
+                          aria-label={`Delete stage ${st.name}`}
                           disabled={st.is_system}
                           onClick={() => handleOpenDeleteStage(st)}
                           style={{ opacity: st.is_system ? 0.35 : 1 }}
@@ -542,7 +560,8 @@ export const Settings = () => {
                       </div>
                     </td>
                   </tr>
-                ))}
+                  ))
+                )}
               </tbody>
             </table>
           </div>

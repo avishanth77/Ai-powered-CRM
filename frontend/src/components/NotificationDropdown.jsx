@@ -10,7 +10,6 @@ import {
   AtSign,
   Layers,
   Award,
-  Check,
   ExternalLink
 } from 'lucide-react';
 
@@ -98,7 +97,7 @@ export const NotificationDropdown = ({
   return (
     <>
       <div className="dropdown-overlay" onClick={onClose} />
-      <div className="notification-dropdown">
+      <div className="notification-dropdown" role="menu" aria-label="Notifications">
         <div className="notification-dropdown-header">
           <div className="notification-header-title">
             <span>Notifications</span>
@@ -133,7 +132,16 @@ export const NotificationDropdown = ({
               <div
                 key={notif.id}
                 className={`notification-item ${notif.is_read ? 'read' : 'unread'}`}
+                role="button"
+                tabIndex={0}
+                aria-label={`${notif.title}${notif.is_read ? '' : ' (unread)'}`}
                 onClick={() => handleItemClick(notif)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleItemClick(notif);
+                  }
+                }}
               >
                 <div className={`notification-icon-box ${getIconClass(notif.notification_type)}`}>
                   {getNotificationIcon(notif.notification_type)}
@@ -141,7 +149,9 @@ export const NotificationDropdown = ({
                 <div className="notification-content">
                   <div className="notification-title">
                     <span>{notif.title}</span>
-                    <span className="notification-time">{formatRelativeTime(notif.created_at)}</span>
+                    <time className="notification-time" dateTime={notif.created_at}>
+                      {formatRelativeTime(notif.created_at)}
+                    </time>
                   </div>
                   <div className="notification-message">{notif.message}</div>
                 </div>

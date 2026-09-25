@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { leadApi } from '../api/leadApi';
 import { reportApi } from '../api/reportApi';
@@ -7,7 +7,7 @@ import { activityApi } from '../api/activityApi';
 import { userApi } from '../api/userApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { formatCurrency, formatDate, formatDateTime } from '../utils/formatters';
+import { formatCurrency, formatDate, formatDateTime, toLocalDateTimeInput } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
 import { LEAD_STATUS, LEAD_PRIORITY, FOLLOWUP_PURPOSES } from '../utils/constants';
 
@@ -41,13 +41,8 @@ import {
   UploadCloud,
   Kanban,
   Activity,
-  UserCheck,
   UserPlus,
-  Check,
-  X,
   FileSpreadsheet,
-  AlertCircle,
-  FileText,
   Share2,
 } from 'lucide-react';
 
@@ -84,7 +79,11 @@ export const Leads = () => {
   const [kpis, setKpis] = useState(null);
   const [followups, setFollowups] = useState([]);
   const [activities, setActivities] = useState([]);
+  const [panelsLoading, setPanelsLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
+  // Guards against out-of-order list responses on rapid filter changes
+  const leadsRequestId = useRef(0);
+  const selectAllRef = useRef(null);
 
   // Modals
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -147,11 +146,11 @@ export const Leads = () => {
   // Fetch Upcoming Follow-ups
   const fetchUpcomingFollowups = useCallback(async () => {
     try {
-      const res = await followupApi.getFollowUps({ page_size: 5, ordering: 'follow_up_at', status: 'PENDING' });
+      const res = await followupApi.getFollowUps({ page_size: 4, ordering: 'follow_up_at', status: 'PENDING' });
       const items = res?.results || res?.data || (Array.isArray(res) ? res : []);
       setFollowups(items);
     } catch {
-      setFollowups([]);
+      // keep previously loaded items on refresh failure
     }
   }, []);
 
@@ -162,17 +161,28 @@ export const Leads = () => {
       const items = res?.results || (Array.isArray(res) ? res : []);
       setActivities(items);
     } catch {
-      setActivities([]);
+      // keep previously loaded items on refresh failure
     }
   }, []);
 
   useEffect(() => {
     fetchKpis();
-    fetchUpcomingFollowups();
-    fetchRecentActivity();
+    setPanelsLoading(true);
+    Promise.allSettled([fetchUpcomingFollowups(), fetchRecentActivity()]).then(() =>
+      setPanelsLoading(false)
+    );
   }, [fetchKpis, fetchUpcomingFollowups, fetchRecentActivity]);
 
+  // Partial selection state for the select-all checkbox
+  const isPartialSelection = selectedLeads.length > 0 && selectedLeads.length < leads.length;
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = isPartialSelection;
+    }
+  }, [isPartialSelection, leads.length]);
+
   const fetchLeads = useCallback(async () => {
+    const requestId = ++leadsRequestId.current;
     setLoading(true);
     try {
       const params = {
@@ -185,6 +195,7 @@ export const Leads = () => {
       };
 
       const res = await leadApi.getLeads(params);
+      if (requestId !== leadsRequestId.current) return; // stale response
       if (res.results) {
         setLeads(res.results);
         setTotalCount(res.count || res.results.length);
@@ -193,9 +204,10 @@ export const Leads = () => {
         setTotalCount(res.length);
       }
     } catch (err) {
+      if (requestId !== leadsRequestId.current) return; // stale response
       showToast(extractErrorMessage(err, 'Failed to fetch leads'), 'error');
     } finally {
-      setLoading(false);
+      if (requestId === leadsRequestId.current) setLoading(false);
     }
   }, [currentPage, search, statusFilter, priorityFilter, sourceFilter, assignedToFilter, showToast]);
 
@@ -299,7 +311,12 @@ export const Leads = () => {
       showToast(`Lead "${leadToDelete.name}" was successfully deleted.`, 'success');
       setDeleteModalOpen(false);
       setLeadToDelete(null);
-      fetchLeads();
+      // Avoid landing on an empty page when deleting the last row
+      if (leads.length <= 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      } else {
+        fetchLeads();
+      }
       fetchKpis();
     } catch (err) {
       showToast(extractErrorMessage(err, 'Failed to delete lead'), 'error');
@@ -308,14 +325,16 @@ export const Leads = () => {
     }
   };
 
-  // Quick Export
+  // Quick Export (mirrors the active table filters)
   const handleExportLeads = async () => {
     setExporting(true);
     try {
       await reportApi.downloadExportCsv({
+        keyword: search || undefined,
         status: statusFilter || undefined,
         priority: priorityFilter || undefined,
         source: sourceFilter || undefined,
+        assigned_to: assignedToFilter || undefined,
       });
       showToast('Leads CSV exported successfully!', 'success');
     } catch (err) {
@@ -727,43 +746,42 @@ export const Leads = () => {
       </div>
 
       {/* Primary Leads Table */}
-      <div className="table-responsive">
-        {canHandoverLeads && selectedLeads.length > 0 && (
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              background: 'rgba(99, 102, 241, 0.12)',
-              border: '1px solid rgba(99, 102, 241, 0.35)',
-              padding: '0.625rem 1rem',
-              borderRadius: 'var(--radius-md)',
-              marginBottom: '1rem',
-            }}
-          >
-            <span style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '0.875rem' }}>
-              {selectedLeads.length} lead{selectedLeads.length > 1 ? 's' : ''} selected
-            </span>
-            <div style={{ display: 'flex', gap: '0.5rem' }}>
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setSelectedLeads([])}
-              >
-                Deselect All
-              </button>
-              <button
-                type="button"
-                className="btn btn-primary btn-sm"
-                onClick={() => setBulkModalOpen(true)}
-              >
-                <Share2 size={14} />
-                <span>Handover Selected ({selectedLeads.length})</span>
-              </button>
-            </div>
+      {canHandoverLeads && selectedLeads.length > 0 && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            background: 'rgba(99, 102, 241, 0.12)',
+            border: '1px solid rgba(99, 102, 241, 0.35)',
+            padding: '0.625rem 1rem',
+            borderRadius: 'var(--radius-md)',
+            marginBottom: '1rem',
+          }}
+        >
+          <span style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '0.875rem' }}>
+            {selectedLeads.length} lead{selectedLeads.length > 1 ? 's' : ''} selected
+          </span>
+          <div style={{ display: 'flex', gap: '0.5rem' }}>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setSelectedLeads([])}
+            >
+              Deselect All
+            </button>
+            <button
+              type="button"
+              className="btn btn-primary btn-sm"
+              onClick={() => setBulkModalOpen(true)}
+            >
+              <Share2 size={14} />
+              <span>Handover Selected ({selectedLeads.length})</span>
+            </button>
           </div>
-        )}
-
+        </div>
+      )}
+      <div className="table-responsive">
         {loading ? (
           <LoadingSpinner text="Retrieving leads..." />
         ) : leads.length === 0 ? (
@@ -781,6 +799,7 @@ export const Leads = () => {
                   <th style={{ width: '38px', textAlign: 'center' }}>
                     <input
                       type="checkbox"
+                      ref={selectAllRef}
                       checked={leads.length > 0 && selectedLeads.length === leads.length}
                       onChange={handleToggleSelectAll}
                       aria-label="Select all leads"
@@ -927,7 +946,9 @@ export const Leads = () => {
           </div>
 
           <div className="followup-compact-list">
-            {followups.length === 0 ? (
+            {panelsLoading ? (
+              <LoadingSpinner size={22} text="Loading follow-ups..." />
+            ) : followups.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--text-dim)', fontSize: '0.8125rem' }}>
                 No upcoming follow-ups scheduled
               </div>
@@ -972,7 +993,9 @@ export const Leads = () => {
           </div>
 
           <div className="activity-compact-list">
-            {activities.length === 0 ? (
+            {panelsLoading ? (
+              <LoadingSpinner size={22} text="Loading activity..." />
+            ) : activities.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--text-dim)', fontSize: '0.8125rem' }}>
                 No recent activity recorded
               </div>
@@ -1059,6 +1082,7 @@ export const Leads = () => {
                     type="datetime-local"
                     className="form-control"
                     value={newFollowup.follow_up_at}
+                    min={toLocalDateTimeInput(new Date())}
                     onChange={(e) => setNewFollowup({ ...newFollowup, follow_up_at: e.target.value })}
                     required
                   />

@@ -279,14 +279,17 @@ export const Notifications = () => {
               <div className="notification-content">
                 <div className="notification-title" style={{ fontSize: '0.92rem' }}>
                   <span>{notif.title}</span>
-                  <span className="notification-time">
+                  <time
+                    className="notification-time"
+                    dateTime={notif.created_at}
+                  >
                     {new Date(notif.created_at).toLocaleString(undefined, {
                       month: 'short',
                       day: 'numeric',
                       hour: '2-digit',
                       minute: '2-digit'
                     })}
-                  </span>
+                  </time>
                 </div>
                 <div className="notification-message" style={{ WebkitLineClamp: 'unset', fontSize: '0.85rem', marginBottom: '8px' }}>
                   {notif.message}

@@ -5,8 +5,9 @@ import { userApi } from '../api/userApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { extractErrorMessage, isValidEmail, isValidPhone } from '../utils/validation';
-import { LEAD_STATUS, LEAD_PRIORITY } from '../utils/constants';
+import { LEAD_PRIORITY } from '../utils/constants';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { ConfirmModal } from '../components/ConfirmModal';
 import { ArrowLeft, Save, Edit3 } from 'lucide-react';
 
 export const LeadEdit = () => {
@@ -32,56 +33,64 @@ export const LeadEdit = () => {
   const [stages, setStages] = useState([]);
   const [sources, setSources] = useState([]);
   const [users, setUsers] = useState([]);
+  const [initialData, setInitialData] = useState(null);
   const [initialLoading, setInitialLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+
+  const loadData = async () => {
+    setInitialLoading(true);
+    setLoadError(null);
+    try {
+      const [leadRes, sourcesRes, stagesRes] = await Promise.all([
+        leadApi.getLeadById(id),
+        leadApi.getSources(),
+        leadApi.getStages(),
+      ]);
+
+      let loadedStages = stagesRes.results || (Array.isArray(stagesRes) ? stagesRes : []);
+      // If current lead's stage is inactive and not in loadedStages, add it so it displays
+      if (leadRes.stage_details && !loadedStages.some((s) => s.id === leadRes.stage_details.id)) {
+        loadedStages = [...loadedStages, { ...leadRes.stage_details, name: `${leadRes.stage_details.name} (Inactive)` }];
+      }
+      setStages(loadedStages);
+
+      const loaded = {
+        name: leadRes.name || '',
+        phone: leadRes.phone || '',
+        email: leadRes.email || '',
+        company_name: leadRes.company_name || '',
+        source: leadRes.source || '',
+        stage: leadRes.stage || leadRes.stage_details?.id || '',
+        priority: leadRes.priority || '',
+        assigned_to: leadRes.assigned_to || '',
+        expected_value: leadRes.expected_value || '0.00',
+        address: leadRes.address || '',
+        lost_reason: leadRes.lost_reason || '',
+      };
+      setFormData(loaded);
+      setInitialData(loaded);
+
+      setSources(sourcesRes.results || (Array.isArray(sourcesRes) ? sourcesRes : []));
+
+      if (canAssignLeads) {
+        const usersRes = await userApi.getUsers();
+        const list = usersRes.results || (Array.isArray(usersRes) ? usersRes : []);
+        setUsers(list.filter((u) => u.is_active && u.role === 'EXECUTIVE'));
+      }
+    } catch (err) {
+      setLoadError(extractErrorMessage(err, 'Failed to load lead details'));
+      showToast(extractErrorMessage(err, 'Failed to load lead details'), 'error');
+    } finally {
+      setInitialLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [leadRes, sourcesRes, stagesRes] = await Promise.all([
-          leadApi.getLeadById(id),
-          leadApi.getSources(),
-          leadApi.getStages(),
-        ]);
-
-        let loadedStages = stagesRes.results || (Array.isArray(stagesRes) ? stagesRes : []);
-        // If current lead's stage is inactive and not in loadedStages, add it so it displays
-        if (leadRes.stage_details && !loadedStages.some((s) => s.id === leadRes.stage_details.id)) {
-          loadedStages = [...loadedStages, { ...leadRes.stage_details, name: `${leadRes.stage_details.name} (Inactive)` }];
-        }
-        setStages(loadedStages);
-
-        setFormData({
-          name: leadRes.name || '',
-          phone: leadRes.phone || '',
-          email: leadRes.email || '',
-          company_name: leadRes.company_name || '',
-          source: leadRes.source || '',
-          stage: leadRes.stage || leadRes.stage_details?.id || '',
-          priority: leadRes.priority || '',
-          assigned_to: leadRes.assigned_to || '',
-          expected_value: leadRes.expected_value || '0.00',
-          address: leadRes.address || '',
-          lost_reason: leadRes.lost_reason || '',
-        });
-
-        setSources(sourcesRes.results || (Array.isArray(sourcesRes) ? sourcesRes : []));
-
-        if (canAssignLeads) {
-          const usersRes = await userApi.getUsers();
-          setUsers(usersRes.results || (Array.isArray(usersRes) ? usersRes : []));
-        }
-      } catch (err) {
-        showToast(extractErrorMessage(err, 'Failed to load lead details'), 'error');
-        navigate('/leads');
-      } finally {
-        setInitialLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [id, canAssignLeads, navigate, showToast]);
+    loadData();
+  }, [id]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -154,11 +163,39 @@ export const LeadEdit = () => {
     return <LoadingSpinner text="Loading lead information..." />;
   }
 
+  if (loadError) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '3rem', maxWidth: '840px' }}>
+        <h3>Unable to load lead</h3>
+        <p className="text-muted" style={{ margin: '0.5rem 0 1.5rem' }}>{loadError}</p>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-primary" onClick={loadData}>
+            Retry
+          </button>
+          <Link to="/leads" className="btn btn-secondary">
+            Back to Leads
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  const isDirty = initialData && JSON.stringify(formData) !== JSON.stringify(initialData);
+
+  const handleCancel = (e) => {
+    e.preventDefault();
+    if (isDirty) {
+      setConfirmCancelOpen(true);
+    } else {
+      navigate(`/leads/${id}`);
+    }
+  };
+
   return (
     <div className="lead-form-page">
       <div className="page-header">
         <div>
-          <Link to={`/leads/${id}`} className="contact-item mb-2" style={{ marginBottom: '0.5rem' }}>
+          <Link to={`/leads/${id}`} onClick={handleCancel} className="contact-item mb-2" style={{ marginBottom: '0.5rem' }}>
             <ArrowLeft size={16} /> Back to Lead Profile
           </Link>
           <h1 className="page-title">
@@ -351,14 +388,15 @@ export const LeadEdit = () => {
               className="form-control"
               value={formData.address || ''}
               onChange={handleChange}
+              placeholder="Street, city, state..."
               rows={2}
             />
           </div>
 
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-            <Link to={`/leads/${id}`} className="btn btn-secondary">
+            <button type="button" className="btn btn-secondary" onClick={handleCancel}>
               Cancel
-            </Link>
+            </button>
             <button type="submit" className="btn btn-primary" disabled={saving}>
               <Save size={18} />
               <span>{saving ? 'Updating...' : 'Save Changes'}</span>
@@ -366,6 +404,17 @@ export const LeadEdit = () => {
           </div>
         </form>
       </div>
+
+      <ConfirmModal
+        isOpen={confirmCancelOpen}
+        title="Discard unsaved changes?"
+        message="You have unsaved edits that will be lost if you leave this page."
+        confirmText="Discard Changes"
+        cancelText="Keep Editing"
+        isDestructive={true}
+        onConfirm={() => navigate(`/leads/${id}`)}
+        onCancel={() => setConfirmCancelOpen(false)}
+      />
     </div>
   );
 };

@@ -1,17 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { customerApi } from '../api/customerApi';
-import { formatDate, formatDateTime } from '../utils/formatters';
+import { formatDate } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
 import { useToast } from '../context/ToastContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import {
   ArrowLeft,
-  Briefcase,
   Phone,
   Mail,
   Building2,
-  Calendar,
   User,
   MapPin,
   ExternalLink,
@@ -24,20 +22,47 @@ export const CustomerDetails = () => {
 
   const [customer, setCustomer] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
 
-  useEffect(() => {
+  const loadCustomer = () => {
+    setLoading(true);
+    setLoadError(null);
     customerApi
       .getCustomerById(id)
       .then((res) => setCustomer(res))
       .catch((err) => {
-        showToast(extractErrorMessage(err, 'Failed to fetch customer profile'), 'error');
-        navigate('/customers');
+        const msg = extractErrorMessage(err, 'Failed to fetch customer profile');
+        setLoadError(msg);
+        showToast(msg, 'error');
       })
       .finally(() => setLoading(false));
-  }, [id, navigate, showToast]);
+  };
 
-  if (loading || !customer) {
+  useEffect(() => {
+    loadCustomer();
+  }, [id]);
+
+  if (loading) {
     return <LoadingSpinner text="Loading customer profile..." />;
+  }
+
+  if (loadError || !customer) {
+    return (
+      <div className="card" style={{ textAlign: 'center', padding: '3rem', maxWidth: '640px', margin: '0 auto' }}>
+        <h3>Unable to load customer</h3>
+        <p className="text-muted" style={{ margin: '0.5rem 0 1.5rem' }}>
+          {loadError || 'This customer account could not be found.'}
+        </p>
+        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <button type="button" className="btn btn-primary" onClick={loadCustomer}>
+            Retry
+          </button>
+          <button type="button" className="btn btn-secondary" onClick={() => navigate('/customers')}>
+            Back to Customers
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -91,7 +116,7 @@ export const CustomerDetails = () => {
             <span className="lead-info-label">Phone Number</span>
             <span className="lead-info-value contact-item">
               <Phone size={14} className="text-dim" />
-              <a href={`tel:${customer.phone}`}>{customer.phone}</a>
+              {customer.phone ? <a href={`tel:${customer.phone}`}>{customer.phone}</a> : '—'}
             </span>
           </div>
 

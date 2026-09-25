@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { authApi } from '../api/authApi';
-import { Compass, LogIn, Lock, Mail, ArrowRight, ShieldCheck, KeyRound, X } from 'lucide-react';
+import { Compass, Lock, Mail, ArrowRight, KeyRound, X } from 'lucide-react';
 import { extractErrorMessage } from '../utils/validation';
 
 export const Login = () => {
@@ -127,7 +127,7 @@ export const Login = () => {
         </div>
 
         {error && (
-          <div className="toast-item toast-error mb-4" style={{ marginBottom: '1.25rem' }}>
+          <div className="toast-item toast-error mb-4" style={{ marginBottom: '1.25rem' }} role="alert">
             <div className="toast-message">{error}</div>
           </div>
         )}
