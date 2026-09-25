@@ -36,6 +36,21 @@ export const leadApi = {
     return response.data;
   },
 
+  handoverLead: async (id, data) => {
+    const response = await api.post(`/api/leads/${id}/handover/`, data);
+    return response.data;
+  },
+
+  bulkHandover: async (data) => {
+    const response = await api.post('/api/leads/bulk-handover/', data);
+    return response.data;
+  },
+
+  getLeadHandovers: async (id) => {
+    const response = await api.get(`/api/leads/${id}/handovers/`);
+    return response.data;
+  },
+
   getNotes: async (leadId) => {
     const response = await api.get(`/api/leads/${leadId}/notes/`);
     return response.data;
@@ -53,6 +68,42 @@ export const leadApi = {
 
   getPipeline: async () => {
     const response = await api.get('/api/leads/pipeline/');
+    return response.data;
+  },
+
+  // Dynamic Lead Stages APIs
+  getStages: async (params = {}) => {
+    const response = await api.get('/api/lead-stages/', { params });
+    return response.data;
+  },
+
+  createStage: async (stageData) => {
+    const response = await api.post('/api/lead-stages/', stageData);
+    return response.data;
+  },
+
+  updateStage: async (id, stageData) => {
+    const response = await api.patch(`/api/lead-stages/${id}/`, stageData);
+    return response.data;
+  },
+
+  deleteStage: async (id, data = {}) => {
+    const response = await api.delete(`/api/lead-stages/${id}/`, { data });
+    return response.data;
+  },
+
+  toggleStageActive: async (id, data = {}) => {
+    const response = await api.patch(`/api/lead-stages/${id}/toggle-active/`, data);
+    return response.data;
+  },
+
+  moveStage: async (id, data) => {
+    const response = await api.patch(`/api/lead-stages/${id}/move/`, data);
+    return response.data;
+  },
+
+  getStageStats: async (id) => {
+    const response = await api.get(`/api/lead-stages/${id}/stats/`);
     return response.data;
   },
 

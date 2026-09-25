@@ -45,7 +45,12 @@ dist-ssr/
 *.swp
 *.swo
 
+# Logs
+*.log
+backend.err.log
+
 # OS
 Thumbs.db
 Desktop.ini
 .DS_Store
+

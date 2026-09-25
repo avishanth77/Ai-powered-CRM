@@ -113,3 +113,130 @@
   justify-content: flex-end;
   gap: 0.75rem;
 }
+
+/* ==========================================================================
+   AI Lead Synthesis Modal Enhancements (High contrast, light & dark theme)
+   ========================================================================== */
+.ai-modal-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.125rem;
+}
+
+.ai-disclaimer-banner {
+  background: var(--accent-purple-subtle, rgba(124, 58, 237, 0.08));
+  border: 1px solid rgba(124, 58, 237, 0.25);
+  padding: 0.875rem 1.125rem;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+}
+
+.ai-disclaimer-text {
+  color: var(--text-main);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.ai-card {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.125rem 1.25rem;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition-fast);
+}
+
+.ai-card:hover {
+  border-color: var(--border-strong);
+}
+
+.ai-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+}
+
+.ai-card-title {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.ai-card-body {
+  color: var(--text-main);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.ai-list {
+  padding-left: 1.25rem;
+  margin: 0;
+  color: var(--text-main);
+  font-size: 0.875rem;
+  line-height: 1.6;
+}
+
+.ai-list li {
+  margin-bottom: 0.35rem;
+}
+
+.ai-recommendation-card {
+  background: var(--primary-subtle, rgba(16, 185, 129, 0.08));
+  border: 1.5px solid var(--primary);
+  border-radius: var(--radius-md);
+  padding: 1.125rem 1.25rem;
+  box-shadow: 0 4px 14px -2px var(--primary-glow, rgba(16, 185, 129, 0.15));
+}
+
+.ai-rec-title {
+  color: var(--primary);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ai-rec-text {
+  color: var(--text-main);
+  font-size: 0.95rem;
+  font-weight: 600;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.ai-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.ai-copy-btn:hover {
+  background: var(--bg-surface-hover);
+  color: var(--text-main);
+  border-color: var(--border-strong);
+}
+

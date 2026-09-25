@@ -5,7 +5,7 @@ import { userApi } from '../api/userApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { extractErrorMessage, isValidEmail, isValidPhone } from '../utils/validation';
-import { LEAD_STATUS, LEAD_PRIORITY } from '../utils/constants';
+import { LEAD_PRIORITY } from '../utils/constants';
 import { ArrowLeft, Save, UserPlus } from 'lucide-react';
 
 export const LeadCreate = () => {
@@ -19,7 +19,7 @@ export const LeadCreate = () => {
     email: '',
     company_name: '',
     source: '',
-    status: LEAD_STATUS.NEW,
+    stage: '',
     priority: LEAD_PRIORITY.MEDIUM,
     assigned_to: user?.id || '',
     expected_value: '0.00',
@@ -27,21 +27,37 @@ export const LeadCreate = () => {
     lost_reason: '',
   });
 
+  const [stages, setStages] = useState([]);
   const [sources, setSources] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
+    // Load dynamic lead stages
     leadApi
-      .getSources()
-      .then((res) => setSources(res.results || res))
+      .getStages()
+      .then((res) => {
+        const stageList = res.results || (Array.isArray(res) ? res : []);
+        setStages(stageList);
+        if (stageList.length > 0) {
+          const defaultStage = stageList.find((s) => s.slug === 'new') || stageList[0];
+          setFormData((prev) => ({ ...prev, stage: prev.stage || defaultStage.id }));
+        }
+      })
       .catch(() => {});
 
+    // Load sources
+    leadApi
+      .getSources()
+      .then((res) => setSources(res.results || (Array.isArray(res) ? res : [])))
+      .catch(() => {});
+
+    // Load users if manager/admin
     if (canAssignLeads) {
       userApi
         .getUsers()
-        .then((res) => setUsers(res.results || res))
+        .then((res) => setUsers(res.results || (Array.isArray(res) ? res : [])))
         .catch(() => {});
     }
   }, [canAssignLeads]);
@@ -53,6 +69,9 @@ export const LeadCreate = () => {
       setErrors((prev) => ({ ...prev, [name]: null }));
     }
   };
+
+  const selectedStageObj = stages.find((s) => s.id === parseInt(formData.stage));
+  const isLostStage = selectedStageObj && (selectedStageObj.slug === 'lost' || selectedStageObj.name.toLowerCase() === 'lost');
 
   const validateForm = () => {
     const newErrors = {};
@@ -71,7 +90,7 @@ export const LeadCreate = () => {
       newErrors.expected_value = 'Expected value cannot be negative.';
     }
 
-    if (formData.status === LEAD_STATUS.LOST && !formData.lost_reason.trim()) {
+    if (isLostStage && !formData.lost_reason.trim()) {
       newErrors.lost_reason = 'A reason is required when marking a lead as Lost.';
     }
 
@@ -89,10 +108,17 @@ export const LeadCreate = () => {
     setLoading(true);
     try {
       const payload = {
-        ...formData,
+        name: formData.name.trim(),
+        phone: formData.phone.trim(),
+        email: formData.email.trim() || null,
+        company_name: formData.company_name.trim() || null,
         source: formData.source ? parseInt(formData.source) : null,
+        stage: formData.stage ? parseInt(formData.stage) : null,
+        priority: formData.priority,
         assigned_to: formData.assigned_to ? parseInt(formData.assigned_to) : null,
         expected_value: parseFloat(formData.expected_value) || 0,
+        address: formData.address.trim() || null,
+        lost_reason: isLostStage ? formData.lost_reason.trim() : null,
       };
 
       const res = await leadApi.createLead(payload);
@@ -129,14 +155,14 @@ export const LeadCreate = () => {
           <div className="form-grid-2">
             <div className="form-group">
               <label className="form-label form-label-required" htmlFor="lead-name">
-                Full Name
+                Full Name / Contact Person
               </label>
               <input
                 id="lead-name"
                 name="name"
                 type="text"
                 className="form-control"
-                placeholder="e.g. Sarah Jenkins"
+                placeholder="e.g. John Doe"
                 value={formData.name}
                 onChange={handleChange}
                 required
@@ -145,13 +171,15 @@ export const LeadCreate = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="lead-company">Company Name</label>
+              <label className="form-label" htmlFor="lead-company">
+                Company Name
+              </label>
               <input
                 id="lead-company"
                 name="company_name"
                 type="text"
                 className="form-control"
-                placeholder="e.g. Acorn Technologies Inc."
+                placeholder="e.g. Acme Corp (optional)"
                 value={formData.company_name}
                 onChange={handleChange}
               />
@@ -168,7 +196,7 @@ export const LeadCreate = () => {
                 name="phone"
                 type="tel"
                 className="form-control"
-                placeholder="+1 (555) 000-0000"
+                placeholder="e.g. +91 9876543210"
                 value={formData.phone}
                 onChange={handleChange}
                 required
@@ -177,13 +205,15 @@ export const LeadCreate = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="lead-email">Email Address</label>
+              <label className="form-label" htmlFor="lead-email">
+                Email Address
+              </label>
               <input
                 id="lead-email"
                 name="email"
                 type="email"
                 className="form-control"
-                placeholder="sarah@example.com"
+                placeholder="e.g. john@acme.com"
                 value={formData.email}
                 onChange={handleChange}
               />
@@ -229,21 +259,24 @@ export const LeadCreate = () => {
           </div>
 
           <div className="form-grid-2">
+            {/* Dynamic Stage Dropdown */}
             <div className="form-group">
-              <label className="form-label" htmlFor="lead-status">Initial Status</label>
+              <label className="form-label form-label-required" htmlFor="lead-stage">Lead Stage</label>
               <select
-                id="lead-status"
-                name="status"
+                id="lead-stage"
+                name="stage"
                 className="form-control"
-                value={formData.status}
+                value={formData.stage}
                 onChange={handleChange}
+                required
               >
-                {Object.entries(LEAD_STATUS).map(([k, v]) => (
-                  <option key={k} value={v}>
-                    {v.replace('_', ' ')}
+                {stages.map((st) => (
+                  <option key={st.id} value={st.id}>
+                    {st.name}
                   </option>
                 ))}
               </select>
+              {errors.stage && <span className="form-error-msg">{errors.stage}</span>}
             </div>
 
             <div className="form-group">
@@ -272,26 +305,42 @@ export const LeadCreate = () => {
                 value={formData.assigned_to}
                 onChange={handleChange}
               >
-                <option value="">Select Assignee</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.full_name || u.email} ({u.role})
-                  </option>
-                ))}
+                <option value="">Unassigned</option>
+                {users
+                  .filter((u) => u.is_active && u.role === 'EXECUTIVE')
+                  .map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.first_name || u.last_name ? `${u.first_name} ${u.last_name}` : u.email}
+                    </option>
+                  ))}
               </select>
             </div>
           )}
 
-          {formData.status === LEAD_STATUS.LOST && (
+          <div className="form-group">
+            <label className="form-label" htmlFor="lead-address">Physical Address / Location</label>
+            <textarea
+              id="lead-address"
+              name="address"
+              className="form-control"
+              rows={2}
+              placeholder="Building, Street, City, State..."
+              value={formData.address}
+              onChange={handleChange}
+            />
+          </div>
+
+          {isLostStage && (
             <div className="form-group">
-              <label className="form-label form-label-required" htmlFor="lost-reason">
-                Lost Reason
+              <label className="form-label form-label-required" htmlFor="lead-lost-reason">
+                Lost Reason (Mandatory when stage is Lost)
               </label>
               <textarea
-                id="lost-reason"
+                id="lead-lost-reason"
                 name="lost_reason"
                 className="form-control"
-                placeholder="Explain why this lead was lost (e.g. competitor, budget, unresponsive)..."
+                rows={2}
+                placeholder="Reason why this lead was lost..."
                 value={formData.lost_reason}
                 onChange={handleChange}
                 required
@@ -300,26 +349,13 @@ export const LeadCreate = () => {
             </div>
           )}
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="lead-address">Physical / Company Address</label>
-            <textarea
-              id="lead-address"
-              name="address"
-              className="form-control"
-              placeholder="Suite, Street, City, State, ZIP..."
-              value={formData.address}
-              onChange={handleChange}
-              rows={2}
-            />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
+          <div className="form-actions" style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
             <Link to="/leads" className="btn btn-secondary">
               Cancel
             </Link>
             <button type="submit" className="btn btn-primary" disabled={loading}>
-              <Save size={18} />
-              <span>{loading ? 'Creating...' : 'Save Lead'}</span>
+              <Save size={16} />
+              <span>{loading ? 'Creating...' : 'Create Lead'}</span>
             </button>
           </div>
         </form>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { reportApi } from '../api/reportApi';
-import { formatCurrency } from '../utils/formatters';
+import { formatCurrency, formatRelativeTime } from '../utils/formatters';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -18,6 +18,7 @@ import {
   BarChart2,
   ArrowUpRight,
   Sparkles,
+  Share2,
 } from 'lucide-react';
 
 export const Dashboard = () => {
@@ -294,6 +295,100 @@ export const Dashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Manager / Admin Team Performance & Handover Analytics */}
+      {!isExecutive && (
+        <div className="dashboard-charts-grid" style={{ marginTop: '1.5rem' }}>
+          {/* Leads by Executive */}
+          <div className="chart-card col-span-6">
+            <div className="chart-card-header">
+              <h3 className="chart-title">
+                <Users size={18} /> Leads by Executive
+              </h3>
+            </div>
+            <div className="bar-chart-container">
+              {(!data.leads_by_executive || data.leads_by_executive.length === 0) ? (
+                <p className="text-muted" style={{ padding: '1.5rem 1rem', textAlign: 'center' }}>
+                  No sales executives found.
+                </p>
+              ) : (
+                data.leads_by_executive.map((item) => {
+                  const maxCount = Math.max(...data.leads_by_executive.map((e) => e.count), 1);
+                  const pct = (item.count / maxCount) * 100;
+                  return (
+                    <div key={item.id} className="bar-chart-row">
+                      <div className="bar-chart-info">
+                        <span className="bar-chart-label" style={{ fontWeight: 500 }}>
+                          {item.name}
+                        </span>
+                        <span className="bar-chart-count" style={{ fontWeight: 600 }}>
+                          {item.count} leads
+                        </span>
+                      </div>
+                      <div className="bar-track">
+                        <div
+                          className="bar-fill"
+                          style={{ width: `${pct}%`, backgroundColor: 'var(--primary)' }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Recently Handed Over Leads */}
+          <div className="chart-card col-span-6">
+            <div className="chart-card-header">
+              <h3 className="chart-title">
+                <Share2 size={18} /> Recently Handed Over Leads
+              </h3>
+            </div>
+            <div style={{ padding: '0.75rem 1rem' }}>
+              {(!data.recent_handovers || data.recent_handovers.length === 0) ? (
+                <p className="text-muted" style={{ padding: '1.5rem 1rem', textAlign: 'center' }}>
+                  No recent lead handovers.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
+                  {data.recent_handovers.map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '0.75rem',
+                        background: 'rgba(255,255,255,0.02)',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--border-subtle)',
+                      }}
+                    >
+                      <div>
+                        <Link
+                          to={`/leads/${item.lead_id}`}
+                          style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.875rem' }}
+                        >
+                          {item.company_name ? `${item.company_name} (${item.lead_name})` : item.lead_name}
+                        </Link>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.2rem' }}>
+                          <span style={{ color: '#fbbf24' }}>{item.previous_assignee}</span> →{' '}
+                          <span style={{ color: 'var(--success)' }}>{item.new_assignee}</span>
+                          {item.reason && ` • Reason: ${item.reason}`}
+                        </div>
+                      </div>
+                      <span className="text-dim font-sm" style={{ whiteSpace: 'nowrap', fontSize: '0.75rem' }}>
+                        {formatRelativeTime(item.created_at)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

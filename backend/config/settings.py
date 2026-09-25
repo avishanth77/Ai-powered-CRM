@@ -169,3 +169,11 @@ SPECTACULAR_SETTINGS = {
     'SERVE_INCLUDE_SCHEMA': False,
     'COMPONENT_SPLIT_REQUEST': True,
 }
+
+# ==============================================================================
+# EMAIL CONFIGURATION (Development Console Backend)
+# ==============================================================================
+# In development, emails are printed directly to the standard output (console/terminal)
+# where `runserver` runs. This prevents accidental real emails and requires no credentials.
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'crm-notifications@example.com')

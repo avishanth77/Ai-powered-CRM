@@ -23,9 +23,16 @@ from accounts.views import (
     ResetPasswordView,
 )
 
+from leads.views import LeadStageViewSet
+from leads.views_email import EmailTestView
+
 # Top-level API router for Users
 user_router = DefaultRouter()
 user_router.register(r'', UserViewSet, basename='system-users')
+
+# Top-level API router for Lead Stages
+stage_router = DefaultRouter()
+stage_router.register(r'', LeadStageViewSet, basename='lead-stages')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -42,12 +49,18 @@ urlpatterns = [
     # System Users Management
     path('api/users/', include(user_router.urls)),
 
+    # Dynamic Lead Stages
+    path('api/lead-stages/', include(stage_router.urls)),
+
     # Core CRM Modules
     path('api/leads/', include('leads.urls')),
     path('api/customers/', include('customers.urls')),
     path('api/follow-ups/', include('followups.urls')),
     path('api/activity/', include('activity.urls')),
     path('api/reports/', include('reports.urls')),
+
+    # Email Testing Endpoint
+    path('api/email/test/', EmailTestView.as_view(), name='email-test'),
 
     # API Documentation (Swagger UI & OpenAPI Schema)
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

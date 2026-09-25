@@ -1,0 +1,18 @@
+Dear {{ customer_name }},
+
+We are writing to update you on the status of your inquiry regarding "{{ company_name }}".
+
+STATUS UPDATE SUMMARY
+==================================================
+• Lead ID:           #{{ lead.id }}
+• Previous Stage:    {{ old_stage_name }}
+• Current Stage:     {{ new_stage_name }}
+• Sales Executive:   {{ sales_executive_name }}
+• Updated On:        {{ updated_time }}
+==================================================
+
+Our team is actively working on your request. If you have any questions or require further assistance, please feel free to reply directly to this notification.
+
+Warm regards,
+{{ sales_executive_name }}
+CRM Lite Customer Success Team

@@ -20,7 +20,18 @@ class FollowUpViewSet(viewsets.ModelViewSet):
     serializer_class = FollowUpSerializer
     filterset_class = FollowUpFilter
     ordering_fields = ['follow_up_at', 'status', 'purpose', 'created_at']
-    ordering = ['follow_up_at']
+    ordering = ['-follow_up_at', '-created_at']
+    search_fields = [
+        'purpose',
+        'outcome',
+        'lead__name',
+        'lead__company_name',
+        'customer__name',
+        'customer__company_name',
+        'assigned_to__first_name',
+        'assigned_to__last_name',
+        'assigned_to__email',
+    ]
 
     def get_queryset(self):
         user = self.request.user
@@ -126,10 +137,12 @@ class FollowUpViewSet(viewsets.ModelViewSet):
         """
         List overdue follow-ups (pending follow-ups with scheduled time in the past).
         """
-        qs = self.get_queryset().filter(
-            status=FollowUp.Status.PENDING,
-            follow_up_at__lt=timezone.now()
-        ).order_by('follow_up_at')
+        qs = self.filter_queryset(
+            self.get_queryset().filter(
+                status=FollowUp.Status.PENDING,
+                follow_up_at__lt=timezone.now()
+            )
+        )
         page = self.paginate_queryset(qs)
         if page is not None:
             serializer = self.get_serializer(page, many=True)
@@ -146,9 +159,14 @@ class FollowUpViewSet(viewsets.ModelViewSet):
         start_of_day = timezone.make_aware(datetime.combine(now.date(), time.min))
         end_of_day = timezone.make_aware(datetime.combine(now.date(), time.max))
 
-        qs = self.get_queryset().filter(
-            follow_up_at__range=(start_of_day, end_of_day)
-        ).order_by('follow_up_at')
-
+        qs = self.filter_queryset(
+            self.get_queryset().filter(
+                follow_up_at__range=(start_of_day, end_of_day)
+            )
+        )
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
         serializer = self.get_serializer(qs, many=True)
         return Response({'success': True, 'data': serializer.data})

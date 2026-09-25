@@ -21,13 +21,13 @@ export const followupApi = {
     return response.data;
   },
 
-  getOverdue: async () => {
-    const response = await api.get('/api/follow-ups/overdue/');
+  getOverdue: async (params = {}) => {
+    const response = await api.get('/api/follow-ups/overdue/', { params });
     return response.data;
   },
 
-  getToday: async () => {
-    const response = await api.get('/api/follow-ups/today/');
+  getToday: async (params = {}) => {
+    const response = await api.get('/api/follow-ups/today/', { params });
     return response.data;
   },
 

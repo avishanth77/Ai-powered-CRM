@@ -34,6 +34,7 @@ import './styles/forms.css';
 import './styles/modal.css';
 import './styles/responsive.css';
 
+
 const AppLayout = () => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [overdueCount, setOverdueCount] = useState(0);
@@ -45,7 +46,7 @@ const AppLayout = () => {
         const count = res.count !== undefined ? res.count : Array.isArray(res.data) ? res.data.length : 0;
         setOverdueCount(count);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   return (

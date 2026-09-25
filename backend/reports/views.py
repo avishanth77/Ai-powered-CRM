@@ -9,7 +9,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import permissions, status
 
-from leads.models import Lead, LeadSource
+from leads.models import Lead, LeadSource, LeadStage, LeadHandover
 from customers.models import Customer
 from followups.models import FollowUp
 from accounts.models import User
@@ -37,13 +37,13 @@ class ReportSummaryView(APIView):
             customers_qs = customers_qs.filter(created_by=user)
 
         total_leads = leads_qs.count()
-        new_leads = leads_qs.filter(status=Lead.Status.NEW).count()
-        contacted_leads = leads_qs.filter(status=Lead.Status.CONTACTED).count()
-        demo_scheduled_leads = leads_qs.filter(status=Lead.Status.DEMO_SCHEDULED).count()
-        negotiation_leads = leads_qs.filter(status=Lead.Status.NEGOTIATION).count()
-        qualified_leads = leads_qs.filter(status=Lead.Status.QUALIFIED).count()
-        won_leads = leads_qs.filter(status=Lead.Status.WON).count()
-        lost_leads = leads_qs.filter(status=Lead.Status.LOST).count()
+        new_leads = leads_qs.filter(stage__slug='new').count()
+        contacted_leads = leads_qs.filter(stage__slug='contacted').count()
+        demo_scheduled_leads = leads_qs.filter(stage__slug='demo-scheduled').count()
+        negotiation_leads = leads_qs.filter(stage__slug='negotiation').count()
+        qualified_leads = leads_qs.filter(stage__slug='qualified').count()
+        won_leads = leads_qs.filter(stage__slug='won').count()
+        lost_leads = leads_qs.filter(stage__slug='lost').count()
 
         total_customers = customers_qs.count()
 
@@ -74,11 +74,18 @@ class ReportSummaryView(APIView):
 
         # Charts Data
 
-        # 1. Leads by status
+        # 1. Leads by status / stage (Dynamic from database)
         status_data = []
-        for st_key, st_label in Lead.Status.choices:
-            cnt = leads_qs.filter(status=st_key).count()
-            status_data.append({'status': st_key, 'label': st_label, 'count': cnt})
+        for st in LeadStage.objects.all().order_by('display_order', 'id'):
+            cnt = leads_qs.filter(stage=st).count()
+            status_data.append({
+                'status': st.slug.upper().replace('-', '_'),
+                'stage_id': st.id,
+                'stage_slug': st.slug,
+                'label': st.name,
+                'color': st.color,
+                'count': cnt
+            })
 
         # 2. Leads by source
         source_counts = leads_qs.values('source__name').annotate(count=Count('id')).order_by('-count')
@@ -105,21 +112,48 @@ class ReportSummaryView(APIView):
             for item in monthly_counts
         ]
 
-        # 5. User performance (for Manager / Admin)
+        # 5. User performance & Leads by Executive (for Manager / Admin)
         user_performance = []
+        leads_by_executive = []
+        recent_handovers = []
+
         if user.role in ['ADMIN', 'MANAGER'] or user.is_superuser:
             executives = User.objects.filter(is_active=True).order_by('first_name')
             for exec_user in executives:
                 user_leads = Lead.objects.filter(assigned_to=exec_user)
-                user_won = user_leads.filter(status=Lead.Status.WON).count()
+                user_won = user_leads.filter(stage__slug='won').count()
+                cnt = user_leads.count()
                 user_performance.append({
                     'user_id': exec_user.id,
                     'name': exec_user.get_full_name() or exec_user.email,
                     'role': exec_user.role,
-                    'total_leads': user_leads.count(),
+                    'total_leads': cnt,
                     'won_leads': user_won,
                     'expected_value': user_leads.aggregate(s=Sum('expected_value'))['s'] or 0,
                     'pending_followups': FollowUp.objects.filter(assigned_to=exec_user, status=FollowUp.Status.PENDING).count()
+                })
+                if exec_user.role == User.Role.EXECUTIVE:
+                    leads_by_executive.append({
+                        'user_id': exec_user.id,
+                        'name': exec_user.get_full_name() or exec_user.email,
+                        'email': exec_user.email,
+                        'count': cnt,
+                        'leads_count': cnt,
+                    })
+
+            # Recent handovers
+            handovers_qs = LeadHandover.objects.select_related('lead', 'previous_assignee', 'new_assignee', 'handed_over_by').order_by('-created_at')[:8]
+            for h in handovers_qs:
+                recent_handovers.append({
+                    'id': h.id,
+                    'lead_id': h.lead_id,
+                    'lead_name': h.lead.name,
+                    'company_name': h.lead.company_name or '',
+                    'previous_assignee': h.previous_assignee.get_full_name() or h.previous_assignee.email if h.previous_assignee else 'Unassigned',
+                    'new_assignee': h.new_assignee.get_full_name() or h.new_assignee.email if h.new_assignee else 'None',
+                    'reason': h.reason,
+                    'handed_over_by': h.handed_over_by.get_full_name() or h.handed_over_by.email if h.handed_over_by else 'Admin',
+                    'created_at': h.created_at.isoformat(),
                 })
 
         return Response({
@@ -149,16 +183,12 @@ class ReportSummaryView(APIView):
                     'won_vs_lost': {
                         'won': won_leads,
                         'lost': lost_leads,
-                        'active': total_leads - (won_leads + lost_leads)
-                    },
-                    'followup_stats': {
-                        'completed': completed_followups,
-                        'overdue': overdue_followups,
-                        'pending': followups_qs.filter(status=FollowUp.Status.PENDING, follow_up_at__gte=now).count(),
-                        'cancelled': followups_qs.filter(status=FollowUp.Status.CANCELLED).count()
+                        'active': total_leads - closed_leads
                     }
                 },
-                'user_performance': user_performance
+                'user_performance': user_performance,
+                'leads_by_executive': leads_by_executive,
+                'recent_handovers': recent_handovers,
             }
         })
 
@@ -172,26 +202,40 @@ class CSVRenderer(BaseRenderer):
     def render(self, data, accepted_media_type=None, renderer_context=None):
         return data
 
-class ExportReportView(APIView):
+
+class ReportExportView(APIView):
     """
-    Export leads & CRM performance records as a formatted CSV file.
-    Supports filters for date range, status, priority, and source.
-    Available to Admin and Sales Manager.
+    CSV Data Export Endpoint.
+    Generates downloadable CSV for Leads, Customers, or Follow-ups.
     """
     permission_classes = [permissions.IsAuthenticated]
     renderer_classes = [CSVRenderer]
 
+
     def get(self, request):
         user = request.user
+        export_type = request.query_params.get('type', 'leads').lower()
+
+        # Sales Executive can only export their own assigned records
+        if export_type == 'leads':
+            return self.export_leads(request, user)
+        elif export_type == 'customers':
+            return self.export_customers(request, user)
+        elif export_type == 'followups':
+            return self.export_followups(request, user)
+        else:
+            return Response(
+                {'error': 'Invalid export type. Must be leads, customers, or followups.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+    def export_leads(self, request, user):
+        qs = Lead.objects.select_related('source', 'stage', 'assigned_to', 'created_by').all()
+
         if user.role == 'EXECUTIVE' and not user.is_superuser:
-            return Response({
-                'success': False,
-                'message': 'Permission denied. Only Managers and Admins can export CRM reports.'
-            }, status=status.HTTP_403_FORBIDDEN)
+            qs = qs.filter(Q(assigned_to=user) | Q(created_by=user))
 
-        qs = Lead.objects.select_related('source', 'assigned_to', 'created_by').all().order_by('-created_at')
-
-        # Filters
+        # Apply basic filters
         status_param = request.query_params.get('status')
         source_param = request.query_params.get('source')
         priority_param = request.query_params.get('priority')
@@ -200,7 +244,7 @@ class ExportReportView(APIView):
         to_date = request.query_params.get('to_date')
 
         if status_param:
-            qs = qs.filter(status=status_param)
+            qs = qs.filter(Q(stage__slug__iexact=status_param) | Q(stage__name__iexact=status_param))
         if source_param:
             qs = qs.filter(source_id=source_param)
         if priority_param:
@@ -255,3 +299,56 @@ class ExportReportView(APIView):
             ])
 
         return response
+
+    def export_customers(self, request, user):
+        qs = Customer.objects.select_related('created_by', 'lead').all()
+        if user.role == 'EXECUTIVE' and not user.is_superuser:
+            qs = qs.filter(created_by=user)
+
+        response = HttpResponse(content_type='text/csv')
+        filename = f"crm_lite_customers_report_{timezone.now():%Y%m%d_%H%M%S}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response)
+        writer.writerow(['Customer ID', 'Name', 'Company', 'Phone', 'Email', 'Converted Date', 'Created By'])
+
+        for c in qs:
+            writer.writerow([
+                c.id,
+                c.name,
+                c.company_name or '',
+                c.phone,
+                c.email or '',
+                c.converted_at.strftime('%Y-%m-%d %H:%M:%S') if c.converted_at else '',
+                c.created_by.get_full_name() if c.created_by else 'System'
+            ])
+
+        return response
+
+    def export_followups(self, request, user):
+        qs = FollowUp.objects.select_related('lead', 'assigned_to', 'created_by').all()
+        if user.role == 'EXECUTIVE' and not user.is_superuser:
+            qs = qs.filter(assigned_to=user)
+
+        response = HttpResponse(content_type='text/csv')
+        filename = f"crm_lite_followups_report_{timezone.now():%Y%m%d_%H%M%S}.csv"
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+        writer = csv.writer(response)
+        writer.writerow(['Follow-up ID', 'Lead Name', 'Purpose', 'Scheduled At', 'Status', 'Assigned To', 'Outcome'])
+
+        for f in qs:
+            writer.writerow([
+                f.id,
+                f.lead.name if f.lead else 'N/A',
+                f.purpose,
+                f.follow_up_at.strftime('%Y-%m-%d %H:%M:%S'),
+                f.status,
+                f.assigned_to.get_full_name() if f.assigned_to else 'Unassigned',
+                f.outcome or ''
+            ])
+
+        return response
+
+
+ExportReportView = ReportExportView

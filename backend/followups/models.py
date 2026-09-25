@@ -49,7 +49,7 @@ class FollowUp(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ['follow_up_at']
+        ordering = ['-follow_up_at']
         indexes = [
             models.Index(fields=['status']),
             models.Index(fields=['follow_up_at']),

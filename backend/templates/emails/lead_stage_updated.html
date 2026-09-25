@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Your Lead Status Has Been Updated</title>
+  <style>
+    /* Client-specific resets */
+    body, table, td, a { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
+    table, td { mso-table-lspace: 0pt; mso-table-rspace: 0pt; }
+    img { -ms-interpolation-mode: bicubic; border: 0; outline: none; text-decoration: none; }
+    body { margin: 0; padding: 0; width: 100% !important; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+  </style>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased;">
+  <!-- Email Wrapper -->
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f1f5f9; padding: 30px 15px;">
+    <tr>
+      <td align="center">
+        <!-- Main Container Card (600px max) -->
+        <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03); border: 1px solid #e2e8f0;">
+          
+          <!-- Header Banner -->
+          <tr>
+            <td style="background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); padding: 28px 32px; text-align: left;">
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                <tr>
+                  <td>
+                    <div style="display: inline-block; background-color: rgba(99, 102, 241, 0.2); border: 1px solid rgba(129, 140, 248, 0.4); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #c7d2fe; letter-spacing: 0.05em; text-transform: uppercase;">
+                      CRM Lite • Notification
+                    </div>
+                    <h1 style="margin: 12px 0 0 0; color: #ffffff; font-size: 20px; font-weight: 700; line-height: 1.3;">
+                      Lead Status Updated
+                    </h1>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+
+          <!-- Main Content Body -->
+          <tr>
+            <td style="padding: 32px 32px 24px 32px;">
+              <p style="margin: 0 0 16px 0; font-size: 15px; line-height: 1.6; color: #334155;">
+                Dear <strong>{{ customer_name }}</strong>,
+              </p>
+              <p style="margin: 0 0 24px 0; font-size: 15px; line-height: 1.6; color: #475569;">
+                We are writing to update you on the current progress of your inquiry regarding <strong>{{ company_name }}</strong>.
+              </p>
+
+              <!-- Stage Transition Highlight Card -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background-color: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 24px;">
+                <tr>
+                  <td style="padding: 20px; text-align: center;">
+                    <div style="font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 12px;">
+                      Stage Transition
+                    </div>
+                    <table role="presentation" cellspacing="0" cellpadding="0" border="0" align="center">
+                      <tr>
+                        <!-- Previous Stage Pill -->
+                        <td align="center" style="background-color: #e2e8f0; color: #475569; padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600;">
+                          {{ old_stage_name }}
+                        </td>
+                        <!-- Arrow Indicator -->
+                        <td style="padding: 0 14px; font-size: 16px; color: #94a3b8; font-weight: bold;">
+                          ➔
+                        </td>
+                        <!-- New Stage Pill with dynamic color accent -->
+                        <td align="center" style="background-color: {{ new_stage_color|default:'#4f46e5' }}; color: #ffffff; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                          {{ new_stage_name }}
+                        </td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Lead Details Summary Box -->
+              <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="margin-bottom: 24px;">
+                <tr>
+                  <td style="border-top: 1px solid #f1f5f9; padding-top: 16px;">
+                    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #64748b; width: 140px;">Reference ID:</td>
+                        <td style="padding: 6px 0; font-size: 13px; color: #0f172a; font-weight: 600;">#{{ lead.id }}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #64748b;">Account / Lead:</td>
+                        <td style="padding: 6px 0; font-size: 13px; color: #0f172a; font-weight: 600;">{{ company_name }}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #64748b;">Sales Executive:</td>
+                        <td style="padding: 6px 0; font-size: 13px; color: #0f172a; font-weight: 600;">{{ sales_executive_name }}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding: 6px 0; font-size: 13px; color: #64748b;">Last Updated:</td>
+                        <td style="padding: 6px 0; font-size: 13px; color: #0f172a; font-weight: 600;">{{ updated_time }}</td>
+                      </tr>
+                    </table>
+                  </td>
+                </tr>
+              </table>
+
+              <!-- Action / Support Message -->
+              <p style="margin: 0 0 24px 0; font-size: 14px; line-height: 1.6; color: #475569;">
+                Our team is actively moving your request forward. If you have questions or would like to share further details, please reply directly to this notification.
+              </p>
+
+              <!-- Sign-off -->
+              <p style="margin: 0; font-size: 14px; line-height: 1.5; color: #334155;">
+                Warm regards,<br>
+                <strong>{{ sales_executive_name }}</strong><br>
+                <span style="font-size: 13px; color: #64748b;">CRM Lite Customer Success Team</span>
+              </p>
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background-color: #f8fafc; border-top: 1px solid #e2e8f0; padding: 20px 32px; text-align: center;">
+              <p style="margin: 0 0 4px 0; font-size: 12px; color: #94a3b8;">
+                This automated update was sent by CRM Lite on behalf of {{ sales_executive_name }}.
+              </p>
+              <p style="margin: 0; font-size: 11px; color: #cbd5e1;">
+                CRM Lite Pipeline Management • Confidential & Proprietary
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>

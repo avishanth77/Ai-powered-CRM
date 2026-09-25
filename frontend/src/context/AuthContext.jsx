@@ -76,12 +76,15 @@ export const AuthProvider = ({ children }) => {
     isExecutive,
     isManagerOrAdmin,
     canAssignLeads: isManagerOrAdmin,
+    canHandoverLeads: isManagerOrAdmin,
     canConvertLeads: isManagerOrAdmin,
     canDeleteLeads: isAdmin,
     canExportReports: isManagerOrAdmin,
     canManageUsers: isAdmin,
     canManageSources: isManagerOrAdmin,
+    canManageStages: isAdmin,
   };
+
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };

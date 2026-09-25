@@ -1,9 +1,10 @@
 import django_filters
 from django.db.models import Q
-from .models import Lead, LeadSource
+from .models import Lead, LeadSource, LeadStage
 
 class LeadFilter(django_filters.FilterSet):
-    status = django_filters.ChoiceFilter(choices=Lead.Status.choices)
+    stage = django_filters.ModelChoiceFilter(queryset=LeadStage.objects.all())
+    status = django_filters.CharFilter(method='filter_status')
     priority = django_filters.ChoiceFilter(choices=Lead.Priority.choices)
     source = django_filters.ModelChoiceFilter(queryset=LeadSource.objects.all())
     assigned_to = django_filters.NumberFilter(field_name='assigned_to__id')
@@ -18,6 +19,7 @@ class LeadFilter(django_filters.FilterSet):
     class Meta:
         model = Lead
         fields = [
+            'stage',
             'status',
             'priority',
             'source',
@@ -30,6 +32,15 @@ class LeadFilter(django_filters.FilterSet):
             'expected_value_max',
             'keyword',
         ]
+
+    def filter_status(self, queryset, name, value):
+        if not value:
+            return queryset
+        val = value.strip()
+        q = Q(stage__slug__iexact=val.lower().replace('_', '-')) | Q(stage__slug__iexact=val) | Q(stage__name__iexact=val)
+        if val.isdigit():
+            q |= Q(stage__id=int(val))
+        return queryset.filter(q)
 
     def filter_keyword(self, queryset, name, value):
         if not value:

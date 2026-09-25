@@ -4,6 +4,7 @@ import { leadApi } from '../api/leadApi';
 import { reportApi } from '../api/reportApi';
 import { followupApi } from '../api/followupApi';
 import { activityApi } from '../api/activityApi';
+import { userApi } from '../api/userApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatCurrency, formatDate, formatDateTime } from '../utils/formatters';
@@ -47,16 +48,19 @@ import {
   FileSpreadsheet,
   AlertCircle,
   FileText,
+  Share2,
 } from 'lucide-react';
 
 export const Leads = () => {
-  const { user, canDeleteLeads } = useAuth();
+  const { user, canDeleteLeads, canHandoverLeads } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
 
   // Primary Leads State
   const [leads, setLeads] = useState([]);
   const [sources, setSources] = useState([]);
+  const [stages, setStages] = useState([]);
+  const [executives, setExecutives] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
@@ -67,6 +71,14 @@ export const Leads = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
+  const [assignedToFilter, setAssignedToFilter] = useState('');
+
+  // Bulk Handover State
+  const [selectedLeads, setSelectedLeads] = useState([]);
+  const [bulkModalOpen, setBulkModalOpen] = useState(false);
+  const [bulkTarget, setBulkTarget] = useState('');
+  const [bulkReason, setBulkReason] = useState('');
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
 
   // Dashboard Enrichment State
   const [kpis, setKpis] = useState(null);
@@ -91,7 +103,7 @@ export const Leads = () => {
     follow_up_at: '',
   });
 
-  // Load Lead Sources for filter dropdown
+  // Load Lead Sources, Dynamic Stages, and Executives
   useEffect(() => {
     leadApi
       .getSources()
@@ -100,7 +112,24 @@ export const Leads = () => {
         else if (Array.isArray(res)) setSources(res);
       })
       .catch(() => {});
-  }, []);
+
+    leadApi
+      .getStages()
+      .then((res) => {
+        setStages(res.results || (Array.isArray(res) ? res : []));
+      })
+      .catch(() => {});
+
+    if (canHandoverLeads) {
+      userApi
+        .getUsers()
+        .then((res) => {
+          const list = res.results || (Array.isArray(res) ? res : []);
+          setExecutives(list.filter((u) => u.is_active && u.role === 'EXECUTIVE'));
+        })
+        .catch(() => {});
+    }
+  }, [canHandoverLeads]);
 
   // Fetch KPI Summary Data
   const fetchKpis = useCallback(async () => {
@@ -117,8 +146,8 @@ export const Leads = () => {
   // Fetch Upcoming Follow-ups
   const fetchUpcomingFollowups = useCallback(async () => {
     try {
-      const res = await followupApi.getFollowUps({ page_size: 5, ordering: 'follow_up_at' });
-      const items = res?.results || (Array.isArray(res) ? res : []);
+      const res = await followupApi.getFollowUps({ page_size: 5, ordering: 'follow_up_at', status: 'PENDING' });
+      const items = res?.results || res?.data || (Array.isArray(res) ? res : []);
       setFollowups(items);
     } catch {
       setFollowups([]);
@@ -151,6 +180,7 @@ export const Leads = () => {
         status: statusFilter || undefined,
         priority: priorityFilter || undefined,
         source: sourceFilter || undefined,
+        assigned_to: assignedToFilter || undefined,
       };
 
       const res = await leadApi.getLeads(params);
@@ -166,7 +196,7 @@ export const Leads = () => {
     } finally {
       setLoading(false);
     }
-  }, [currentPage, search, statusFilter, priorityFilter, sourceFilter, showToast]);
+  }, [currentPage, search, statusFilter, priorityFilter, sourceFilter, assignedToFilter, showToast]);
 
   useEffect(() => {
     fetchLeads();
@@ -190,6 +220,55 @@ export const Leads = () => {
   const handleSourceChange = (e) => {
     setSourceFilter(e.target.value);
     setCurrentPage(1);
+  };
+
+  const handleAssignedToChange = (e) => {
+    setAssignedToFilter(e.target.value);
+    setCurrentPage(1);
+  };
+
+  // Bulk Selection Handlers
+  const handleToggleSelectAll = (e) => {
+    if (e.target.checked) {
+      setSelectedLeads(leads.map((l) => l.id));
+    } else {
+      setSelectedLeads([]);
+    }
+  };
+
+  const handleToggleSelect = (leadId) => {
+    setSelectedLeads((prev) =>
+      prev.includes(leadId) ? prev.filter((id) => id !== leadId) : [...prev, leadId]
+    );
+  };
+
+  const handleConfirmBulkHandover = async (e) => {
+    e.preventDefault();
+    if (!bulkTarget || selectedLeads.length === 0) return;
+    if (!bulkReason.trim()) {
+      showToast('Please provide a handover reason.', 'warning');
+      return;
+    }
+
+    setBulkSubmitting(true);
+    try {
+      const res = await leadApi.bulkHandover({
+        lead_ids: selectedLeads,
+        new_assigned_to: parseInt(bulkTarget),
+        reason: bulkReason.trim(),
+      });
+      showToast(res.message || `Successfully handed over ${selectedLeads.length} lead(s).`, 'success');
+      setBulkModalOpen(false);
+      setSelectedLeads([]);
+      setBulkTarget('');
+      setBulkReason('');
+      fetchLeads();
+      fetchKpis();
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Bulk handover failed'), 'error');
+    } finally {
+      setBulkSubmitting(false);
+    }
   };
 
   // Pipeline stage click filter
@@ -239,6 +318,15 @@ export const Leads = () => {
     } finally {
       setExporting(false);
     }
+  };
+
+  const handleOpenScheduleForLead = (lead) => {
+    setNewFollowup({
+      lead: lead.id.toString(),
+      purpose: 'Phone Call',
+      follow_up_at: '',
+    });
+    setScheduleModalOpen(true);
   };
 
   // Quick Schedule Follow-up
@@ -518,14 +606,22 @@ export const Leads = () => {
               className="filter-select"
               value={statusFilter}
               onChange={handleStatusChange}
-              aria-label="Filter by Status"
+              aria-label="Filter by Lead Stage"
             >
-              <option value="">All Statuses</option>
-              {Object.entries(LEAD_STATUS).map(([key, val]) => (
-                <option key={key} value={val}>
-                  {val.replace('_', ' ')}
-                </option>
-              ))}
+              <option value="">All Stages</option>
+              {stages.length > 0 ? (
+                stages.map((st) => (
+                  <option key={st.id} value={st.slug || st.name}>
+                    {st.name}
+                  </option>
+                ))
+              ) : (
+                Object.entries(LEAD_STATUS).map(([key, val]) => (
+                  <option key={key} value={val}>
+                    {val.replace('_', ' ')}
+                  </option>
+                ))
+              )}
             </select>
           </div>
 
@@ -556,11 +652,63 @@ export const Leads = () => {
               </option>
             ))}
           </select>
+
+          {canHandoverLeads && (
+            <select
+              className="filter-select"
+              value={assignedToFilter}
+              onChange={handleAssignedToChange}
+              aria-label="Filter by Assigned Executive"
+            >
+              <option value="">All Executives</option>
+              {executives.map((exec) => (
+                <option key={exec.id} value={exec.id}>
+                  {exec.full_name || exec.email}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
       {/* Primary Leads Table */}
       <div className="table-responsive">
+        {canHandoverLeads && selectedLeads.length > 0 && (
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'rgba(99, 102, 241, 0.12)',
+              border: '1px solid rgba(99, 102, 241, 0.35)',
+              padding: '0.625rem 1rem',
+              borderRadius: 'var(--radius-md)',
+              marginBottom: '1rem',
+            }}
+          >
+            <span style={{ fontWeight: 600, color: 'var(--primary)', fontSize: '0.875rem' }}>
+              {selectedLeads.length} lead{selectedLeads.length > 1 ? 's' : ''} selected
+            </span>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={() => setSelectedLeads([])}
+              >
+                Deselect All
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                onClick={() => setBulkModalOpen(true)}
+              >
+                <Share2 size={14} />
+                <span>Handover Selected ({selectedLeads.length})</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {loading ? (
           <LoadingSpinner text="Retrieving leads..." />
         ) : leads.length === 0 ? (
@@ -574,6 +722,16 @@ export const Leads = () => {
           <table className="crm-table">
             <thead>
               <tr>
+                {canHandoverLeads && (
+                  <th style={{ width: '38px', textAlign: 'center' }}>
+                    <input
+                      type="checkbox"
+                      checked={leads.length > 0 && selectedLeads.length === leads.length}
+                      onChange={handleToggleSelectAll}
+                      aria-label="Select all leads"
+                    />
+                  </th>
+                )}
                 <th>Lead / Company</th>
                 <th>Contact</th>
                 <th>Source</th>
@@ -588,6 +746,16 @@ export const Leads = () => {
             <tbody>
               {leads.map((lead) => (
                 <tr key={lead.id}>
+                  {canHandoverLeads && (
+                    <td style={{ textAlign: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={selectedLeads.includes(lead.id)}
+                        onChange={() => handleToggleSelect(lead.id)}
+                        aria-label={`Select lead ${lead.name}`}
+                      />
+                    </td>
+                  )}
                   <td>
                     <div className="lead-name-cell">
                       <Link to={`/leads/${lead.id}`} className="lead-primary-name">
@@ -616,7 +784,7 @@ export const Leads = () => {
                     </span>
                   </td>
                   <td>
-                    <StatusBadge status={lead.status} />
+                    <StatusBadge status={lead.stage_details || lead.status} />
                   </td>
                   <td>
                     <PriorityBadge priority={lead.priority} />
@@ -640,6 +808,14 @@ export const Leads = () => {
                   </td>
                   <td className="table-action-col">
                     <div className="action-buttons-group" style={{ justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        className="icon-action-btn"
+                        title="Schedule Follow-up"
+                        onClick={() => handleOpenScheduleForLead(lead)}
+                      >
+                        <CalendarPlus size={15} />
+                      </button>
                       <Link
                         to={`/leads/${lead.id}`}
                         className="icon-action-btn"
@@ -910,6 +1086,70 @@ export const Leads = () => {
                   disabled={importing || !selectedFile}
                 >
                   {importing ? 'Processing File...' : 'Upload & Import Leads'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Modal: Bulk Handover Leads */}
+      {bulkModalOpen && (
+        <div className="modal-backdrop" onClick={() => setBulkModalOpen(false)}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <div className="modal-title-row">
+                <Share2 size={18} color="var(--primary)" />
+                <h3>Bulk Handover Leads</h3>
+              </div>
+              <button className="modal-close-btn" onClick={() => setBulkModalOpen(false)}>✕</button>
+            </div>
+            <form onSubmit={handleConfirmBulkHandover}>
+              <div className="modal-body form-layout">
+                <p className="text-muted font-sm">
+                  Transferring <strong>{selectedLeads.length}</strong> selected lead(s) to a new Sales Executive.
+                </p>
+                <div className="form-group">
+                  <label className="form-label form-label-required" htmlFor="bulk-exec-target">Transfer To</label>
+                  <select
+                    id="bulk-exec-target"
+                    className="form-control"
+                    value={bulkTarget}
+                    onChange={(e) => setBulkTarget(e.target.value)}
+                    required
+                  >
+                    <option value="">Select Sales Executive</option>
+                    {executives.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.full_name || u.email}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label form-label-required" htmlFor="bulk-handover-reason">Reason</label>
+                  <textarea
+                    id="bulk-handover-reason"
+                    className="form-control"
+                    rows={3}
+                    placeholder="e.g. John is on leave, regional portfolio reallocation..."
+                    value={bulkReason}
+                    onChange={(e) => setBulkReason(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setBulkModalOpen(false)}>
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={bulkSubmitting || !bulkTarget || !bulkReason.trim()}
+                >
+                  <Share2 size={14} />
+                  <span>{bulkSubmitting ? 'Transferring...' : 'Confirm Bulk Handover'}</span>
                 </button>
               </div>
             </form>

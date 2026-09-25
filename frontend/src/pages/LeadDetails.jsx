@@ -17,6 +17,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { PriorityBadge } from '../components/PriorityBadge';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { ConfirmModal } from '../components/ConfirmModal';
+import { LostReasonModal } from '../components/LostReasonModal';
 
 import {
   ArrowLeft,
@@ -38,22 +39,28 @@ import {
   Send,
   Sparkles,
   Bot,
+  Copy,
+  Check,
+  Target,
+  ShieldAlert,
 } from 'lucide-react';
 
 export const LeadDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { user, canAssignLeads, canConvertLeads } = useAuth();
+  const { user, canAssignLeads, canConvertLeads, canHandoverLeads } = useAuth();
   const { showToast } = useToast();
 
   const [lead, setLead] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('notes'); // notes | followups | timeline
+  const [activeTab, setActiveTab] = useState('notes'); // notes | followups | handovers | timeline
 
-  // Data for tabs
+  // Data for tabs & dropdowns
+  const [stages, setStages] = useState([]);
   const [notes, setNotes] = useState([]);
   const [timeline, setTimeline] = useState([]);
   const [followups, setFollowups] = useState([]);
+  const [handovers, setHandovers] = useState([]);
   const [usersList, setUsersList] = useState([]);
 
   // Modals state
@@ -63,6 +70,12 @@ export const LeadDetails = () => {
   const [assignModalOpen, setAssignModalOpen] = useState(false);
   const [selectedAssignee, setSelectedAssignee] = useState('');
   const [assigning, setAssigning] = useState(false);
+
+  // Handover state
+  const [handoverModalOpen, setHandoverModalOpen] = useState(false);
+  const [handoverTarget, setHandoverTarget] = useState('');
+  const [handoverReason, setHandoverReason] = useState('');
+  const [handoverSubmitting, setHandoverSubmitting] = useState(false);
 
   const [newNoteModalOpen, setNewNoteModalOpen] = useState(false);
   const [noteData, setNoteData] = useState({ note_type: 'CALL', note_text: '' });
@@ -80,10 +93,30 @@ export const LeadDetails = () => {
   const [completionOutcome, setCompletionOutcome] = useState('');
   const [completing, setCompleting] = useState(false);
 
+  const [lostModalOpen, setLostModalOpen] = useState(false);
+  const [pendingLostStageId, setPendingLostStageId] = useState(null);
+  const [lostSubmitting, setLostSubmitting] = useState(false);
+
   // AI Summary State
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [aiSummaryData, setAiSummaryData] = useState(null);
   const [loadingAi, setLoadingAi] = useState(false);
+  const [copiedAction, setCopiedAction] = useState(false);
+  const [copiedSummary, setCopiedSummary] = useState(false);
+
+  const handleCopy = (text, type) => {
+    if (!text) return;
+    navigator.clipboard?.writeText(text);
+    if (type === 'action') {
+      setCopiedAction(true);
+      setTimeout(() => setCopiedAction(false), 2000);
+      showToast('Recommended action copied to clipboard', 'info');
+    } else if (type === 'summary') {
+      setCopiedSummary(true);
+      setTimeout(() => setCopiedSummary(false), 2000);
+      showToast('Executive summary copied to clipboard', 'info');
+    }
+  };
 
   const handleOpenAiSummary = async () => {
     setAiModalOpen(true);
@@ -106,12 +139,19 @@ export const LeadDetails = () => {
       setLead(res);
       setSelectedAssignee(res.assigned_to || '');
     } catch (err) {
-      showToast(extractErrorMessage(err, 'Failed to fetch lead profile'), 'error');
+      showToast(extractErrorMessage(err, 'Failed to load lead profile'), 'error');
       navigate('/leads');
     } finally {
       setLoading(false);
     }
   }, [id, navigate, showToast]);
+
+  const fetchStages = useCallback(async () => {
+    try {
+      const res = await leadApi.getStages();
+      setStages(res.results || (Array.isArray(res) ? res : []));
+    } catch {}
+  }, []);
 
   const fetchNotes = useCallback(async () => {
     try {
@@ -134,45 +174,94 @@ export const LeadDetails = () => {
     } catch {}
   }, [id]);
 
+  const fetchHandovers = useCallback(async () => {
+    try {
+      const res = await leadApi.getLeadHandovers(id);
+      setHandovers(res.data || (Array.isArray(res) ? res : []));
+    } catch {}
+  }, [id]);
+
   useEffect(() => {
     fetchLeadDetails();
+    fetchStages();
     fetchNotes();
     fetchTimeline();
     fetchFollowups();
+    fetchHandovers();
 
-    if (canAssignLeads) {
+    if (canAssignLeads || canHandoverLeads) {
       userApi.getUsers().then((res) => setUsersList(res.results || res)).catch(() => {});
     }
-  }, [fetchLeadDetails, fetchNotes, fetchTimeline, fetchFollowups, canAssignLeads]);
+  }, [fetchLeadDetails, fetchStages, fetchNotes, fetchTimeline, fetchFollowups, fetchHandovers, canAssignLeads, canHandoverLeads]);
 
-  // Handle Quick Status Change
-  const handleStatusChange = async (newStatus) => {
-    if (newStatus === lead.status) return;
+  // Handle Quick Stage Change
+  const handleStageChange = async (newStageId) => {
+    const targetStageObj = stages.find((s) => s.id === parseInt(newStageId));
+    if (!targetStageObj) return;
+    const isLost = targetStageObj.slug === 'lost' || targetStageObj.name.toLowerCase() === 'lost';
 
-    if (newStatus === LEAD_STATUS.LOST) {
-      const reason = window.prompt('Please provide a reason why this lead is lost:');
-      if (!reason || !reason.trim()) {
-        showToast('Lost reason is required.', 'warning');
-        return;
-      }
-      try {
-        await leadApi.updateLead(id, { status: newStatus, lost_reason: reason.trim() });
-        showToast('Lead marked as Lost.', 'info');
-        fetchLeadDetails();
-        fetchTimeline();
-      } catch (err) {
-        showToast(extractErrorMessage(err, 'Status update failed'), 'error');
-      }
+    if (isLost) {
+      setPendingLostStageId(parseInt(newStageId));
+      setLostModalOpen(true);
       return;
     }
 
     try {
-      await leadApi.updateLead(id, { status: newStatus });
-      showToast(`Status changed to ${newStatus.replace('_', ' ')}`, 'success');
+      await leadApi.updateLead(id, { stage: parseInt(newStageId) });
+      showToast(`Stage changed to ${targetStageObj.name}`, 'success');
       fetchLeadDetails();
       fetchTimeline();
     } catch (err) {
-      showToast(extractErrorMessage(err, 'Status update failed'), 'error');
+      showToast(extractErrorMessage(err, 'Stage update failed'), 'error');
+    }
+  };
+
+  const handleConfirmLost = async (reason) => {
+    if (!pendingLostStageId) return;
+    setLostSubmitting(true);
+    try {
+      await leadApi.updateLead(id, { stage: pendingLostStageId, lost_reason: reason });
+      showToast('Lead marked as Lost.', 'info');
+      setLostModalOpen(false);
+      setPendingLostStageId(null);
+      fetchLeadDetails();
+      fetchTimeline();
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Stage update failed'), 'error');
+    } finally {
+      setLostSubmitting(false);
+    }
+  };
+
+  // Handle Lead Handover (Admin & Sales Manager only)
+  const handleConfirmHandover = async (e) => {
+    e.preventDefault();
+    if (!handoverTarget) {
+      showToast('Please select a target Sales Executive.', 'warning');
+      return;
+    }
+    if (!handoverReason.trim()) {
+      showToast('Please provide a reason for the handover.', 'warning');
+      return;
+    }
+
+    setHandoverSubmitting(true);
+    try {
+      await leadApi.handoverLead(id, {
+        new_assigned_to: parseInt(handoverTarget),
+        reason: handoverReason.trim(),
+      });
+      showToast('Lead handed over successfully.', 'success');
+      setHandoverModalOpen(false);
+      setHandoverTarget('');
+      setHandoverReason('');
+      fetchLeadDetails();
+      fetchTimeline();
+      fetchHandovers();
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Lead handover failed'), 'error');
+    } finally {
+      setHandoverSubmitting(false);
     }
   };
 
@@ -219,8 +308,11 @@ export const LeadDetails = () => {
 
     setAddingNote(true);
     try {
-      await leadApi.addNote(id, noteData);
-      showToast('Note recorded.', 'success');
+      await leadApi.addNote(id, {
+        ...noteData,
+        lead: parseInt(id),
+      });
+      showToast('Communication note recorded successfully.', 'success');
       setNoteData({ note_type: 'CALL', note_text: '' });
       setNewNoteModalOpen(false);
       fetchNotes();
@@ -263,8 +355,8 @@ export const LeadDetails = () => {
   // Handle Follow-up Completion
   const handleCompleteFollowup = async (e) => {
     e.preventDefault();
-    if (!completionOutcome.trim()) {
-      showToast('Please provide an outcome note.', 'warning');
+    if (!completionOutcome.trim() || completionOutcome.trim().length < 3) {
+      showToast('Please provide an outcome note (minimum 3 characters).', 'warning');
       return;
     }
 
@@ -273,7 +365,12 @@ export const LeadDetails = () => {
       await followupApi.completeFollowUp(selectedFollowup.id, {
         outcome: completionOutcome.trim(),
       });
-      showToast('Follow-up marked as completed.', 'success');
+      showToast(
+        selectedFollowup?.status === 'COMPLETED'
+          ? 'Follow-up outcome updated!'
+          : 'Follow-up marked as completed.',
+        'success'
+      );
       setCompleteModalOpen(false);
       setSelectedFollowup(null);
       setCompletionOutcome('');
@@ -286,12 +383,43 @@ export const LeadDetails = () => {
     }
   };
 
+  const handleReopenFollowup = async () => {
+    if (!selectedFollowup) return;
+    setCompleting(true);
+    try {
+      await followupApi.updateFollowUp(selectedFollowup.id, { status: 'PENDING' });
+      showToast('Follow-up reopened as Pending!', 'success');
+      setCompleteModalOpen(false);
+      setSelectedFollowup(null);
+      setCompletionOutcome('');
+      fetchFollowups();
+      fetchTimeline();
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Failed to reopen follow-up'), 'error');
+    } finally {
+      setCompleting(false);
+    }
+  };
+
   if (loading || !lead) {
     return <LoadingSpinner text="Loading lead profile..." />;
   }
 
-  const isQualified = lead.status === LEAD_STATUS.QUALIFIED;
-  const isWon = lead.status === LEAD_STATUS.WON;
+  const isQualified =
+    lead.stage_details?.slug === 'qualified' ||
+    lead.stage?.slug === 'qualified' ||
+    lead.status === LEAD_STATUS.QUALIFIED ||
+    lead.stage_details?.name?.toLowerCase() === 'qualified';
+
+  const isWon =
+    lead.stage_details?.slug === 'won' ||
+    lead.stage?.slug === 'won' ||
+    lead.status === LEAD_STATUS.WON ||
+    lead.stage_details?.name?.toLowerCase() === 'won';
+
+  const eligibleExecutives = usersList.filter(
+    (u) => u.is_active && u.role === 'EXECUTIVE' && u.id !== lead.assigned_to
+  );
 
   return (
     <div className="lead-detail-page">
@@ -303,7 +431,7 @@ export const LeadDetails = () => {
           </Link>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
             <h1 className="page-title">{lead.name}</h1>
-            <StatusBadge status={lead.status} />
+            <StatusBadge status={lead.stage_details || lead.status} />
             <PriorityBadge priority={lead.priority} />
           </div>
           <p className="page-subtitle">
@@ -375,22 +503,58 @@ export const LeadDetails = () => {
           <div className="card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
               <h3 style={{ fontSize: '1rem' }}>Contact Information</h3>
-              {/* Quick Status Selector */}
+              {/* Quick Stage Selector */}
               <select
                 className="pipeline-move-select"
-                value={lead.status}
-                onChange={(e) => handleStatusChange(e.target.value)}
-                aria-label="Change Lead Status"
+                value={lead.stage || lead.stage_details?.id || ''}
+                onChange={(e) => handleStageChange(e.target.value)}
+                aria-label="Change Lead Stage"
               >
-                {Object.entries(LEAD_STATUS).map(([k, v]) => (
-                  <option key={k} value={v}>
-                    {v.replace('_', ' ')}
+                {stages.map((st) => (
+                  <option key={st.id} value={st.id}>
+                    {st.name}
                   </option>
                 ))}
               </select>
             </div>
 
             <div className="lead-info-list">
+              {/* Current Assignment Block */}
+              <div
+                className="lead-info-item"
+                style={{
+                  background: 'rgba(99, 102, 241, 0.08)',
+                  padding: '0.875rem 1rem',
+                  borderRadius: 'var(--radius-md)',
+                  border: '1px solid rgba(99, 102, 241, 0.25)',
+                  marginBottom: '0.75rem',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <div>
+                    <span className="lead-info-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                      Current Assignment
+                    </span>
+                    <div style={{ fontWeight: 600, fontSize: '0.9375rem', color: 'var(--text-main)', marginTop: '0.25rem' }}>
+                      {lead.assigned_to_details?.full_name || lead.assigned_to_details?.email || 'Unassigned'}
+                    </div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.125rem' }}>
+                      Role: {lead.assigned_to_details?.role === 'EXECUTIVE' ? 'Sales Executive' : (lead.assigned_to_details?.role || 'Sales Executive')}
+                    </div>
+                  </div>
+                  {canHandoverLeads && (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      style={{ padding: '0.35rem 0.625rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}
+                      onClick={() => setHandoverModalOpen(true)}
+                    >
+                      <Share2 size={13} />
+                      <span>Handover Lead</span>
+                    </button>
+                  )}
+                </div>
+              </div>
               <div className="lead-info-item">
                 <span className="lead-info-label">Phone</span>
                 <span className="lead-info-value contact-item">
@@ -476,6 +640,16 @@ export const LeadDetails = () => {
               <Clock size={16} />
               <span>Follow-ups</span>
               <span className="tab-badge">{followups.length}</span>
+            </button>
+
+            <button
+              type="button"
+              className={`tab-btn ${activeTab === 'handovers' ? 'tab-btn-active' : ''}`}
+              onClick={() => setActiveTab('handovers')}
+            >
+              <Share2 size={16} />
+              <span>Handover History</span>
+              <span className="tab-badge">{handovers.length}</span>
             </button>
 
             <button
@@ -592,18 +766,36 @@ export const LeadDetails = () => {
                           </div>
                         )}
 
-                        {fu.status === 'PENDING' && (
-                          <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-end' }}>
+                        {fu.status !== 'COMPLETED' ? (
+                          <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
                             <button
                               type="button"
                               className="btn btn-success btn-sm"
                               onClick={() => {
                                 setSelectedFollowup(fu);
+                                setCompletionOutcome(fu.outcome || '');
                                 setCompleteModalOpen(true);
                               }}
+                              title="Complete task & log outcome"
                             >
                               <CheckCircle2 size={14} />
                               <span>Complete & Log Outcome</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              onClick={() => {
+                                setSelectedFollowup(fu);
+                                setCompletionOutcome(fu.outcome || '');
+                                setCompleteModalOpen(true);
+                              }}
+                              title="View or update logged outcome"
+                            >
+                              <FileText size={14} />
+                              <span>View / Edit Outcome</span>
                             </button>
                           </div>
                         )}
@@ -642,6 +834,63 @@ export const LeadDetails = () => {
               )}
             </div>
           )}
+
+          {/* TAB 4: Handover History */}
+          {activeTab === 'handovers' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h3 style={{ fontSize: '1.125rem' }}>Ownership Handover History</h3>
+                {canHandoverLeads && (
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => setHandoverModalOpen(true)}
+                  >
+                    <Share2 size={14} />
+                    <span>+ Handover Lead</span>
+                  </button>
+                )}
+              </div>
+
+              {handovers.length === 0 ? (
+                <div className="card text-center" style={{ padding: '3rem 1.5rem', textAlign: 'center' }}>
+                  <p className="text-muted">No ownership handovers recorded for this lead.</p>
+                  {canHandoverLeads && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm mt-3"
+                      style={{ margin: '1rem auto 0' }}
+                      onClick={() => setHandoverModalOpen(true)}
+                    >
+                      Initiate Handover
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="timeline-container">
+                  {handovers.map((item) => (
+                    <div key={item.id} className="timeline-item">
+                      <div className="timeline-dot" style={{ background: 'var(--primary)', borderColor: 'var(--primary)' }} />
+                      <div className="timeline-card">
+                        <div className="timeline-header">
+                          <span className="timeline-action" style={{ color: 'var(--primary)' }}>
+                            {item.previous_assignee_name || 'Unassigned'} → {item.new_assignee_name}
+                          </span>
+                          <span className="timeline-time">{formatRelativeTime(item.created_at)}</span>
+                        </div>
+                        <div className="timeline-actor">
+                          Handed over by: <strong>{item.handed_over_by_name || 'Admin / Manager'}</strong> ({formatDateTime(item.created_at)})
+                        </div>
+                        <div className="timeline-notes" style={{ marginTop: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
+                          <strong>Reason:</strong> {item.reason}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -654,6 +903,18 @@ export const LeadDetails = () => {
         loading={converting}
         onConfirm={handleConfirmConvert}
         onCancel={() => setConvertModalOpen(false)}
+      />
+
+      {/* Lost Reason Modal */}
+      <LostReasonModal
+        isOpen={lostModalOpen}
+        leadName={lead?.name}
+        loading={lostSubmitting}
+        onConfirm={handleConfirmLost}
+        onCancel={() => {
+          setLostModalOpen(false);
+          setPendingLostStageId(null);
+        }}
       />
 
       {/* Assign Lead Modal */}
@@ -687,6 +948,78 @@ export const LeadDetails = () => {
                 {assigning ? 'Assigning...' : 'Confirm Assignment'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Handover Lead Modal */}
+      {handoverModalOpen && (
+        <div className="modal-backdrop" onClick={() => setHandoverModalOpen(false)}>
+          <div className="modal-container" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '480px' }}>
+            <div className="modal-header">
+              <h3>Handover Lead</h3>
+              <button className="modal-close-btn" onClick={() => setHandoverModalOpen(false)}>✕</button>
+            </div>
+            <form onSubmit={handleConfirmHandover}>
+              <div className="modal-body form-layout">
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '0.75rem 1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)', marginBottom: '0.5rem' }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Lead</div>
+                  <div style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-main)', marginTop: '0.125rem' }}>
+                    {lead.company_name ? `${lead.company_name} (${lead.name})` : lead.name}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.375rem' }}>
+                    Current Executive: <strong style={{ color: 'var(--text-main)' }}>{lead.assigned_to_details?.full_name || lead.assigned_to_details?.email || 'Unassigned'}</strong>
+                  </div>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label form-label-required" htmlFor="handover-target">Transfer To</label>
+                  <select
+                    id="handover-target"
+                    className="form-control"
+                    value={handoverTarget}
+                    onChange={(e) => setHandoverTarget(e.target.value)}
+                    required
+                  >
+                    <option value="">Select Sales Executive</option>
+                    {eligibleExecutives.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.full_name || u.email}
+                      </option>
+                    ))}
+                  </select>
+                  {eligibleExecutives.length === 0 && (
+                    <span className="form-error-msg" style={{ marginTop: '0.25rem' }}>
+                      No eligible active Sales Executives found.
+                    </span>
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label form-label-required" htmlFor="handover-reason">Reason</label>
+                  <textarea
+                    id="handover-reason"
+                    className="form-control"
+                    rows={3}
+                    placeholder="e.g. Customer requested another executive, territory reassignment..."
+                    value={handoverReason}
+                    onChange={(e) => setHandoverReason(e.target.value)}
+                    required
+                  />
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => setHandoverModalOpen(false)}>Cancel</button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={handoverSubmitting || !handoverTarget || !handoverReason.trim()}
+                >
+                  <Share2 size={15} />
+                  <span>{handoverSubmitting ? 'Transferring...' : 'Confirm Handover'}</span>
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
@@ -787,37 +1120,84 @@ export const LeadDetails = () => {
         </div>
       )}
 
-      {/* Complete Follow-up Modal */}
+      {/* Complete Follow-up / Outcome Modal */}
       {completeModalOpen && (
         <div className="modal-backdrop" onClick={() => setCompleteModalOpen(false)}>
           <div className="modal-container" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>Complete Follow-up</h3>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {selectedFollowup?.status === 'COMPLETED' ? (
+                  <CheckCircle2 size={18} color="var(--success)" />
+                ) : (
+                  <Clock size={18} color="var(--primary)" />
+                )}
+                <h3 style={{ margin: 0 }}>
+                  {selectedFollowup?.status === 'COMPLETED'
+                    ? 'Follow-up Outcome & Details'
+                    : 'Complete Follow-up'}
+                </h3>
+              </div>
               <button className="modal-close-btn" onClick={() => setCompleteModalOpen(false)}>✕</button>
             </div>
             <form onSubmit={handleCompleteFollowup}>
               <div className="modal-body form-layout">
-                <p className="text-muted font-sm">
-                  Marking <strong>{selectedFollowup?.purpose}</strong> as completed. Please log the outcome of the interaction:
-                </p>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  <p className="text-muted font-sm" style={{ margin: 0 }}>
+                    Target: <strong>{lead?.name}</strong> ({selectedFollowup?.purpose})
+                  </p>
+                  <span
+                    className="status-badge"
+                    style={{
+                      color: selectedFollowup?.status === 'COMPLETED' ? 'var(--success)' : '#38bdf8',
+                      backgroundColor: selectedFollowup?.status === 'COMPLETED' ? 'rgba(16, 185, 129, 0.12)' : 'rgba(56, 189, 248, 0.12)',
+                    }}
+                  >
+                    {selectedFollowup?.status}
+                  </span>
+                </div>
                 <div className="form-group">
                   <label className="form-label form-label-required" htmlFor="complete-outcome">Outcome Description</label>
                   <textarea
                     id="complete-outcome"
                     className="form-control"
-                    placeholder="e.g. Call connected with VP of Operations. Agreed to proceed with demonstration next Tuesday..."
+                    placeholder="e.g. Call connected with VP of Operations. Agreed to proceed with demonstration next Tuesday (min 3 chars)..."
                     value={completionOutcome}
                     onChange={(e) => setCompletionOutcome(e.target.value)}
-                    rows={3}
+                    rows={4}
+                    minLength={3}
                     required
                   />
                 </div>
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setCompleteModalOpen(false)}>Cancel</button>
-                <button type="submit" className="btn btn-success" disabled={completing || !completionOutcome.trim()}>
-                  {completing ? 'Saving...' : 'Mark Completed'}
-                </button>
+              <div className="modal-footer" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <div>
+                  {selectedFollowup?.status === 'COMPLETED' && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={handleReopenFollowup}
+                      disabled={completing}
+                      title="Change status back to Pending"
+                    >
+                      <Clock size={14} />
+                      <span>Reopen as Pending</span>
+                    </button>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                  <button type="button" className="btn btn-secondary" onClick={() => setCompleteModalOpen(false)}>Cancel</button>
+                  <button
+                    type="submit"
+                    className={selectedFollowup?.status === 'COMPLETED' ? 'btn btn-primary' : 'btn btn-success'}
+                    disabled={completing || completionOutcome.trim().length < 3}
+                  >
+                    {completing
+                      ? 'Saving...'
+                      : selectedFollowup?.status === 'COMPLETED'
+                      ? 'Update Outcome'
+                      : 'Mark Completed'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
@@ -829,65 +1209,117 @@ export const LeadDetails = () => {
           <div className="modal-container modal-container-lg" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <div className="modal-title-row">
-                <Sparkles size={20} color="#a855f7" />
-                <h3>AI Lead Synthesis & Recommendations</h3>
+                <Sparkles size={20} color="var(--accent-purple, #7c3aed)" />
+                <h3 style={{ margin: 0 }}>AI Lead Synthesis & Recommendations</h3>
               </div>
               <button className="modal-close-btn" onClick={() => setAiModalOpen(false)}>✕</button>
             </div>
-            <div className="modal-body form-layout">
+            <div className="modal-body">
               {loadingAi ? (
-                <LoadingSpinner text="Analyzing historical notes and stage progression..." />
+                <div style={{ padding: '2rem 0' }}>
+                  <LoadingSpinner text="Synthesizing historical notes, stage progression, and client intent..." />
+                </div>
               ) : aiSummaryData ? (
-                <>
-                  <div style={{ background: 'rgba(168, 85, 247, 0.12)', border: '1px solid rgba(168, 85, 247, 0.3)', padding: '0.875rem 1rem', borderRadius: 'var(--radius-md)', display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
-                    <Bot size={20} color="#c084fc" />
-                    <span className="font-sm" style={{ color: '#e9d5ff' }}>
-                      {aiSummaryData.disclaimer}
-                    </span>
-                  </div>
-
-                  <div>
-                    <h4 style={{ fontSize: '0.875rem', textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--text-dim)', marginBottom: '0.375rem' }}>
-                      Executive Summary
-                    </h4>
-                    <p style={{ color: '#ffffff', fontSize: '0.9375rem', lineHeight: 1.6 }}>
-                      {aiSummaryData.data?.executive_summary}
+                <div className="ai-modal-content">
+                  {/* AI Disclaimer */}
+                  <div className="ai-disclaimer-banner">
+                    <Bot size={20} color="var(--accent-purple, #7c3aed)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                    <p className="ai-disclaimer-text">
+                      <strong>AI Advisory:</strong> {aiSummaryData.disclaimer || 'Generated based on notes, touchpoints, and timeline history for this lead.'}
                     </p>
                   </div>
 
+                  {/* Executive Summary Card */}
+                  <div className="ai-card">
+                    <div className="ai-card-header">
+                      <h4 className="ai-card-title">
+                        <Sparkles size={14} color="var(--accent-purple, #7c3aed)" />
+                        <span>Executive Summary</span>
+                      </h4>
+                      {aiSummaryData.data?.executive_summary && (
+                        <button
+                          type="button"
+                          className="ai-copy-btn"
+                          onClick={() => handleCopy(aiSummaryData.data.executive_summary, 'summary')}
+                          title="Copy executive summary"
+                        >
+                          {copiedSummary ? <Check size={12} color="var(--success)" /> : <Copy size={12} />}
+                          <span>{copiedSummary ? 'Copied' : 'Copy'}</span>
+                        </button>
+                      )}
+                    </div>
+                    <p className="ai-card-body">
+                      {aiSummaryData.data?.executive_summary || 'No summary generated yet.'}
+                    </p>
+                  </div>
+
+                  {/* Requirements & Objections Grid */}
                   <div className="form-grid-2">
-                    <div style={{ background: 'var(--bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                      <h4 style={{ fontSize: '0.8125rem', color: '#38bdf8', marginBottom: '0.5rem', fontWeight: 600 }}>
-                        Identified Requirements
-                      </h4>
-                      <ul style={{ paddingLeft: '1.25rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                        {aiSummaryData.data?.customer_requirements?.map((req, i) => (
-                          <li key={i} style={{ marginBottom: '0.25rem' }}>{req}</li>
-                        ))}
-                      </ul>
+                    <div className="ai-card">
+                      <div className="ai-card-header">
+                        <h4 className="ai-card-title" style={{ color: 'var(--info, #0284c7)' }}>
+                          <Target size={15} color="var(--info, #0284c7)" />
+                          <span>Identified Requirements</span>
+                        </h4>
+                      </div>
+                      {aiSummaryData.data?.customer_requirements?.length > 0 ? (
+                        <ul className="ai-list">
+                          {aiSummaryData.data.customer_requirements.map((req, i) => (
+                            <li key={i}>{req}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-muted font-sm" style={{ margin: 0, fontStyle: 'italic' }}>
+                          No specific technical or commercial requirements logged yet.
+                        </p>
+                      )}
                     </div>
 
-                    <div style={{ background: 'var(--bg-surface-elevated)', padding: '1rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
-                      <h4 style={{ fontSize: '0.8125rem', color: '#fca5a5', marginBottom: '0.5rem', fontWeight: 600 }}>
-                        Key Objections & Risk Factors
-                      </h4>
-                      <ul style={{ paddingLeft: '1.25rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                        {aiSummaryData.data?.main_objections?.map((obj, i) => (
-                          <li key={i} style={{ marginBottom: '0.25rem' }}>{obj}</li>
-                        ))}
-                      </ul>
+                    <div className="ai-card">
+                      <div className="ai-card-header">
+                        <h4 className="ai-card-title" style={{ color: 'var(--danger, #e11d48)' }}>
+                          <ShieldAlert size={15} color="var(--danger, #e11d48)" />
+                          <span>Key Objections & Risks</span>
+                        </h4>
+                      </div>
+                      {aiSummaryData.data?.main_objections?.length > 0 ? (
+                        <ul className="ai-list">
+                          {aiSummaryData.data.main_objections.map((obj, i) => (
+                            <li key={i}>{obj}</li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="text-muted font-sm" style={{ margin: 0, fontStyle: 'italic' }}>
+                          No significant client objections or blockers recorded.
+                        </p>
+                      )}
                     </div>
                   </div>
 
-                  <div style={{ background: 'rgba(16, 185, 129, 0.08)', border: '1px solid rgba(16, 185, 129, 0.25)', padding: '1rem', borderRadius: 'var(--radius-md)' }}>
-                    <h4 style={{ fontSize: '0.8125rem', color: 'var(--success)', marginBottom: '0.375rem', fontWeight: 600 }}>
-                      Recommended Next Action
-                    </h4>
-                    <p style={{ color: '#ffffff', fontSize: '0.9375rem', fontWeight: 500 }}>
-                      {aiSummaryData.data?.recommended_next_action}
+                  {/* Recommended Next Action Card */}
+                  <div className="ai-recommendation-card">
+                    <div className="ai-rec-title">
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <CheckCircle2 size={16} color="var(--primary)" />
+                        <span>Recommended Next Action</span>
+                      </div>
+                      {aiSummaryData.data?.recommended_next_action && (
+                        <button
+                          type="button"
+                          className="ai-copy-btn"
+                          onClick={() => handleCopy(aiSummaryData.data.recommended_next_action, 'action')}
+                          title="Copy recommended action"
+                        >
+                          {copiedAction ? <Check size={12} color="var(--success)" /> : <Copy size={12} />}
+                          <span>{copiedAction ? 'Copied' : 'Copy Action'}</span>
+                        </button>
+                      )}
+                    </div>
+                    <p className="ai-rec-text">
+                      {aiSummaryData.data?.recommended_next_action || 'Continue standard follow-up cycle.'}
                     </p>
                   </div>
-                </>
+                </div>
               ) : null}
             </div>
             <div className="modal-footer">

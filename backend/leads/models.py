@@ -18,15 +18,49 @@ class LeadSource(models.Model):
         return self.name
 
 
+class LeadStage(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=120, unique=True)
+    description = models.TextField(blank=True, null=True)
+    color = models.CharField(max_length=30, default='#6366F1')
+    display_order = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+    is_system = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['display_order', 'id']
+        verbose_name = 'Lead Stage'
+        verbose_name_plural = 'Lead Stages'
+
+    def __str__(self):
+        return self.name
+
+
+def get_default_stage():
+    stage = LeadStage.objects.filter(is_system=True, slug='new').first() or LeadStage.objects.order_by('display_order').first()
+    return stage.id if stage else None
+
+
 class Lead(models.Model):
-    class Status(models.TextChoices):
-        NEW = 'NEW', 'New'
-        CONTACTED = 'CONTACTED', 'Contacted'
-        DEMO_SCHEDULED = 'DEMO_SCHEDULED', 'Demo Scheduled'
-        NEGOTIATION = 'NEGOTIATION', 'Negotiation'
-        QUALIFIED = 'QUALIFIED', 'Qualified'
-        WON = 'WON', 'Won'
-        LOST = 'LOST', 'Lost'
+    class Status:
+        NEW = 'New'
+        CONTACTED = 'Contacted'
+        DEMO_SCHEDULED = 'Demo Scheduled'
+        NEGOTIATION = 'Negotiation'
+        QUALIFIED = 'Qualified'
+        WON = 'Won'
+        LOST = 'Lost'
+        choices = [
+            ('NEW', 'New'),
+            ('CONTACTED', 'Contacted'),
+            ('DEMO_SCHEDULED', 'Demo Scheduled'),
+            ('NEGOTIATION', 'Negotiation'),
+            ('QUALIFIED', 'Qualified'),
+            ('WON', 'Won'),
+            ('LOST', 'Lost'),
+        ]
 
     class Priority(models.TextChoices):
         LOW = 'LOW', 'Low'
@@ -45,10 +79,10 @@ class Lead(models.Model):
         blank=True,
         related_name='leads'
     )
-    status = models.CharField(
-        max_length=20,
-        choices=Status.choices,
-        default=Status.NEW,
+    stage = models.ForeignKey(
+        LeadStage,
+        on_delete=models.PROTECT,
+        related_name='leads',
         db_index=True
     )
     priority = models.CharField(
@@ -89,10 +123,35 @@ class Lead(models.Model):
         indexes = [
             models.Index(fields=['phone']),
             models.Index(fields=['email']),
-            models.Index(fields=['status']),
+            models.Index(fields=['stage']),
             models.Index(fields=['assigned_to']),
             models.Index(fields=['created_at']),
         ]
+
+    @property
+    def status(self):
+        return self.stage.name if self.stage else ''
+
+    @status.setter
+    def status(self, value):
+        if isinstance(value, LeadStage):
+            self.stage = value
+        elif isinstance(value, str):
+            val = value.strip()
+            stage = LeadStage.objects.filter(
+                models.Q(slug__iexact=val.lower().replace('_', '-')) |
+                models.Q(slug__iexact=val) |
+                models.Q(name__iexact=val)
+            ).first()
+            if stage:
+                self.stage = stage
+
+    def save(self, *args, **kwargs):
+        if not self.stage_id:
+            default_stage = LeadStage.objects.filter(is_system=True, slug='new').first() or LeadStage.objects.order_by('display_order').first()
+            if default_stage:
+                self.stage = default_stage
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} ({self.company_name or 'No Company'}) - {self.status}"
@@ -133,3 +192,43 @@ class LeadNote(models.Model):
 
     def __str__(self):
         return f"{self.note_type} on Lead #{self.lead_id} by {self.user}"
+
+
+class LeadHandover(models.Model):
+    lead = models.ForeignKey(
+        Lead,
+        on_delete=models.CASCADE,
+        related_name='handovers'
+    )
+    previous_assignee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='handovers_from'
+    )
+    new_assignee = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='handovers_to'
+    )
+    reason = models.TextField()
+    handed_over_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='handovers_performed'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Lead Handover'
+        verbose_name_plural = 'Lead Handovers'
+
+    def __str__(self):
+        prev = self.previous_assignee.get_full_name() if self.previous_assignee else 'Unassigned'
+        new = self.new_assignee.get_full_name() if self.new_assignee else 'None'
+        return f"Handover for Lead #{self.lead_id}: {prev} -> {new}"
+

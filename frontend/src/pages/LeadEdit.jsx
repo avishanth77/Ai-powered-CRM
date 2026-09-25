@@ -21,7 +21,7 @@ export const LeadEdit = () => {
     email: '',
     company_name: '',
     source: '',
-    status: '',
+    stage: '',
     priority: '',
     assigned_to: '',
     expected_value: '0.00',
@@ -29,6 +29,7 @@ export const LeadEdit = () => {
     lost_reason: '',
   });
 
+  const [stages, setStages] = useState([]);
   const [sources, setSources] = useState([]);
   const [users, setUsers] = useState([]);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -38,10 +39,18 @@ export const LeadEdit = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [leadRes, sourcesRes] = await Promise.all([
+        const [leadRes, sourcesRes, stagesRes] = await Promise.all([
           leadApi.getLeadById(id),
           leadApi.getSources(),
+          leadApi.getStages(),
         ]);
+
+        let loadedStages = stagesRes.results || (Array.isArray(stagesRes) ? stagesRes : []);
+        // If current lead's stage is inactive and not in loadedStages, add it so it displays
+        if (leadRes.stage_details && !loadedStages.some((s) => s.id === leadRes.stage_details.id)) {
+          loadedStages = [...loadedStages, { ...leadRes.stage_details, name: `${leadRes.stage_details.name} (Inactive)` }];
+        }
+        setStages(loadedStages);
 
         setFormData({
           name: leadRes.name || '',
@@ -49,7 +58,7 @@ export const LeadEdit = () => {
           email: leadRes.email || '',
           company_name: leadRes.company_name || '',
           source: leadRes.source || '',
-          status: leadRes.status || '',
+          stage: leadRes.stage || leadRes.stage_details?.id || '',
           priority: leadRes.priority || '',
           assigned_to: leadRes.assigned_to || '',
           expected_value: leadRes.expected_value || '0.00',
@@ -57,11 +66,11 @@ export const LeadEdit = () => {
           lost_reason: leadRes.lost_reason || '',
         });
 
-        setSources(sourcesRes.results || sourcesRes);
+        setSources(sourcesRes.results || (Array.isArray(sourcesRes) ? sourcesRes : []));
 
         if (canAssignLeads) {
           const usersRes = await userApi.getUsers();
-          setUsers(usersRes.results || usersRes);
+          setUsers(usersRes.results || (Array.isArray(usersRes) ? usersRes : []));
         }
       } catch (err) {
         showToast(extractErrorMessage(err, 'Failed to load lead details'), 'error');
@@ -82,6 +91,9 @@ export const LeadEdit = () => {
     }
   };
 
+  const selectedStageObj = stages.find((s) => s.id === parseInt(formData.stage));
+  const isLostStage = selectedStageObj && (selectedStageObj.slug === 'lost' || selectedStageObj.name.toLowerCase() === 'lost');
+
   const validateForm = () => {
     const newErrors = {};
     if (!formData.name.trim()) newErrors.name = 'Contact / Lead name is required.';
@@ -99,7 +111,7 @@ export const LeadEdit = () => {
       newErrors.expected_value = 'Expected value cannot be negative.';
     }
 
-    if (formData.status === LEAD_STATUS.LOST && !formData.lost_reason?.trim()) {
+    if (isLostStage && !formData.lost_reason?.trim()) {
       newErrors.lost_reason = 'A reason is required when marking a lead as Lost.';
     }
 
@@ -118,6 +130,7 @@ export const LeadEdit = () => {
     try {
       const payload = {
         ...formData,
+        stage: formData.stage ? parseInt(formData.stage) : null,
         source: formData.source ? parseInt(formData.source) : null,
         assigned_to: formData.assigned_to ? parseInt(formData.assigned_to) : null,
         expected_value: parseFloat(formData.expected_value) || 0,
@@ -258,20 +271,22 @@ export const LeadEdit = () => {
 
           <div className="form-grid-2">
             <div className="form-group">
-              <label className="form-label" htmlFor="edit-status">Status</label>
+              <label className="form-label form-label-required" htmlFor="edit-stage">Lead Stage</label>
               <select
-                id="edit-status"
-                name="status"
+                id="edit-stage"
+                name="stage"
                 className="form-control"
-                value={formData.status}
+                value={formData.stage}
                 onChange={handleChange}
+                required
               >
-                {Object.entries(LEAD_STATUS).map(([k, v]) => (
-                  <option key={k} value={v}>
-                    {v.replace('_', ' ')}
+                {stages.map((st) => (
+                  <option key={st.id} value={st.id}>
+                    {st.name}
                   </option>
                 ))}
               </select>
+              {errors.stage && <span className="form-error-msg">{errors.stage}</span>}
             </div>
 
             <div className="form-group">
@@ -310,7 +325,7 @@ export const LeadEdit = () => {
             </div>
           )}
 
-          {formData.status === LEAD_STATUS.LOST && (
+          {isLostStage && (
             <div className="form-group">
               <label className="form-label form-label-required" htmlFor="edit-lost-reason">
                 Lost Reason
