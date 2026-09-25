@@ -7,14 +7,19 @@ import { extractErrorMessage, isValidEmail } from '../utils/validation';
 import { USER_ROLES, ROLE_LABELS } from '../utils/constants';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
-import { UserCog, UserPlus, Shield, Phone, Mail, Check, X } from 'lucide-react';
+import { Pagination } from '../components/Pagination';
+import { UserCog, UserPlus, Shield, Phone, Mail } from 'lucide-react';
 
 export const Users = () => {
-  const { user: currentUser, isAdmin } = useAuth();
+  const { isAdmin } = useAuth();
   const { showToast } = useToast();
 
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 20;
 
   // Create user modal
   const [modalOpen, setModalOpen] = useState(false);
@@ -29,12 +34,17 @@ export const Users = () => {
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
 
-  const fetchUsers = async () => {
+  const fetchUsers = async (page = 1) => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const res = await userApi.getUsers();
-      setUsers(res.results || res);
+      const res = await userApi.getUsers({ page, page_size: pageSize });
+      const list = res.results || (Array.isArray(res) ? res : []);
+      setUsers(Array.isArray(list) ? list : []);
+      setTotalCount(res.count ?? (Array.isArray(res) ? res.length : 0));
+      setCurrentPage(page);
     } catch (err) {
+      setLoadError(extractErrorMessage(err, 'Failed to fetch users'));
       showToast(extractErrorMessage(err, 'Failed to fetch users'), 'error');
     } finally {
       setLoading(false);
@@ -42,7 +52,7 @@ export const Users = () => {
   };
 
   useEffect(() => {
-    fetchUsers();
+    fetchUsers(1);
   }, []);
 
   const handleChange = (e) => {
@@ -77,7 +87,9 @@ export const Users = () => {
         role: USER_ROLES.EXECUTIVE,
         password: '',
       });
-      fetchUsers();
+      setErrors({});
+      fetchUsers(1);
+      setCurrentPage(1);
     } catch (err) {
       const msg = extractErrorMessage(err, 'Failed to create user');
       showToast(msg, 'error');
@@ -119,6 +131,13 @@ export const Users = () => {
       <div className="table-responsive">
         {loading ? (
           <LoadingSpinner text="Retrieving team members..." />
+        ) : loadError ? (
+          <EmptyState
+            title="Could not load users"
+            message={loadError}
+            actionLabel="Retry"
+            onAction={() => fetchUsers(currentPage)}
+          />
         ) : users.length === 0 ? (
           <EmptyState title="No users found" message="No user accounts registered." />
         ) : (
@@ -193,6 +212,15 @@ export const Users = () => {
           </table>
         )}
       </div>
+
+      {!loading && !loadError && users.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalCount={totalCount}
+          pageSize={pageSize}
+          onPageChange={(page) => fetchUsers(page)}
+        />
+      )}
 
       {/* Add User Modal */}
       {modalOpen && (

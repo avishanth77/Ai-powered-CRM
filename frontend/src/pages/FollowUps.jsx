@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { followupApi } from '../api/followupApi';
 import { leadApi } from '../api/leadApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
-import { formatDateTime, formatDate } from '../utils/formatters';
+import { formatDateTime } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
 import { StatusBadge } from '../components/StatusBadge';
 import { SearchBar } from '../components/SearchBar';
+import { Pagination } from '../components/Pagination';
 import { FOLLOWUP_PURPOSES } from '../utils/constants';
 
 import {
@@ -19,7 +20,6 @@ import {
   CheckCircle2,
   CalendarPlus,
   Phone,
-  MessageSquare,
   Users,
   Presentation,
   Mail,
@@ -27,7 +27,6 @@ import {
   Filter,
   ArrowUpDown,
   X,
-  Search,
 } from 'lucide-react';
 
 export const FollowUps = () => {
@@ -37,6 +36,9 @@ export const FollowUps = () => {
   const [activeTab, setActiveTab] = useState('all'); // all | overdue | today | completed
   const [followups, setFollowups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const pageSize = 20;
 
   // Search & Filtering State
   const [search, setSearch] = useState('');
@@ -62,7 +64,7 @@ export const FollowUps = () => {
   const fetchFollowups = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { page: currentPage, page_size: pageSize };
       if (search.trim()) params.search = search.trim();
       if (purposeFilter) params.purpose = purposeFilter;
       if (sortOrder) params.ordering = sortOrder;
@@ -79,12 +81,13 @@ export const FollowUps = () => {
       }
 
       setFollowups(res.results || res.data || (Array.isArray(res) ? res : []));
+      setTotalCount(res.count ?? (Array.isArray(res) ? res.length : 0));
     } catch (err) {
       showToast(extractErrorMessage(err, 'Failed to fetch follow-ups'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [activeTab, search, purposeFilter, sortOrder, showToast]);
+  }, [activeTab, search, purposeFilter, sortOrder, currentPage, pageSize, showToast]);
 
   useEffect(() => {
     fetchFollowups();
@@ -102,6 +105,12 @@ export const FollowUps = () => {
     setSearch('');
     setPurposeFilter('');
     setSortOrder('-follow_up_at');
+    setCurrentPage(1);
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
   };
 
   const hasActiveFilters = Boolean(search || purposeFilter || sortOrder !== '-follow_up_at');
@@ -226,11 +235,13 @@ export const FollowUps = () => {
       </div>
 
       {/* Tabs */}
-      <div className="tabs-navigation">
+      <div className="tabs-navigation" role="tablist" aria-label="Follow-up views">
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === 'all'}
           className={`tab-btn ${activeTab === 'all' ? 'tab-btn-active' : ''}`}
-          onClick={() => setActiveTab('all')}
+          onClick={() => handleTabChange('all')}
         >
           <Calendar size={16} />
           <span>All Follow-ups</span>
@@ -238,8 +249,10 @@ export const FollowUps = () => {
 
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === 'overdue'}
           className={`tab-btn ${activeTab === 'overdue' ? 'tab-btn-active' : ''}`}
-          onClick={() => setActiveTab('overdue')}
+          onClick={() => handleTabChange('overdue')}
           style={{ color: activeTab === 'overdue' ? 'var(--danger)' : undefined }}
         >
           <AlertCircle size={16} color="var(--danger)" />
@@ -248,8 +261,10 @@ export const FollowUps = () => {
 
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === 'today'}
           className={`tab-btn ${activeTab === 'today' ? 'tab-btn-active' : ''}`}
-          onClick={() => setActiveTab('today')}
+          onClick={() => handleTabChange('today')}
         >
           <Clock size={16} />
           <span>Scheduled Today</span>
@@ -257,8 +272,10 @@ export const FollowUps = () => {
 
         <button
           type="button"
+          role="tab"
+          aria-selected={activeTab === 'completed'}
           className={`tab-btn ${activeTab === 'completed' ? 'tab-btn-active' : ''}`}
-          onClick={() => setActiveTab('completed')}
+          onClick={() => handleTabChange('completed')}
         >
           <CheckCircle2 size={16} color="var(--success)" />
           <span>Completed</span>
@@ -269,7 +286,10 @@ export const FollowUps = () => {
       <div className="filter-toolbar">
         <SearchBar
           value={search}
-          onChange={(val) => setSearch(val)}
+          onChange={(val) => {
+            setSearch(val);
+            setCurrentPage(1);
+          }}
           placeholder="Search by contact, company, purpose, rep, or outcome..."
         />
 
@@ -280,7 +300,10 @@ export const FollowUps = () => {
             <select
               className="filter-select"
               value={purposeFilter}
-              onChange={(e) => setPurposeFilter(e.target.value)}
+              onChange={(e) => {
+                setPurposeFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               aria-label="Filter by Purpose"
             >
               <option value="">All Purposes</option>
@@ -298,7 +321,10 @@ export const FollowUps = () => {
             <select
               className="filter-select"
               value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
+              onChange={(e) => {
+                setSortOrder(e.target.value);
+                setCurrentPage(1);
+              }}
               aria-label="Sort Order"
             >
               <option value="-follow_up_at">Latest Scheduled First</option>
@@ -455,6 +481,15 @@ export const FollowUps = () => {
           </table>
         )}
       </div>
+
+      {!loading && followups.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalCount={totalCount}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
+      )}
 
       {/* Complete / Outcome Modal */}
       {completeModalOpen && (

@@ -1,16 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { getInitials } from '../utils/formatters';
 import { ROLE_LABELS } from '../utils/constants';
-import { LogOut, User as UserIcon, Menu, Shield, Bell, Sun, Moon } from 'lucide-react';
+import { LogOut, User as UserIcon, Menu, Shield, Clock, Sun, Moon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { NotificationBell } from './NotificationBell';
 
-export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0 }) => {
+export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0, mobileSidebarOpen = false }) => {
   const { user, logout } = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);
+
+  // Close the profile menu on Escape (click-outside is already handled by the overlay)
+  useEffect(() => {
+    if (!showDropdown) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') setShowDropdown(false);
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [showDropdown]);
 
   const roleLabel = user ? ROLE_LABELS[user.role] || user.role : '';
 
@@ -27,6 +37,8 @@ export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0 }) => {
           className="mobile-menu-btn"
           onClick={onToggleMobileSidebar}
           aria-label="Toggle navigation menu"
+          aria-expanded={mobileSidebarOpen}
+          aria-controls="main-sidebar"
         >
           <Menu size={22} />
         </button>
@@ -52,6 +64,19 @@ export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0 }) => {
 
         {/* Live Notification Center Bell */}
         <NotificationBell />
+
+        {/* Overdue follow-ups alert */}
+        {overdueCount > 0 && (
+          <Link
+            to="/follow-ups"
+            className="navbar-alert-link"
+            title="Overdue follow-ups"
+            aria-label={`${overdueCount} overdue follow-up${overdueCount === 1 ? '' : 's'}`}
+          >
+            <Clock size={18} />
+            <span className="alert-count-pill">{overdueCount > 99 ? '99+' : overdueCount}</span>
+          </Link>
+        )}
 
         <div className={`navbar-role-pill ${getRoleBadgeClass()}`}>
           <Shield size={13} />

@@ -64,6 +64,7 @@ const AppLayout = () => {
         <Navbar
           onToggleMobileSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
           overdueCount={overdueCount}
+          mobileSidebarOpen={mobileSidebarOpen}
         />
         <main className="page-container">
           <Outlet />

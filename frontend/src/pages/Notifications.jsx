@@ -18,6 +18,9 @@ import {
 } from 'lucide-react';
 import { notificationApi } from '../api/notificationApi';
 import { useToast } from '../context/ToastContext';
+import { LoadingSpinner } from '../components/LoadingSpinner';
+import { EmptyState } from '../components/EmptyState';
+import { Pagination } from '../components/Pagination';
 
 export const Notifications = () => {
   const navigate = useNavigate();
@@ -25,22 +28,54 @@ export const Notifications = () => {
 
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState(null);
   const [activeTab, setActiveTab] = useState('all'); // all, unread, leads, followups, mentions
+  const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [unreadTotal, setUnreadTotal] = useState(0);
+  const pageSize = 20;
+
+  // Debounce the search box so typing does not fire a request per keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput.trim());
+      setCurrentPage(1);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   const fetchNotifications = useCallback(async () => {
     setLoading(true);
+    setLoadError(null);
     try {
-      const res = await notificationApi.getNotifications({ ordering: '-created_at' });
-      const items = res.results || res;
+      const params = { page: currentPage, page_size: pageSize, ordering: '-created_at' };
+      if (activeTab === 'unread') params.is_read = false;
+      if (['leads', 'followups', 'mentions'].includes(activeTab)) params.group = activeTab;
+      if (searchQuery) params.search = searchQuery;
+
+      const [res, unreadRes] = await Promise.all([
+        notificationApi.getNotifications(params),
+        notificationApi.getUnreadCount(),
+      ]);
+      const items = res.results || (Array.isArray(res) ? res : []);
+      if (items.length === 0 && currentPage > 1) {
+        // Page emptied by a delete/mark-read — step back instead of showing empty
+        setCurrentPage(currentPage - 1);
+        return;
+      }
       setNotifications(Array.isArray(items) ? items : []);
+      setTotalCount(res.count ?? (Array.isArray(res) ? res.length : 0));
+      setUnreadTotal(unreadRes.count ?? 0);
     } catch (err) {
       console.error('Error fetching notifications:', err);
+      setLoadError('Failed to load notifications');
       showToast('Failed to load notifications', 'error');
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [activeTab, searchQuery, currentPage, showToast]);
 
   useEffect(() => {
     fetchNotifications();
@@ -49,10 +84,8 @@ export const Notifications = () => {
   const handleMarkRead = async (id) => {
     try {
       await notificationApi.markAsRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
-      );
       showToast('Notification marked as read', 'success');
+      fetchNotifications();
     } catch (err) {
       showToast('Failed to update notification', 'error');
     }
@@ -61,8 +94,8 @@ export const Notifications = () => {
   const handleMarkAllRead = async () => {
     try {
       await notificationApi.markAllAsRead();
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
       showToast('All notifications marked as read', 'success');
+      fetchNotifications();
     } catch (err) {
       showToast('Failed to mark all as read', 'error');
     }
@@ -71,11 +104,16 @@ export const Notifications = () => {
   const handleDelete = async (id) => {
     try {
       await notificationApi.deleteNotification(id);
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
       showToast('Notification deleted', 'info');
+      fetchNotifications();
     } catch (err) {
       showToast('Failed to delete notification', 'error');
     }
+  };
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
   };
 
   const getNotificationIcon = (type) => {
@@ -122,28 +160,6 @@ export const Notifications = () => {
     return 'stage';
   };
 
-  const filteredNotifications = notifications.filter((notif) => {
-    const notifType = (notif.notification_type || '').toLowerCase();
-
-    // Tab filter
-    if (activeTab === 'unread' && notif.is_read) return false;
-    if (activeTab === 'leads' && !notifType.startsWith('lead_')) return false;
-    if (activeTab === 'followups' && !notifType.startsWith('follow_up') && !notifType.startsWith('followup')) return false;
-    if (activeTab === 'mentions' && !notifType.includes('mention') && !notifType.includes('comment')) return false;
-
-    // Search filter
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      const matchTitle = notif.title?.toLowerCase().includes(q);
-      const matchMsg = notif.message?.toLowerCase().includes(q);
-      if (!matchTitle && !matchMsg) return false;
-    }
-
-    return true;
-  });
-
-  const unreadTotal = notifications.filter((n) => !n.is_read).length;
-
   return (
     <div className="notifications-page-container">
       <div className="notifications-page-header">
@@ -169,51 +185,62 @@ export const Notifications = () => {
 
       {/* Filter Tabs & Search */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
-        <div className="notifications-filter-bar" style={{ margin: 0 }}>
+        <div className="notifications-filter-bar" style={{ margin: 0 }} role="tablist" aria-label="Notification filters">
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'all'}
             className={`notifications-filter-tab ${activeTab === 'all' ? 'active' : ''}`}
-            onClick={() => setActiveTab('all')}
+            onClick={() => handleTabChange('all')}
           >
-            All ({notifications.length})
+            All ({totalCount})
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'unread'}
             className={`notifications-filter-tab ${activeTab === 'unread' ? 'active' : ''}`}
-            onClick={() => setActiveTab('unread')}
+            onClick={() => handleTabChange('unread')}
           >
             Unread ({unreadTotal})
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'leads'}
             className={`notifications-filter-tab ${activeTab === 'leads' ? 'active' : ''}`}
-            onClick={() => setActiveTab('leads')}
+            onClick={() => handleTabChange('leads')}
           >
             Leads
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'followups'}
             className={`notifications-filter-tab ${activeTab === 'followups' ? 'active' : ''}`}
-            onClick={() => setActiveTab('followups')}
+            onClick={() => handleTabChange('followups')}
           >
             Follow-ups
           </button>
           <button
             type="button"
+            role="tab"
+            aria-selected={activeTab === 'mentions'}
             className={`notifications-filter-tab ${activeTab === 'mentions' ? 'active' : ''}`}
-            onClick={() => setActiveTab('mentions')}
+            onClick={() => handleTabChange('mentions')}
           >
             Mentions & Comments
           </button>
         </div>
 
-        <div style={{ position: 'relative', minWidth: '220px' }}>
+        <div style={{ position: 'relative', minWidth: '220px' }} role="search">
           <input
-            type="text"
+            type="search"
             className="form-input"
             placeholder="Search notifications..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            aria-label="Search notifications"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
             style={{ paddingLeft: '32px', fontSize: '0.85rem' }}
           />
           <Search size={15} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
@@ -223,10 +250,15 @@ export const Notifications = () => {
       {/* Notifications List */}
       <div className="notifications-list-card">
         {loading ? (
-          <div style={{ padding: '40px', textAlign: 'center', color: 'var(--text-dim)' }}>
-            Loading notification records...
-          </div>
-        ) : filteredNotifications.length === 0 ? (
+          <LoadingSpinner text="Loading notifications..." />
+        ) : loadError ? (
+          <EmptyState
+            title="Could not load notifications"
+            message={loadError}
+            actionLabel="Retry"
+            onAction={() => fetchNotifications()}
+          />
+        ) : notifications.length === 0 ? (
           <div className="notification-empty" style={{ padding: '60px 20px' }}>
             <div className="notification-empty-icon">
               <Bell size={36} />
@@ -235,7 +267,7 @@ export const Notifications = () => {
             <p>You're all caught up! No notifications match the selected filter.</p>
           </div>
         ) : (
-          filteredNotifications.map((notif) => (
+          notifications.map((notif) => (
             <div
               key={notif.id}
               className={`notifications-page-item ${notif.is_read ? 'read' : 'unread'}`}
@@ -281,6 +313,7 @@ export const Notifications = () => {
                     className="notification-action-btn"
                     onClick={() => handleMarkRead(notif.id)}
                     title="Mark as read"
+                    aria-label={`Mark as read: ${notif.title}`}
                   >
                     <Check size={14} />
                     <span>Read</span>
@@ -307,6 +340,7 @@ export const Notifications = () => {
                   className="notification-action-btn delete"
                   onClick={() => handleDelete(notif.id)}
                   title="Delete notification"
+                  aria-label={`Delete notification: ${notif.title}`}
                 >
                   <Trash2 size={14} />
                 </button>
@@ -315,6 +349,15 @@ export const Notifications = () => {
           ))
         )}
       </div>
+
+      {!loading && !loadError && notifications.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalCount={totalCount}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
+      )}
     </div>
   );
 };

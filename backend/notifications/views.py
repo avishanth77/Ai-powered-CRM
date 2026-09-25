@@ -1,6 +1,7 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.db import models
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter
 from django.utils import timezone
@@ -29,7 +30,27 @@ class NotificationViewSet(viewsets.ModelViewSet):
         if not user.is_authenticated:
             return Notification.objects.none()
         NotificationService.sync_user_followups(user)
-        return Notification.objects.filter(recipient=user).select_related('actor')
+        qs = Notification.objects.filter(recipient=user).select_related('actor')
+
+        # Tab groups used by the notification center UI
+        group = self.request.query_params.get('group')
+        if group == 'leads':
+            qs = qs.filter(notification_type__startswith='LEAD')
+        elif group == 'followups':
+            qs = qs.filter(notification_type__startswith='FOLLOW_UP')
+        elif group == 'mentions':
+            qs = qs.filter(
+                models.Q(notification_type__icontains='MENTION') |
+                models.Q(notification_type__icontains='COMMENT')
+            )
+
+        search = self.request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                models.Q(title__icontains=search) |
+                models.Q(message__icontains=search)
+            )
+        return qs
 
     @action(detail=False, methods=['get'], url_path='unread-count')
     def unread_count(self, request):

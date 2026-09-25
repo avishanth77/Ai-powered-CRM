@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
@@ -18,6 +18,33 @@ import {
 
 export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
   const { user, isAdmin, isManager, isExecutive } = useAuth();
+  const asideRef = useRef(null);
+  const [isMobileViewport, setIsMobileViewport] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
+  );
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)');
+    const onChange = (e) => setIsMobileViewport(e.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
+  // Mobile drawer behavior: Escape closes, background scroll locks, focus moves in.
+  useEffect(() => {
+    if (!isMobileOpen) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onCloseMobile();
+    };
+    document.addEventListener('keydown', onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    asideRef.current?.querySelector('.sidebar-link')?.focus();
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = prevOverflow;
+    };
+  }, [isMobileOpen, onCloseMobile]);
 
   const navItems = [
     {
@@ -85,7 +112,12 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
   return (
     <>
       {isMobileOpen && <div className="sidebar-backdrop" onClick={onCloseMobile} />}
-      <aside className={`main-sidebar ${isMobileOpen ? 'mobile-open' : ''}`}>
+      <aside
+        id="main-sidebar"
+        ref={asideRef}
+        className={`main-sidebar ${isMobileOpen ? 'mobile-open' : ''}`}
+        inert={isMobileViewport && !isMobileOpen ? true : undefined}
+      >
         <div className="sidebar-brand">
           <div className="brand-logo-icon">
             <Compass size={22} />
@@ -99,7 +131,7 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
           </button>
         </div>
 
-        <nav className="sidebar-nav">
+        <nav className="sidebar-nav" aria-label="Primary navigation">
           <div className="sidebar-section-title">Navigation</div>
           {navItems
             .filter((item) => item.show)

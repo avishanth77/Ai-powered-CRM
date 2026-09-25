@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { customerApi } from '../api/customerApi';
 import { leadApi } from '../api/leadApi';
@@ -8,22 +8,19 @@ import { useToast } from '../context/ToastContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { EmptyState } from '../components/EmptyState';
 import { SearchBar } from '../components/SearchBar';
+import { Pagination } from '../components/Pagination';
 import {
   Briefcase,
   Phone,
   Mail,
   Building2,
   Eye,
-  Calendar,
-  UserCheck,
   Trophy,
   Filter,
   ArrowUpDown,
   X,
   DollarSign,
-  Award,
   Layers,
-  Sparkles,
 } from 'lucide-react';
 
 export const Customers = () => {
@@ -35,6 +32,12 @@ export const Customers = () => {
   const [sourceFilter, setSourceFilter] = useState('');
   const [sortOrder, setSortOrder] = useState('-converted_at');
   const [sources, setSources] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [metrics, setMetrics] = useState({ total: 0, wonCount: 0, directCount: 0, totalWonValue: 0 });
+  const pageSize = 20;
+  // Upper bound for the single metrics snapshot (one extra request, no pagination UI).
+  const METRICS_PAGE_SIZE = 100;
 
   // Load sources list for filter dropdown
   useEffect(() => {
@@ -50,21 +53,39 @@ export const Customers = () => {
   const fetchCustomers = useCallback(async () => {
     setLoading(true);
     try {
-      const params = {};
+      const params = { page: currentPage, page_size: pageSize };
       if (search.trim()) params.search = search.trim();
       if (originFilter) params.origin = originFilter;
       if (sourceFilter) params.source_id = sourceFilter;
       if (sortOrder) params.ordering = sortOrder;
 
-      const res = await customerApi.getCustomers(params);
+      // Metrics snapshot shares search/source but ignores the origin filter
+      // so the breakdown cards always describe the same universe.
+      const metricParams = { ...params, page_size: METRICS_PAGE_SIZE };
+      delete metricParams.origin;
+      delete metricParams.page;
+
+      const [res, snapRes] = await Promise.all([
+        customerApi.getCustomers(params),
+        customerApi.getCustomers(metricParams),
+      ]);
       const data = res.results || res.data || (Array.isArray(res) ? res : []);
       setCustomers(data);
+      setTotalCount(res.count ?? (Array.isArray(res) ? res.length : 0));
+
+      const snapRows = snapRes.results || snapRes.data || (Array.isArray(snapRes) ? snapRes : []);
+      setMetrics({
+        total: snapRes.count ?? snapRows.length,
+        wonCount: snapRows.filter((c) => c.lead || c.is_won_lead).length,
+        directCount: snapRows.filter((c) => !c.lead && !c.is_won_lead).length,
+        totalWonValue: snapRows.reduce((sum, c) => sum + (parseFloat(c.lead_expected_value) || 0), 0),
+      });
     } catch (err) {
       showToast(extractErrorMessage(err, 'Failed to fetch customer accounts'), 'error');
     } finally {
       setLoading(false);
     }
-  }, [search, originFilter, sourceFilter, sortOrder, showToast]);
+  }, [search, originFilter, sourceFilter, sortOrder, currentPage, showToast]);
 
   useEffect(() => {
     fetchCustomers();
@@ -75,22 +96,15 @@ export const Customers = () => {
     setOriginFilter('');
     setSourceFilter('');
     setSortOrder('-converted_at');
+    setCurrentPage(1);
+  };
+
+  const handleOriginShortcut = (value) => {
+    setOriginFilter((prev) => (prev === value ? '' : value));
+    setCurrentPage(1);
   };
 
   const hasActiveFilters = Boolean(search || originFilter || sourceFilter || sortOrder !== '-converted_at');
-
-  // Compute metrics from current or total view
-  const metrics = useMemo(() => {
-    const total = customers.length;
-    const wonCount = customers.filter((c) => c.lead || c.is_won_lead).length;
-    const directCount = customers.filter((c) => !c.lead && !c.is_won_lead).length;
-    const totalWonValue = customers.reduce((sum, c) => {
-      const val = parseFloat(c.lead_expected_value) || 0;
-      return sum + val;
-    }, 0);
-
-    return { total, wonCount, directCount, totalWonValue };
-  }, [customers]);
 
   return (
     <div className="customers-page">
@@ -112,7 +126,17 @@ export const Customers = () => {
         <div
           className={`lead-summary-card summary-card-accent-blue ${originFilter === '' ? 'summary-card-active' : ''}`}
           style={{ cursor: 'pointer' }}
-          onClick={() => setOriginFilter('')}
+          role="button"
+          tabIndex={0}
+          aria-pressed={originFilter === ''}
+          aria-label="Show all customer accounts"
+          onClick={() => handleOriginShortcut('')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleOriginShortcut('');
+            }
+          }}
           title="Click to view all accounts"
         >
           <div className="summary-card-header">
@@ -132,7 +156,17 @@ export const Customers = () => {
         <div
           className={`lead-summary-card summary-card-accent-emerald ${originFilter === 'won_lead' ? 'summary-card-active' : ''}`}
           style={{ cursor: 'pointer' }}
-          onClick={() => setOriginFilter(originFilter === 'won_lead' ? '' : 'won_lead')}
+          role="button"
+          tabIndex={0}
+          aria-pressed={originFilter === 'won_lead'}
+          aria-label="Filter to customers converted from won leads"
+          onClick={() => handleOriginShortcut('won_lead')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleOriginShortcut('won_lead');
+            }
+          }}
           title="Click to filter won lead conversions"
         >
           <div className="summary-card-header">
@@ -152,7 +186,17 @@ export const Customers = () => {
         <div
           className={`lead-summary-card summary-card-accent-purple ${originFilter === 'direct' ? 'summary-card-active' : ''}`}
           style={{ cursor: 'pointer' }}
-          onClick={() => setOriginFilter(originFilter === 'direct' ? '' : 'direct')}
+          role="button"
+          tabIndex={0}
+          aria-pressed={originFilter === 'direct'}
+          aria-label="Filter to direct customer accounts"
+          onClick={() => handleOriginShortcut('direct')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleOriginShortcut('direct');
+            }
+          }}
           title="Click to filter direct customers"
         >
           <div className="summary-card-header">
@@ -188,7 +232,10 @@ export const Customers = () => {
       <div className="filter-toolbar">
         <SearchBar
           value={search}
-          onChange={(val) => setSearch(val)}
+          onChange={(val) => {
+            setSearch(val);
+            setCurrentPage(1);
+          }}
           placeholder="Search by customer name, company, phone, email, or lead name..."
         />
 
@@ -199,7 +246,10 @@ export const Customers = () => {
             <select
               className="filter-select"
               value={originFilter}
-              onChange={(e) => setOriginFilter(e.target.value)}
+              onChange={(e) => {
+                setOriginFilter(e.target.value);
+                setCurrentPage(1);
+              }}
               aria-label="Filter by Customer Origin"
             >
               <option value="">All Origins</option>
@@ -209,12 +259,15 @@ export const Customers = () => {
           </div>
 
           {/* Source Filter */}
-          <select
-            className="filter-select"
-            value={sourceFilter}
-            onChange={(e) => setSourceFilter(e.target.value)}
-            aria-label="Filter by Lead Source"
-          >
+            <select
+              className="filter-select"
+              value={sourceFilter}
+              onChange={(e) => {
+                setSourceFilter(e.target.value);
+                setCurrentPage(1);
+              }}
+              aria-label="Filter by Lead Source"
+            >
             <option value="">All Lead Sources</option>
             {sources.map((src) => (
               <option key={src.id} value={src.id}>
@@ -229,7 +282,10 @@ export const Customers = () => {
             <select
               className="filter-select"
               value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value)}
+              onChange={(e) => {
+                setSortOrder(e.target.value);
+                setCurrentPage(1);
+              }}
               aria-label="Sort Customer Records"
             >
               <option value="-converted_at">Latest Converted First</option>
@@ -343,6 +399,7 @@ export const Customers = () => {
                       to={`/customers/${cust.id}`}
                       className="icon-action-btn"
                       title="View Customer Details"
+                      aria-label={`View details for ${cust.name}`}
                       style={{ marginLeft: 'auto' }}
                     >
                       <Eye size={15} />
@@ -354,6 +411,15 @@ export const Customers = () => {
           </table>
         )}
       </div>
+
+      {!loading && customers.length > 0 && (
+        <Pagination
+          currentPage={currentPage}
+          totalCount={totalCount}
+          pageSize={pageSize}
+          onPageChange={setCurrentPage}
+        />
+      )}
     </div>
   );
 };
