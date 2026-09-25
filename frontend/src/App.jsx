@@ -24,6 +24,7 @@ import { Reports } from './pages/Reports';
 import { Users } from './pages/Users';
 import { Settings } from './pages/Settings';
 import { Notifications } from './pages/Notifications';
+import { Calendar } from './pages/Calendar';
 import { NotFound } from './pages/NotFound';
 
 import './styles/global.css';
@@ -35,6 +36,7 @@ import './styles/forms.css';
 import './styles/modal.css';
 import './styles/responsive.css';
 import './styles/notifications.css';
+import './styles/calendar.css';
 
 
 const AppLayout = () => {
@@ -95,6 +97,7 @@ export default function App() {
                 <Route path="leads/:id" element={<LeadDetails />} />
                 <Route path="leads/:id/edit" element={<LeadEdit />} />
                 <Route path="pipeline" element={<Pipeline />} />
+                <Route path="calendar" element={<Calendar />} />
                 <Route path="follow-ups" element={<FollowUps />} />
                 <Route path="customers" element={<Customers />} />
                 <Route path="customers/:id" element={<CustomerDetails />} />
