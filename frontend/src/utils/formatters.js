@@ -22,6 +22,13 @@ export function formatDateTime(dateString) {
   });
 }
 
+export function formatTime(dateString) {
+  if (!dateString) return '—';
+  const date = new Date(dateString);
+  if (isNaN(date.getTime())) return '—';
+  return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+}
+
 export function formatDate(dateString) {
   if (!dateString) return '—';
   const date = new Date(dateString);

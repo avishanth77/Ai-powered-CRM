@@ -1,9 +1,11 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useOutletContext } from 'react-router-dom';
 import { Bot, Mic, Sparkles, MessageSquare, ArrowRight, FileText, CheckCircle2, ShieldAlert } from 'lucide-react';
 
-export const AiCenter = ({ onOpenAssistant }) => {
+export const AiCenter = ({ onOpenAssistant: propOpenAssistant }) => {
   const navigate = useNavigate();
+  const outletCtx = useOutletContext() || {};
+  const onOpenAssistant = propOpenAssistant || outletCtx.onOpenAssistant;
 
   return (
     <div className="ai-center-page">

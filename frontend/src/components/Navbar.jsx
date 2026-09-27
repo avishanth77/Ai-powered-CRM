@@ -7,7 +7,7 @@ import { LogOut, User as UserIcon, Menu, Shield, Clock, Sun, Moon, Bot } from 'l
 import { Link } from 'react-router-dom';
 import { NotificationBell } from './NotificationBell';
 
-export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0, mobileSidebarOpen = false }) => {
+export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0, mobileSidebarOpen = false, onOpenAi }) => {
   const { user, logout } = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);
@@ -94,16 +94,17 @@ export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0, mobileSidebarO
           </Link>
         )}
 
-        {/* AI Center Quick Link */}
-        <Link
-          to="/ai"
+        {/* AI Assistant Quick Trigger */}
+        <button
+          type="button"
           className="navbar-ai-btn"
-          title="AI Center & Assistant"
-          aria-label="AI Center & Assistant"
+          onClick={onOpenAi}
+          title="Open CRM AI Assistant"
+          aria-label="Open CRM AI Assistant"
         >
           <Bot size={15} />
-          <span>AI Center</span>
-        </Link>
+          <span>AI Copilot</span>
+        </button>
 
         <div className={`navbar-role-pill ${getRoleBadgeClass()}`}>
           <Shield size={13} />

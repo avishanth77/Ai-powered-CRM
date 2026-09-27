@@ -26,6 +26,7 @@ import { Settings } from './pages/Settings';
 import { Notifications } from './pages/Notifications';
 import { Calendar } from './pages/Calendar';
 import { AiCenter } from './pages/AiCenter';
+import { AiAssistantDrawer } from './components/AiAssistantDrawer';
 import { NotFound } from './pages/NotFound';
 
 import './styles/global.css';
@@ -44,6 +45,7 @@ import './styles/ai.css';
 const AppLayout = () => {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [overdueCount, setOverdueCount] = useState(0);
+  const [aiDrawerOpen, setAiDrawerOpen] = useState(false);
 
   useEffect(() => {
     followupApi
@@ -67,11 +69,18 @@ const AppLayout = () => {
           onToggleMobileSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
           overdueCount={overdueCount}
           mobileSidebarOpen={mobileSidebarOpen}
+          onOpenAi={() => setAiDrawerOpen(true)}
         />
         <main className="page-container">
-          <Outlet />
+          <Outlet context={{ onOpenAssistant: () => setAiDrawerOpen(true) }} />
         </main>
       </div>
+
+      {/* Floating CRM AI Assistant Drawer */}
+      <AiAssistantDrawer
+        isOpen={aiDrawerOpen}
+        onClose={() => setAiDrawerOpen(false)}
+      />
     </div>
   );
 };
