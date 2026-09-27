@@ -14,6 +14,7 @@ import {
   Compass,
   Calendar,
   Bell,
+  Bot,
 } from 'lucide-react';
 
 export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
@@ -99,6 +100,12 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
       label: 'Notifications',
       path: '/notifications',
       icon: Bell,
+      show: true,
+    },
+    {
+      label: 'AI Center',
+      path: '/ai',
+      icon: Bot,
       show: true,
     },
     {

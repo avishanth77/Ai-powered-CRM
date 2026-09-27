@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { getInitials } from '../utils/formatters';
 import { ROLE_LABELS } from '../utils/constants';
-import { LogOut, User as UserIcon, Menu, Shield, Clock, Sun, Moon } from 'lucide-react';
+import { LogOut, User as UserIcon, Menu, Shield, Clock, Sun, Moon, Bot } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { NotificationBell } from './NotificationBell';
 
@@ -93,6 +93,17 @@ export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0, mobileSidebarO
             <span className="alert-count-pill">{overdueCount > 99 ? '99+' : overdueCount}</span>
           </Link>
         )}
+
+        {/* AI Center Quick Link */}
+        <Link
+          to="/ai"
+          className="navbar-ai-btn"
+          title="AI Center & Assistant"
+          aria-label="AI Center & Assistant"
+        >
+          <Bot size={15} />
+          <span>AI Center</span>
+        </Link>
 
         <div className={`navbar-role-pill ${getRoleBadgeClass()}`}>
           <Shield size={13} />
