@@ -172,9 +172,17 @@ SPECTACULAR_SETTINGS = {
 }
 
 # ==============================================================================
-# EMAIL CONFIGURATION (Development Console Backend)
+# EMAIL CONFIGURATION
 # ==============================================================================
-# In development, emails are printed directly to the standard output (console/terminal)
-# where `runserver` runs. This prevents accidental real emails and requires no credentials.
-EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'crm-notifications@example.com')
+# Default is console backend (safe for development, prints emails to terminal).
+# To send real emails, set EMAIL_BACKEND to smtp and provide credentials in .env:
+# EMAIL_BACKEND = django.core.mail.backends.smtp.EmailBackend
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
+EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
+EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 't')
+EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('true', '1', 't')
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER )
+

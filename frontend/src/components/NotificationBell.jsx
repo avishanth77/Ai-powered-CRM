@@ -9,6 +9,7 @@ export const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const intervalRef = useRef(null);
+  const notificationContainerRef = useRef(null);
 
   const fetchUnreadCount = useCallback(async () => {
     try {
@@ -47,14 +48,32 @@ export const NotificationBell = () => {
     };
   }, [fetchUnreadCount]);
 
-  // Close the dropdown on Escape
+  // Close the dropdown on Escape or click outside
   useEffect(() => {
     if (!isOpen) return;
+
+    const handleClickOutside = (e) => {
+      if (
+        notificationContainerRef.current &&
+        !notificationContainerRef.current.contains(e.target)
+      ) {
+        setIsOpen(false);
+      }
+    };
+
     const onKey = (e) => {
       if (e.key === 'Escape') setIsOpen(false);
     };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [isOpen]);
 
   const toggleDropdown = async () => {
@@ -89,7 +108,7 @@ export const NotificationBell = () => {
   };
 
   return (
-    <div className="notification-bell-container">
+    <div className="notification-bell-container" ref={notificationContainerRef}>
       <button
         type="button"
         className={`notification-bell-btn ${unreadCount > 0 ? 'has-unread' : ''}`}

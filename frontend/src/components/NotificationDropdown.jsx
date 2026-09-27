@@ -95,82 +95,79 @@ export const NotificationDropdown = ({
   };
 
   return (
-    <>
-      <div className="dropdown-overlay" onClick={onClose} />
-      <div className="notification-dropdown" role="menu" aria-label="Notifications">
-        <div className="notification-dropdown-header">
-          <div className="notification-header-title">
-            <span>Notifications</span>
-            {unreadCount > 0 && (
-              <span className="notification-header-badge">{unreadCount} new</span>
-            )}
-          </div>
+    <div className="notification-dropdown" role="menu" aria-label="Notifications">
+      <div className="notification-dropdown-header">
+        <div className="notification-header-title">
+          <span>Notifications</span>
           {unreadCount > 0 && (
-            <button
-              type="button"
-              className="notification-mark-all-btn"
-              onClick={onMarkAllRead}
-              title="Mark all as read"
-            >
-              Mark all read
-            </button>
+            <span className="notification-header-badge">{unreadCount} new</span>
           )}
         </div>
-
-        <div className="notification-dropdown-list">
-          {loading ? (
-            <div className="notification-empty">Loading notifications...</div>
-          ) : !notifications || notifications.length === 0 ? (
-            <div className="notification-empty">
-              <div className="notification-empty-icon">
-                <Bell size={28} />
-              </div>
-              <p>No notifications yet</p>
-            </div>
-          ) : (
-            notifications.map((notif) => (
-              <div
-                key={notif.id}
-                className={`notification-item ${notif.is_read ? 'read' : 'unread'}`}
-                role="button"
-                tabIndex={0}
-                aria-label={`${notif.title}${notif.is_read ? '' : ' (unread)'}`}
-                onClick={() => handleItemClick(notif)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    handleItemClick(notif);
-                  }
-                }}
-              >
-                <div className={`notification-icon-box ${getIconClass(notif.notification_type)}`}>
-                  {getNotificationIcon(notif.notification_type)}
-                </div>
-                <div className="notification-content">
-                  <div className="notification-title">
-                    <span>{notif.title}</span>
-                    <time className="notification-time" dateTime={notif.created_at}>
-                      {formatRelativeTime(notif.created_at)}
-                    </time>
-                  </div>
-                  <div className="notification-message">{notif.message}</div>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="notification-dropdown-footer">
-          <Link
-            to="/notifications"
-            className="notification-view-all-link"
-            onClick={onClose}
+        {unreadCount > 0 && (
+          <button
+            type="button"
+            className="notification-mark-all-btn"
+            onClick={onMarkAllRead}
+            title="Mark all as read"
           >
-            <span>View All Notifications</span>
-            <ExternalLink size={13} />
-          </Link>
-        </div>
+            Mark all read
+          </button>
+        )}
       </div>
-    </>
+
+      <div className="notification-dropdown-list">
+        {loading ? (
+          <div className="notification-empty">Loading notifications...</div>
+        ) : !notifications || notifications.length === 0 ? (
+          <div className="notification-empty">
+            <div className="notification-empty-icon">
+              <Bell size={28} />
+            </div>
+            <p>No notifications yet</p>
+          </div>
+        ) : (
+          notifications.map((notif) => (
+            <div
+              key={notif.id}
+              className={`notification-item ${notif.is_read ? 'read' : 'unread'}`}
+              role="button"
+              tabIndex={0}
+              aria-label={`${notif.title}${notif.is_read ? '' : ' (unread)'}`}
+              onClick={() => handleItemClick(notif)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  handleItemClick(notif);
+                }
+              }}
+            >
+              <div className={`notification-icon-box ${getIconClass(notif.notification_type)}`}>
+                {getNotificationIcon(notif.notification_type)}
+              </div>
+              <div className="notification-content">
+                <div className="notification-title">
+                  <span>{notif.title}</span>
+                  <time className="notification-time" dateTime={notif.created_at}>
+                    {formatRelativeTime(notif.created_at)}
+                  </time>
+                </div>
+                <div className="notification-message">{notif.message}</div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="notification-dropdown-footer">
+        <Link
+          to="/notifications"
+          className="notification-view-all-link"
+          onClick={onClose}
+        >
+          <span>View All Notifications</span>
+          <ExternalLink size={13} />
+        </Link>
+      </div>
+    </div>
   );
 };

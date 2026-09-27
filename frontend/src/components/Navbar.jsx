@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { getInitials } from '../utils/formatters';
@@ -11,15 +11,31 @@ export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0, mobileSidebarO
   const { user, logout } = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);
+  const profileMenuRef = useRef(null);
 
-  // Close the profile menu on Escape (click-outside is already handled by the overlay)
+  // Close the profile menu on click outside or Escape
   useEffect(() => {
     if (!showDropdown) return;
+
+    const handleClickOutside = (e) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
+        setShowDropdown(false);
+      }
+    };
+
     const onKey = (e) => {
       if (e.key === 'Escape') setShowDropdown(false);
     };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
     document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
+      document.removeEventListener('keydown', onKey);
+    };
   }, [showDropdown]);
 
   const roleLabel = user ? ROLE_LABELS[user.role] || user.role : '';
@@ -83,7 +99,7 @@ export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0, mobileSidebarO
           <span>{roleLabel}</span>
         </div>
 
-        <div className="user-profile-menu">
+        <div className="user-profile-menu" ref={profileMenuRef}>
           <button
             type="button"
             className="user-profile-btn"
@@ -102,36 +118,33 @@ export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0, mobileSidebarO
           </button>
 
           {showDropdown && (
-            <>
-              <div className="dropdown-overlay" onClick={() => setShowDropdown(false)} />
-              <div className="user-dropdown-card">
-                <div className="dropdown-user-header">
-                  <strong>{user?.first_name} {user?.last_name}</strong>
-                  <span className="dropdown-email">{user?.email}</span>
-                </div>
-                <div className="dropdown-divider" />
-                <Link
-                  to="/settings"
-                  className="dropdown-item"
-                  onClick={() => setShowDropdown(false)}
-                >
-                  <UserIcon size={16} />
-                  <span>My Profile & Settings</span>
-                </Link>
-                <div className="dropdown-divider" />
-                <button
-                  type="button"
-                  className="dropdown-item dropdown-logout"
-                  onClick={() => {
-                    setShowDropdown(false);
-                    logout();
-                  }}
-                >
-                  <LogOut size={16} />
-                  <span>Sign Out</span>
-                </button>
+            <div className="user-dropdown-card">
+              <div className="dropdown-user-header">
+                <strong>{user?.first_name} {user?.last_name}</strong>
+                <span className="dropdown-email">{user?.email}</span>
               </div>
-            </>
+              <div className="dropdown-divider" />
+              <Link
+                to="/settings"
+                className="dropdown-item"
+                onClick={() => setShowDropdown(false)}
+              >
+                <UserIcon size={16} />
+                <span>My Profile & Settings</span>
+              </Link>
+              <div className="dropdown-divider" />
+              <button
+                type="button"
+                className="dropdown-item dropdown-logout"
+                onClick={() => {
+                  setShowDropdown(false);
+                  logout();
+                }}
+              >
+                <LogOut size={16} />
+                <span>Sign Out</span>
+              </button>
+            </div>
           )}
         </div>
       </div>

@@ -459,3 +459,37 @@ class LeadAndPermissionTests(TestCase):
         self.assertIn('Lead ID', content)
         self.assertIn('Exec 1 Lead', content)
         self.assertIn('Exec 2 Lead', content)
+
+    def test_report_preview(self):
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.get('/api/reports/preview/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertTrue(response.data['success'])
+        data = response.data['data']
+        self.assertEqual(data['total_count'], 2)
+        self.assertGreater(data['total_expected_value'], 0)
+        self.assertEqual(len(data['records']), 2)
+
+    def test_report_preview_filtering(self):
+        self.client.force_authenticate(user=self.admin)
+        # Filter by keyword
+        response = self.client.get('/api/reports/preview/?keyword=Exec 1')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data['data']
+        self.assertEqual(data['total_count'], 1)
+        self.assertEqual(data['records'][0]['name'], 'Exec 1 Lead')
+
+        # Filter by status
+        response = self.client.get('/api/reports/preview/?status=new')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(response.data['data']['total_count'], 1)
+
+    def test_report_preview_executive_scoping(self):
+        self.client.force_authenticate(user=self.exec_1)
+        response = self.client.get('/api/reports/preview/')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data = response.data['data']
+        # Executive 1 should only see their own assigned lead
+        self.assertEqual(data['total_count'], 1)
+        self.assertEqual(data['records'][0]['name'], 'Exec 1 Lead')
+

@@ -64,6 +64,14 @@
   /* Transitions */
   --transition-fast: 150ms ease;
   --transition-normal: 250ms ease;
+
+  /* Table Dimensions & Cell Padding (Change these to adjust table spacing) */
+  --table-cell-padding-x: 0.625rem; /* Horizontal spacing between column border and text */
+  --table-cell-padding-y: 0.5rem;   /* Vertical spacing for table rows */
+  --table-cell-padding: var(--table-cell-padding-y) var(--table-cell-padding-x);
+  --table-header-padding-y: 0.625rem;
+  --table-header-padding-x: var(--table-cell-padding-x);
+  --table-header-padding: var(--table-header-padding-y) var(--table-header-padding-x);
 }
 
 /* ==========================================================================
@@ -473,7 +481,7 @@ button, input, select, textarea {
 
 .crm-table th {
   background-color: var(--bg-surface-elevated);
-  padding: 0.875rem 1rem;
+  padding: var(--table-header-padding, 0.625rem 0.625rem);
   color: var(--text-muted);
   font-weight: 700;
   text-transform: uppercase;
@@ -484,7 +492,7 @@ button, input, select, textarea {
 }
 
 .crm-table td {
-  padding: 1rem;
+  padding: var(--table-cell-padding, 0.5rem 0.625rem);
   border-bottom: 1px solid var(--border-subtle);
   color: var(--text-main);
   vertical-align: middle;
@@ -513,7 +521,14 @@ button, input, select, textarea {
   white-space: normal;
   word-break: break-word;
   line-height: 1.4;
+}
+
+span.table-truncate-cell {
   display: inline-block;
+}
+
+td.table-truncate-cell {
+  display: table-cell;
 }
 
 /* Table embedded inside a card (no double border/background) */

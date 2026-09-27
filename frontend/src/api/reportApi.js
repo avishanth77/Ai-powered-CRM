@@ -7,6 +7,11 @@ export const reportApi = {
     return response.data;
   },
 
+  getPreview: async (params = {}) => {
+    const response = await api.get('/api/reports/preview/', { params });
+    return response.data;
+  },
+
   getExportUrl: (params = {}) => {
     const query = new URLSearchParams({ format: 'csv', ...params }).toString();
     return `${API_BASE_URL}/api/reports/export/?${query}`;

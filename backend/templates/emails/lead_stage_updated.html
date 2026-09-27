@@ -27,7 +27,7 @@
                 <tr>
                   <td>
                     <div style="display: inline-block; background-color: rgba(99, 102, 241, 0.2); border: 1px solid rgba(129, 140, 248, 0.4); padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; color: #c7d2fe; letter-spacing: 0.05em; text-transform: uppercase;">
-                      CRM Lite • Notification
+                      CRM Lite &bull; Notification
                     </div>
                     <h1 style="margin: 12px 0 0 0; color: #ffffff; font-size: 20px; font-weight: 700; line-height: 1.3;">
                       Lead Status Updated
@@ -62,11 +62,11 @@
                           {{ old_stage_name }}
                         </td>
                         <!-- Arrow Indicator -->
-                        <td style="padding: 0 14px; font-size: 16px; color: #94a3b8; font-weight: bold;">
-                          ➔
+                        <td style="padding: 0 14px; font-size: 18px; color: #94a3b8; font-weight: bold;">
+                          &rarr;
                         </td>
                         <!-- New Stage Pill with dynamic color accent -->
-                        <td align="center" style="background-color: {{ new_stage_color|default:'#4f46e5' }}; color: #ffffff; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                        <td align="center" bgcolor="{{ new_stage_color|default:'#4f46e5' }}" style="background-color: {{ new_stage_color|default:'#4f46e5' }}; color: #ffffff; padding: 6px 16px; border-radius: 20px; font-size: 13px; font-weight: 700; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                           {{ new_stage_name }}
                         </td>
                       </tr>
@@ -122,7 +122,7 @@
                 This automated update was sent by CRM Lite on behalf of {{ sales_executive_name }}.
               </p>
               <p style="margin: 0; font-size: 11px; color: #cbd5e1;">
-                CRM Lite Pipeline Management • Confidential & Proprietary
+                CRM Lite Pipeline Management &bull; Confidential & Proprietary
               </p>
             </td>
           </tr>

@@ -203,6 +203,49 @@ class CSVRenderer(BaseRenderer):
         return data
 
 
+def get_filtered_leads_queryset(user, query_params):
+    qs = Lead.objects.select_related('source', 'stage', 'assigned_to', 'created_by').all()
+
+    if user.role == 'EXECUTIVE' and not user.is_superuser:
+        qs = qs.filter(Q(assigned_to=user) | Q(created_by=user))
+
+    status_param = query_params.get('status')
+    source_param = query_params.get('source')
+    priority_param = query_params.get('priority')
+    assigned_to_param = query_params.get('assigned_to')
+    from_date = query_params.get('from_date')
+    to_date = query_params.get('to_date')
+    keyword_param = query_params.get('keyword')
+
+    if status_param:
+        qs = qs.filter(Q(stage__slug__iexact=status_param) | Q(stage__name__iexact=status_param))
+    if source_param:
+        qs = qs.filter(source_id=source_param)
+    if priority_param:
+        qs = qs.filter(priority=priority_param)
+    if assigned_to_param:
+        qs = qs.filter(assigned_to_id=assigned_to_param)
+    if from_date:
+        if 'T' in from_date:
+            qs = qs.filter(created_at__gte=from_date)
+        else:
+            qs = qs.filter(created_at__date__gte=from_date)
+    if to_date:
+        if 'T' in to_date:
+            qs = qs.filter(created_at__lte=to_date)
+        else:
+            qs = qs.filter(created_at__date__lte=to_date)
+    if keyword_param:
+        qs = qs.filter(
+            Q(name__icontains=keyword_param) |
+            Q(phone__icontains=keyword_param) |
+            Q(email__icontains=keyword_param) |
+            Q(company_name__icontains=keyword_param)
+        )
+
+    return qs.order_by('-created_at')
+
+
 class ReportExportView(APIView):
     """
     CSV Data Export Endpoint.
@@ -230,39 +273,7 @@ class ReportExportView(APIView):
             )
 
     def export_leads(self, request, user):
-        qs = Lead.objects.select_related('source', 'stage', 'assigned_to', 'created_by').all()
-
-        if user.role == 'EXECUTIVE' and not user.is_superuser:
-            qs = qs.filter(Q(assigned_to=user) | Q(created_by=user))
-
-        # Apply basic filters
-        status_param = request.query_params.get('status')
-        source_param = request.query_params.get('source')
-        priority_param = request.query_params.get('priority')
-        assigned_to_param = request.query_params.get('assigned_to')
-        from_date = request.query_params.get('from_date')
-        to_date = request.query_params.get('to_date')
-        keyword_param = request.query_params.get('keyword')
-
-        if status_param:
-            qs = qs.filter(Q(stage__slug__iexact=status_param) | Q(stage__name__iexact=status_param))
-        if source_param:
-            qs = qs.filter(source_id=source_param)
-        if priority_param:
-            qs = qs.filter(priority=priority_param)
-        if assigned_to_param:
-            qs = qs.filter(assigned_to_id=assigned_to_param)
-        if from_date:
-            qs = qs.filter(created_at__gte=from_date)
-        if to_date:
-            qs = qs.filter(created_at__lte=to_date)
-        if keyword_param:
-            qs = qs.filter(
-                Q(name__icontains=keyword_param) |
-                Q(phone__icontains=keyword_param) |
-                Q(email__icontains=keyword_param) |
-                Q(company_name__icontains=keyword_param)
-            )
+        qs = get_filtered_leads_queryset(user, request.query_params)
 
         response = HttpResponse(content_type='text/csv')
         filename = f"crm_lite_leads_report_{timezone.now():%Y%m%d_%H%M%S}.csv"
@@ -360,3 +371,72 @@ class ReportExportView(APIView):
 
 
 ExportReportView = ReportExportView
+
+
+class ReportPreviewView(APIView):
+    """
+    Real-time preview API for Report Filters & Export Criteria.
+    Returns matched count, total expected sales value, average deal size,
+    and a preview list of matching lead records for the export.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        export_type = request.query_params.get('type', 'leads').lower()
+
+        if export_type != 'leads':
+            return Response(
+                {'error': 'Preview is currently supported for leads.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        qs = get_filtered_leads_queryset(user, request.query_params)
+
+        total_count = qs.count()
+        aggregates = qs.aggregate(
+            total_value=Sum('expected_value'),
+            avg_value=Avg('expected_value')
+        )
+        total_value = float(aggregates['total_value'] or 0.0)
+        avg_value = round(float(aggregates['avg_value'] or 0.0), 2)
+
+        try:
+            limit = min(max(int(request.query_params.get('limit', 10)), 1), 50)
+        except (ValueError, TypeError):
+            limit = 10
+
+        records = []
+        for lead in qs[:limit]:
+            records.append({
+                'id': lead.id,
+                'name': lead.name,
+                'company_name': lead.company_name or '',
+                'phone': lead.phone or '',
+                'email': lead.email or '',
+                'source': lead.source.name if lead.source else 'N/A',
+                'source_id': lead.source_id,
+                'status': lead.status,
+                'stage_slug': lead.stage.slug if lead.stage else '',
+                'stage_name': lead.stage.name if lead.stage else (lead.status or 'New'),
+                'stage_color': getattr(lead.stage, 'color', None) if lead.stage else None,
+                'priority': lead.priority,
+                'expected_value': float(lead.expected_value or 0.0),
+                'assigned_to': lead.assigned_to.get_full_name() or lead.assigned_to.email if lead.assigned_to else 'Unassigned',
+                'assigned_to_id': lead.assigned_to_id,
+                'created_by': lead.created_by.get_full_name() or lead.created_by.email if lead.created_by else 'System',
+                'created_at': lead.created_at.strftime('%Y-%m-%d %H:%M:%S'),
+                'created_date': lead.created_at.strftime('%Y-%m-%d'),
+            })
+
+        return Response({
+            'success': True,
+            'data': {
+                'total_count': total_count,
+                'total_expected_value': total_value,
+                'avg_expected_value': avg_value,
+                'preview_limit': limit,
+                'records': records,
+            }
+        })
+

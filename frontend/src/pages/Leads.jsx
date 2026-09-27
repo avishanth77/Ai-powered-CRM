@@ -817,7 +817,6 @@ export const Leads = () => {
                 )}
                 <th>Lead / Company</th>
                 <th>Contact</th>
-                <th>Source</th>
                 <th>Status</th>
                 <th>Priority</th>
                 <th>Assigned To</th>
@@ -860,11 +859,6 @@ export const Leads = () => {
                         </span>
                       )}
                     </div>
-                  </td>
-                  <td>
-                    <span className="text-muted font-sm">
-                      {lead.source_name || 'N/A'}
-                    </span>
                   </td>
                   <td>
                     <StatusBadge status={lead.stage_details || lead.status} />

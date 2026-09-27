@@ -1,4 +1,5 @@
 import logging
+import threading
 from django.core.mail import EmailMultiAlternatives
 from django.core.validators import validate_email, ValidationError
 from django.template.loader import render_to_string
@@ -7,7 +8,7 @@ from django.conf import settings
 logger = logging.getLogger(__name__)
 
 
-def send_lead_stage_update_email(lead, old_stage, new_stage):
+def send_lead_stage_update_email(lead, old_stage, new_stage, async_dispatch=True):
     """
     Sends a dual-format (HTML + Plain-Text fallback) customer notification email
     when a lead's stage/status changes.
@@ -17,7 +18,8 @@ def send_lead_stage_update_email(lead, old_stage, new_stage):
     2. Validates email structure using Django's validate_email validator.
     3. Handles unassigned leads and missing customer/company names with friendly fallbacks.
     4. Renders responsive HTML and clean Plain-Text using Django templates.
-    5. Dispatches via EmailMultiAlternatives for 100% email client compatibility.
+    5. Dispatches via EmailMultiAlternatives in a background daemon thread (when async_dispatch=True)
+       to ensure zero latency and non-blocking instant UI feedback for end users.
     6. Catches all transmission exceptions and logs full stack trace.
     7. Never raises an uncaught exception, ensuring lead persistence is never broken.
 
@@ -25,9 +27,11 @@ def send_lead_stage_update_email(lead, old_stage, new_stage):
     - lead (Lead): The updated Lead model instance.
     - old_stage (LeadStage or str): The previous stage prior to saving.
     - new_stage (LeadStage or str): The newly assigned stage.
+    - async_dispatch (bool): If True (default), sends the email in a background daemon thread
+      so the HTTP request returns immediately without waiting for SMTP network handshake.
 
     Returns:
-    - bool: True if the email was dispatched successfully, False otherwise.
+    - bool: True if the email was dispatched or queued for background transmission, False otherwise.
     """
     if not lead:
         logger.warning("[EmailService] No lead instance provided. Skipping notification.")
@@ -53,6 +57,7 @@ def send_lead_stage_update_email(lead, old_stage, new_stage):
         )
         return False
 
+    lead_id = getattr(lead, 'id', 'Unknown')
     customer_name = getattr(lead, 'name', None) or "Valued Customer"
     company_name = getattr(lead, 'company_name', None) or customer_name
 
@@ -76,7 +81,7 @@ def send_lead_stage_update_email(lead, old_stage, new_stage):
         else "Recently"
     )
 
-    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@crmlite.local')
+    from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'crm-notifications@example.com')
     subject = f"Your Lead Status Has Been Updated: {new_stage_name}"
 
     # Template context for both plain text and HTML versions
@@ -92,29 +97,50 @@ def send_lead_stage_update_email(lead, old_stage, new_stage):
     }
 
     try:
-        # Render plain-text fallback and HTML templates
+        # Render plain-text fallback and HTML templates in-memory (< 1ms)
         text_content = render_to_string('emails/lead_stage_updated.txt', context)
         html_content = render_to_string('emails/lead_stage_updated.html', context)
 
-        # Construct multipart email message
-        msg = EmailMultiAlternatives(
-            subject=subject,
-            body=text_content,
-            from_email=from_email,
-            to=[customer_email],
-        )
-        msg.attach_alternative(html_content, "text/html")
-        sent_count = msg.send(fail_silently=False)
+        def _send_worker():
+            try:
+                # Construct multipart email message
+                msg = EmailMultiAlternatives(
+                    subject=subject,
+                    body=text_content,
+                    from_email=from_email,
+                    to=[customer_email],
+                )
+                msg.attach_alternative(html_content, "text/html")
+                sent_count = msg.send(fail_silently=False)
 
-        logger.info(
-            f"[EmailService] Successfully sent HTML stage update email to {customer_email} "
-            f"for Lead #{getattr(lead, 'id', 'Unknown')} ({old_stage_name} -> {new_stage_name})."
-        )
-        return bool(sent_count > 0)
+                logger.info(
+                    f"[EmailService] Successfully sent HTML stage update email to {customer_email} "
+                    f"for Lead #{lead_id} ({old_stage_name} -> {new_stage_name})."
+                )
+                return bool(sent_count > 0)
+            except Exception as e:
+                logger.error(
+                    f"[EmailService] Failed to send stage update email to {customer_email} "
+                    f"for Lead #{lead_id}: {str(e)}",
+                    exc_info=True
+                )
+                return False
+
+        if async_dispatch:
+            thread = threading.Thread(
+                target=_send_worker,
+                daemon=True,
+                name=f"EmailWorker-Lead-{lead_id}"
+            )
+            thread.start()
+            return True
+        else:
+            return _send_worker()
+
     except Exception as e:
         logger.error(
-            f"[EmailService] Failed to send stage update email to {customer_email} "
-            f"for Lead #{getattr(lead, 'id', 'Unknown')}: {str(e)}",
+            f"[EmailService] Failed to prepare stage update email for Lead #{lead_id}: {str(e)}",
             exc_info=True
         )
         return False
+
