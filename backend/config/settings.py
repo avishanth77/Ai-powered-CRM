@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'reports',
     'activity',
     'notifications',
+    'ai',
 ]
 
 MIDDLEWARE = [
