@@ -23,6 +23,7 @@ class ActivityLog(models.Model):
         LEAD_MARKED_LOST = 'LEAD_MARKED_LOST', 'Lead Marked Lost'
         CUSTOMER_CREATED = 'CUSTOMER_CREATED', 'Customer Created'
         CUSTOMER_UPDATED = 'CUSTOMER_UPDATED', 'Customer Updated'
+        CALL_LOGGED = 'CALL_LOGGED', 'Call Logged'
 
     entity_type = models.CharField(max_length=50, choices=EntityType.choices, db_index=True)
     entity_id = models.CharField(max_length=64, db_index=True)

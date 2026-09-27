@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { leadApi } from '../api/leadApi';
 import { followupApi } from '../api/followupApi';
 import { userApi } from '../api/userApi';
+import { aiApi } from '../api/aiApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatCurrency, formatDateTime, formatDate, formatRelativeTime, toLocalDateTimeInput } from '../utils/formatters';
@@ -33,6 +34,9 @@ import {
   Clock,
   Activity,
   Phone,
+  PhoneCall,
+  Mic,
+  FileText,
   Mail,
   Building2,
   MapPin,
@@ -114,6 +118,43 @@ export const LeadDetails = () => {
   const scheduleDialogRef = useDialogA11y(scheduleModalOpen, () => setScheduleModalOpen(false));
   const completeDialogRef = useDialogA11y(completeModalOpen, () => setCompleteModalOpen(false));
   const aiDialogRef = useDialogA11y(aiModalOpen, () => setAiModalOpen(false));
+
+  // Logged Call Summary Details Modal
+  const [callModalOpen, setCallModalOpen] = useState(false);
+  const [activeCallSummary, setActiveCallSummary] = useState(null);
+  const [loadingCallDetails, setLoadingCallDetails] = useState(false);
+  const callDialogRef = useDialogA11y(callModalOpen, () => setCallModalOpen(false));
+
+  const handleViewCallSummary = async (callId, actItem) => {
+    setCallModalOpen(true);
+    if (callId) {
+      setLoadingCallDetails(true);
+      try {
+        const res = await aiApi.getCallById(callId);
+        setActiveCallSummary(res);
+      } catch {
+        setActiveCallSummary({
+          call_type: actItem.new_value?.call_type || 'Outbound',
+          duration_seconds: actItem.new_value?.duration_seconds || 0,
+          ai_summary: actItem.new_value?.ai_summary || actItem.notes,
+          next_action: actItem.new_value?.next_action,
+          customer_intent: actItem.new_value?.customer_intent,
+          follow_up_date: actItem.new_value?.follow_up_date,
+        });
+      } finally {
+        setLoadingCallDetails(false);
+      }
+    } else {
+      setActiveCallSummary({
+        call_type: actItem.new_value?.call_type || 'Outbound',
+        duration_seconds: actItem.new_value?.duration_seconds || 0,
+        ai_summary: actItem.new_value?.ai_summary || actItem.notes,
+        next_action: actItem.new_value?.next_action,
+        customer_intent: actItem.new_value?.customer_intent,
+        follow_up_date: actItem.new_value?.follow_up_date,
+      });
+    }
+  };
 
   const handleCopy = async (text, type) => {
     if (!text) return;
@@ -507,6 +548,15 @@ export const LeadDetails = () => {
             <span>{loadingAi ? 'Analyzing…' : 'AI Synthesis'}</span>
           </button>
 
+          <Link
+            to={`/ai/call-summary?lead=${id}`}
+            className="btn btn-secondary"
+            title="Record or Upload AI Voice Call Summary"
+          >
+            <Mic size={16} color="var(--primary)" />
+            <span>AI Call Summary</span>
+          </Link>
+
           <Link to={`/leads/${id}/edit`} className="btn btn-secondary">
             <Edit size={16} />
             <span>Edit Profile</span>
@@ -860,21 +910,83 @@ export const LeadDetails = () => {
                 <p className="text-muted">No logged activity for this lead.</p>
               ) : (
                 <div className="timeline-container">
-                  {timeline.map((act) => (
-                    <div key={act.id} className="timeline-item">
-                      <div className="timeline-dot" />
-                      <div className="timeline-card">
-                        <div className="timeline-header">
-                          <span className="timeline-action">{act.action_display || act.action}</span>
-                          <span className="timeline-time">{formatRelativeTime(act.created_at)}</span>
+                  {timeline.map((act) => {
+                    const isCall = act.action === 'CALL_LOGGED';
+                    return (
+                      <div key={act.id} className="timeline-item">
+                        <div
+                          className="timeline-dot"
+                          style={isCall ? { background: 'var(--primary)', borderColor: 'var(--primary)' } : undefined}
+                        />
+                        <div
+                          className="timeline-card"
+                          style={isCall ? { borderLeft: '3px solid var(--primary)' } : undefined}
+                        >
+                          <div className="timeline-header">
+                            <span
+                              className="timeline-action"
+                              style={isCall ? { display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--primary)' } : undefined}
+                            >
+                              {isCall ? (
+                                <>
+                                  <Mic size={14} />
+                                  <span>🎙 Call • {act.new_value?.call_type || 'Outbound'} Call</span>
+                                </>
+                              ) : (
+                                act.action_display || act.action
+                              )}
+                            </span>
+                            <span className="timeline-time">{formatRelativeTime(act.created_at)}</span>
+                          </div>
+
+                          <div className="timeline-actor">
+                            By: {act.performer_name || 'System / Automated'}
+                            {isCall && act.new_value?.duration_seconds !== undefined
+                              ? ` • Duration: ${Math.floor(act.new_value.duration_seconds / 60)}:${String(act.new_value.duration_seconds % 60).padStart(2, '0')}`
+                              : ''}{' '}
+                            ({formatDateTime(act.created_at)})
+                          </div>
+
+                          {isCall && act.new_value?.ai_summary ? (
+                            <div style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
+                              <div style={{ fontWeight: 600, color: 'var(--text-dim)', fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                                AI Summary:
+                              </div>
+                              <div style={{ color: 'var(--text-main)', lineHeight: 1.5 }}>
+                                {act.new_value.ai_summary}
+                              </div>
+                            </div>
+                          ) : act.notes ? (
+                            <div className="timeline-notes">{act.notes}</div>
+                          ) : null}
+
+                          {isCall && act.new_value?.next_action && (
+                            <div style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
+                              <div style={{ fontWeight: 600, color: 'var(--text-dim)', fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
+                                Next Action:
+                              </div>
+                              <div style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                                {act.new_value.next_action}
+                              </div>
+                            </div>
+                          )}
+
+                          {isCall && (
+                            <div style={{ marginTop: '0.75rem' }}>
+                              <button
+                                type="button"
+                                className="btn btn-secondary btn-sm"
+                                onClick={() => handleViewCallSummary(act.new_value?.call_id, act)}
+                              >
+                                <FileText size={13} />
+                                <span>View Summary</span>
+                              </button>
+                            </div>
+                          )}
                         </div>
-                        <div className="timeline-actor">
-                          By: {act.performer_name || 'System / Automated'} ({formatDateTime(act.created_at)})
-                        </div>
-                        {act.notes && <div className="timeline-notes">{act.notes}</div>}
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
@@ -1387,6 +1499,174 @@ export const LeadDetails = () => {
             </div>
             <div className="modal-footer">
               <button type="button" className="btn btn-secondary" onClick={() => setAiModalOpen(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Call Summary Inspection Modal */}
+      {callModalOpen && (
+        <div className="modal-backdrop" onClick={() => setCallModalOpen(false)}>
+          <div
+            ref={callDialogRef}
+            className="modal-container modal-container-lg"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="call-summary-modal-title"
+          >
+            <div className="modal-header">
+              <div className="modal-title-row">
+                <Mic size={20} color="var(--primary)" />
+                <h3 id="call-summary-modal-title">
+                  {activeCallSummary?.call_type || 'Outbound'} Call Intelligence
+                </h3>
+              </div>
+              <button
+                type="button"
+                className="mobile-close-btn"
+                onClick={() => setCallModalOpen(false)}
+                aria-label="Close dialog"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="modal-body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
+              {loadingCallDetails ? (
+                <div style={{ padding: '3rem', textAlign: 'center' }}>
+                  <div className="spinner" style={{ margin: '0 auto 1rem' }} />
+                  <p className="text-muted">Loading call intelligence details...</p>
+                </div>
+              ) : activeCallSummary ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                  {/* Call meta */}
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '1rem',
+                      flexWrap: 'wrap',
+                      padding: '0.75rem 1rem',
+                      background: 'var(--bg-surface-elevated)',
+                      borderRadius: 'var(--radius-md)',
+                      fontSize: '0.8125rem',
+                    }}
+                  >
+                    <span><strong>Call Type:</strong> {activeCallSummary.call_type || 'Outbound'}</span>
+                    <span>•</span>
+                    <span>
+                      <strong>Duration:</strong>{' '}
+                      {Math.floor((activeCallSummary.duration_seconds || 0) / 60)}:
+                      {String((activeCallSummary.duration_seconds || 0) % 60).padStart(2, '0')}
+                    </span>
+                    {activeCallSummary.customer_intent && (
+                      <>
+                        <span>•</span>
+                        <span className="badge badge-success">
+                          {activeCallSummary.customer_intent}
+                        </span>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Summary */}
+                  <div>
+                    <h4 style={{ fontSize: '0.875rem', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.35rem' }}>
+                      AI Executive Summary
+                    </h4>
+                    <p style={{ fontSize: '0.9375rem', lineHeight: 1.6, color: 'var(--text-main)', margin: 0 }}>
+                      {activeCallSummary.ai_summary || 'No summary text available.'}
+                    </p>
+                  </div>
+
+                  {/* Next Action */}
+                  {activeCallSummary.next_action && (
+                    <div
+                      style={{
+                        padding: '0.875rem 1rem',
+                        background: 'var(--primary-subtle)',
+                        borderRadius: 'var(--radius-md)',
+                        border: '1px solid var(--primary-glow)',
+                      }}
+                    >
+                      <h4 style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--primary)', marginBottom: '0.25rem', fontWeight: 700 }}>
+                        Recommended Next Action
+                      </h4>
+                      <p style={{ margin: 0, fontWeight: 600, color: 'var(--text-main)' }}>
+                        {activeCallSummary.next_action}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Key Points */}
+                  {activeCallSummary.key_points?.length > 0 && (
+                    <div>
+                      <h4 style={{ fontSize: '0.875rem', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.35rem' }}>
+                        Key Discussion Points
+                      </h4>
+                      <ul className="summary-bullet-list">
+                        {activeCallSummary.key_points.map((pt, i) => (
+                          <li key={i}>{pt}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* Requirements & Objections Grid */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+                    {activeCallSummary.customer_requirements?.length > 0 && (
+                      <div className="card" style={{ padding: '1rem', background: 'var(--bg-surface-elevated)' }}>
+                        <h4 style={{ fontSize: '0.8125rem', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.5rem' }}>
+                          Customer Requirements
+                        </h4>
+                        <ul className="summary-bullet-list">
+                          {activeCallSummary.customer_requirements.map((req, i) => (
+                            <li key={i}>{req}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+
+                    {activeCallSummary.objections?.length > 0 && (
+                      <div className="card" style={{ padding: '1rem', background: 'var(--bg-surface-elevated)' }}>
+                        <h4 style={{ fontSize: '0.8125rem', textTransform: 'uppercase', color: 'var(--danger)', marginBottom: '0.5rem' }}>
+                          Customer Objections
+                        </h4>
+                        <ul className="summary-bullet-list">
+                          {activeCallSummary.objections.map((obj, i) => (
+                            <li key={i}>{obj}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Transcript */}
+                  {activeCallSummary.transcript && (
+                    <div>
+                      <h4 style={{ fontSize: '0.875rem', textTransform: 'uppercase', color: 'var(--text-dim)', marginBottom: '0.35rem' }}>
+                        Call Transcript
+                      </h4>
+                      <div className="transcript-card" style={{ maxHeight: 200 }}>
+                        {activeCallSummary.transcript}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="text-muted">No call details found.</p>
+              )}
+            </div>
+
+            <div className="modal-footer">
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setCallModalOpen(false)}
+              >
+                Close
+              </button>
             </div>
           </div>
         </div>

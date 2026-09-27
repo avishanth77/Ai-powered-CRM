@@ -4,11 +4,12 @@ from .models import ActivityLog
 class ActivityLogSerializer(serializers.ModelSerializer):
     performer_name = serializers.SerializerMethodField()
     performer_email = serializers.SerializerMethodField()
+    action_display = serializers.CharField(source='get_action_display', read_only=True)
 
     class Meta:
         model = ActivityLog
         fields = [
-            'id', 'entity_type', 'entity_id', 'action',
+            'id', 'entity_type', 'entity_id', 'action', 'action_display',
             'old_value', 'new_value', 'notes',
             'performed_by', 'performer_name', 'performer_email',
             'created_at'
