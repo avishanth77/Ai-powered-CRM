@@ -25,6 +25,7 @@ import { Users } from './pages/Users';
 import { Settings } from './pages/Settings';
 import { Notifications } from './pages/Notifications';
 import { Calendar } from './pages/Calendar';
+import { AiCenter } from './pages/AiCenter';
 import { NotFound } from './pages/NotFound';
 
 import './styles/global.css';
@@ -37,6 +38,7 @@ import './styles/modal.css';
 import './styles/responsive.css';
 import './styles/notifications.css';
 import './styles/calendar.css';
+import './styles/ai.css';
 
 
 const AppLayout = () => {
@@ -113,6 +115,7 @@ export default function App() {
                 />
                 <Route path="settings" element={<Settings />} />
                 <Route path="notifications" element={<Notifications />} />
+                <Route path="ai" element={<AiCenter />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
