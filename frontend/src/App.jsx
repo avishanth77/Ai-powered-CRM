@@ -26,6 +26,7 @@ import { Settings } from './pages/Settings';
 import { Notifications } from './pages/Notifications';
 import { Calendar } from './pages/Calendar';
 import { AiCenter } from './pages/AiCenter';
+import { AiCallSummaryPage } from './pages/AiCallSummaryPage';
 import { AiAssistantDrawer } from './components/AiAssistantDrawer';
 import { NotFound } from './pages/NotFound';
 
@@ -125,6 +126,7 @@ export default function App() {
                 <Route path="settings" element={<Settings />} />
                 <Route path="notifications" element={<Notifications />} />
                 <Route path="ai" element={<AiCenter />} />
+                <Route path="ai/call-summary" element={<AiCallSummaryPage />} />
                 <Route path="*" element={<NotFound />} />
               </Route>
             </Routes>
