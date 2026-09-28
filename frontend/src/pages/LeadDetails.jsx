@@ -1524,7 +1524,7 @@ export const LeadDetails = () => {
               </div>
               <button
                 type="button"
-                className="mobile-close-btn"
+                className="modal-close-btn"
                 onClick={() => setCallModalOpen(false)}
                 aria-label="Close dialog"
               >

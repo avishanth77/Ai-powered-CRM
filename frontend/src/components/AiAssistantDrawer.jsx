@@ -179,50 +179,52 @@ export const AiAssistantDrawer = ({ isOpen, onClose }) => {
       ?.suggestions || DEFAULT_SUGGESTIONS.slice(0, 3);
 
   return (
-    <div className="ai-chat-drawer" role="dialog" aria-modal="true" aria-label="CRM AI Assistant">
-      {/* Header */}
-      <div className="chat-header">
-        <div className="chat-header-info">
-          <div className="chat-avatar-icon">
-            <Bot size={18} />
-          </div>
-          <div>
-            <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
-              <span>CRM AI Copilot</span>
-              <span className="ai-card-badge" style={{ margin: 0, background: 'var(--primary-subtle)', color: 'var(--primary)' }}>
-                Gemini
+    <>
+      {/* Backdrop for mobile / overlay close */}
+      <div className="ai-chat-backdrop" onClick={onClose} aria-label="Close Assistant overlay" />
+
+      <div className="ai-chat-drawer" role="dialog" aria-modal="true" aria-label="CRM AI Assistant">
+        {/* Header */}
+        <div className="chat-header">
+          <div className="chat-header-info">
+            <div className="chat-avatar-icon">
+              <Bot size={18} />
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: '0.9375rem', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '0.375rem' }}>
+                <span>CRM AI Copilot</span>
+                <span className="ai-card-badge" style={{ margin: 0, background: 'var(--primary-subtle)', color: 'var(--primary)' }}>
+                  Gemini
+                </span>
+              </div>
+              <span style={{ fontSize: '0.75rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)' }} />
+                Live CRM Tools Connected
               </span>
             </div>
-            <span style={{ fontSize: '0.75rem', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-              <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--success)' }} />
-              Live CRM Tools Connected
-            </span>
+          </div>
+
+          <div className="chat-header-actions">
+            <button
+              type="button"
+              className="chat-header-btn chat-clear-btn"
+              onClick={handleClear}
+              title="Clear Conversation"
+              aria-label="Clear Conversation"
+            >
+              <Trash2 size={15} />
+            </button>
+            <button
+              type="button"
+              className="chat-header-btn chat-close-btn"
+              onClick={onClose}
+              title="Close AI Assistant (Esc)"
+              aria-label="Close AI Assistant"
+            >
+              <X size={18} />
+            </button>
           </div>
         </div>
-
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-          <button
-            type="button"
-            className="mobile-close-btn"
-            style={{ width: 28, height: 28 }}
-            onClick={handleClear}
-            title="Clear Conversation"
-            aria-label="Clear Conversation"
-          >
-            <Trash2 size={15} />
-          </button>
-          <button
-            type="button"
-            className="mobile-close-btn"
-            style={{ width: 28, height: 28 }}
-            onClick={onClose}
-            title="Close Assistant"
-            aria-label="Close Assistant"
-          >
-            <X size={18} />
-          </button>
-        </div>
-      </div>
 
       {/* Messages Stream */}
       <div className="chat-messages-container">
@@ -383,5 +385,6 @@ export const AiAssistantDrawer = ({ isOpen, onClose }) => {
         </button>
       </form>
     </div>
+    </>
   );
 };

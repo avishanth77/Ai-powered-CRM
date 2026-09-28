@@ -560,7 +560,7 @@ CRM Lite Team`;
                   </div>
                   <button
                     type="button"
-                    className="mobile-close-btn"
+                    className="modal-close-btn"
                     onClick={() => setUploadedAudioFile(null)}
                     disabled={isBusy}
                     title="Remove file"
@@ -961,7 +961,7 @@ CRM Lite Team`;
               </h3>
               <button
                 type="button"
-                className="mobile-close-btn"
+                className="modal-close-btn"
                 onClick={() => setFollowupModalOpen(false)}
                 disabled={isSchedulingFollowup}
               >
@@ -1051,7 +1051,7 @@ CRM Lite Team`;
               </h3>
               <button
                 type="button"
-                className="mobile-close-btn"
+                className="modal-close-btn"
                 onClick={() => setEmailModalOpen(false)}
               >
                 <X size={18} />

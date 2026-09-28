@@ -27,6 +27,7 @@ import { Notifications } from './pages/Notifications';
 import { Calendar } from './pages/Calendar';
 import { AiCenter } from './pages/AiCenter';
 import { AiCallSummaryPage } from './pages/AiCallSummaryPage';
+import { Bot } from 'lucide-react';
 import { AiAssistantDrawer } from './components/AiAssistantDrawer';
 import { NotFound } from './pages/NotFound';
 
@@ -70,12 +71,33 @@ const AppLayout = () => {
           onToggleMobileSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)}
           overdueCount={overdueCount}
           mobileSidebarOpen={mobileSidebarOpen}
-          onOpenAi={() => setAiDrawerOpen(true)}
+          onOpenAi={() => setAiDrawerOpen((prev) => !prev)}
+          isAiOpen={aiDrawerOpen}
         />
         <main className="page-container">
-          <Outlet context={{ onOpenAssistant: () => setAiDrawerOpen(true) }} />
+          <Outlet
+            context={{
+              onOpenAssistant: () => setAiDrawerOpen(true),
+              onCloseAssistant: () => setAiDrawerOpen(false),
+              onToggleAssistant: () => setAiDrawerOpen((prev) => !prev),
+              isAssistantOpen: aiDrawerOpen,
+            }}
+          />
         </main>
       </div>
+
+      {/* Floating AI Assistant Trigger Button (Bottom Right) */}
+      {!aiDrawerOpen && (
+        <button
+          type="button"
+          className="floating-ai-trigger"
+          onClick={() => setAiDrawerOpen(true)}
+          title="Open CRM AI Assistant"
+          aria-label="Open CRM AI Assistant"
+        >
+          <Bot size={22} />
+        </button>
+      )}
 
       {/* Floating CRM AI Assistant Drawer */}
       <AiAssistantDrawer
