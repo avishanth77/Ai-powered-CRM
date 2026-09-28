@@ -187,3 +187,11 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER )
 
+# ==============================================================================
+# AI SERVICE CONFIGURATION
+# ==============================================================================
+AI_PROVIDER = os.getenv('AI_PROVIDER', 'gemini').lower()
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', os.getenv('GOOGLE_API_KEY', ''))
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
+OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+
