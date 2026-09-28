@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useOutletContext } from 'react-router-dom';
-import { Bot, Mic, Sparkles, MessageSquare, ArrowRight, FileText, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { Bot, Mic, Sparkles, MessageSquare, ArrowRight, FileText, CheckCircle2, ShieldCheck } from 'lucide-react';
 
 export const AiCenter = ({ onOpenAssistant: propOpenAssistant }) => {
   const navigate = useNavigate();
@@ -13,10 +13,10 @@ export const AiCenter = ({ onOpenAssistant: propOpenAssistant }) => {
         <div>
           <div className="ai-header-badge">
             <Sparkles size={13} />
-            <span>AI Workspace • Phase 1 Demo</span>
+            <span>AI Workspace • Production Gemini Integration</span>
           </div>
           <h1 className="page-title">AI Center</h1>
-          <p className="page-subtitle">AI-powered tools and intelligent automation for your CRM</p>
+          <p className="page-subtitle">Real AI speech-to-text call analysis and intelligent CRM copilot</p>
         </div>
       </div>
 
@@ -32,16 +32,18 @@ export const AiCenter = ({ onOpenAssistant: propOpenAssistant }) => {
               <div>
                 <h2 className="ai-card-title">
                   AI Assistant
-                  <span className="ai-card-badge">Demo AI</span>
+                  <span className="ai-card-badge" style={{ background: 'var(--primary-subtle)', color: 'var(--primary)' }}>
+                    Gemini Copilot
+                  </span>
                 </h2>
                 <span className="text-dim" style={{ fontSize: '0.8125rem' }}>
-                  Conversational CRM Copilot
+                  Conversational CRM Assistant
                 </span>
               </div>
             </div>
 
             <p className="ai-card-description">
-              Ask questions about your CRM pipeline, overdue follow-ups, lead summaries, and daily tasks in natural language.
+              Ask questions about your live CRM pipeline, overdue follow-ups, lead summaries, and daily tasks in natural language with controlled safety for CRM actions.
             </p>
 
             <ul className="ai-card-features-list">
@@ -55,13 +57,13 @@ export const AiCenter = ({ onOpenAssistant: propOpenAssistant }) => {
               </li>
               <li>
                 <CheckCircle2 size={15} />
-                <span>Role-aware CRM queries and actionable suggestions</span>
+                <span>Confirmation-based safe CRM actions (stage transitions)</span>
               </li>
             </ul>
           </div>
 
           <div className="ai-card-footer">
-            <span className="text-dim" style={{ fontSize: '0.8125rem' }}>Ready to chat</span>
+            <span className="text-dim" style={{ fontSize: '0.8125rem' }}>Live CRM Tools Connected</span>
             <button
               type="button"
               className="btn btn-primary"
@@ -74,7 +76,7 @@ export const AiCenter = ({ onOpenAssistant: propOpenAssistant }) => {
               }}
             >
               <MessageSquare size={16} />
-              <span>Open Assistant</span>
+              <span>Open</span>
               <ArrowRight size={14} />
             </button>
           </div>
@@ -91,16 +93,18 @@ export const AiCenter = ({ onOpenAssistant: propOpenAssistant }) => {
               <div>
                 <h2 className="ai-card-title">
                   Call Summary
-                  <span className="ai-card-badge">Voice Note & Notes</span>
+                  <span className="ai-card-badge" style={{ background: 'rgba(124, 58, 237, 0.15)', color: 'var(--accent-purple)' }}>
+                    Speech-to-Text
+                  </span>
                 </h2>
                 <span className="text-dim" style={{ fontSize: '0.8125rem' }}>
-                  Speech-to-Text & Deal Intelligence
+                  Multimodal Audio & Deal Intelligence
                 </span>
               </div>
             </div>
 
             <p className="ai-card-description">
-              Record or upload audio voice notes from sales calls. Automatically extract transcripts, customer objections, requirements, and next steps.
+              Record voice notes or upload audio recordings (.mp3, .wav, .m4a, .webm). Transcribe conversations verbatim and extract customer objections, requirements, and next actions.
             </p>
 
             <ul className="ai-card-features-list">
@@ -110,17 +114,21 @@ export const AiCenter = ({ onOpenAssistant: propOpenAssistant }) => {
               </li>
               <li>
                 <CheckCircle2 size={15} />
-                <span>Structured synthesis: key points, intent & objections</span>
+                <span>Verbatim transcript generation with speaker labeling</span>
               </li>
               <li>
                 <CheckCircle2 size={15} />
-                <span>1-click save to Lead profile, follow-ups & activity timeline</span>
+                <span>Structured synthesis: key points, intent, objections, next steps</span>
+              </li>
+              <li>
+                <CheckCircle2 size={15} />
+                <span>1-click save to Lead profile & Activity Timeline</span>
               </li>
             </ul>
           </div>
 
           <div className="ai-card-footer">
-            <span className="text-dim" style={{ fontSize: '0.8125rem' }}>Voice note ready</span>
+            <span className="text-dim" style={{ fontSize: '0.8125rem' }}>Multimodal STT Ready</span>
             <button
               type="button"
               className="btn btn-primary"
@@ -128,14 +136,14 @@ export const AiCenter = ({ onOpenAssistant: propOpenAssistant }) => {
               onClick={() => navigate('/ai/call-summary')}
             >
               <FileText size={16} />
-              <span>Open Call Summary</span>
+              <span>Open</span>
               <ArrowRight size={14} />
             </button>
           </div>
         </div>
       </div>
 
-      {/* Architecture Notice Banner */}
+      {/* Production Architecture Banner */}
       <div
         className="card"
         style={{
@@ -145,12 +153,12 @@ export const AiCenter = ({ onOpenAssistant: propOpenAssistant }) => {
           display: 'flex',
           alignItems: 'center',
           gap: '1rem',
-          marginTop: '1rem',
+          marginTop: '1.25rem',
         }}
       >
-        <ShieldAlert size={20} color="var(--primary)" style={{ flexShrink: 0 }} />
+        <ShieldCheck size={22} color="var(--primary)" style={{ flexShrink: 0 }} />
         <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-          <strong style={{ color: 'var(--text-main)' }}>AI Architecture Note:</strong> Currently running on Phase 1 mock intelligence services. Backend service boundaries are fully structured to seamlessly integrate Gemini, OpenAI, or local STT models without modifying CRM workflows.
+          <strong style={{ color: 'var(--text-main)' }}>Production AI Architecture:</strong> Audio transcription and deal intelligence run through the Google Gemini multimodal API behind a secure Django server service layer. All credentials remain server-side, and CRM business rules and role permissions are strictly enforced.
         </div>
       </div>
     </div>

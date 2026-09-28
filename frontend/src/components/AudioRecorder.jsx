@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Mic, Square, Trash2, Play, Pause, Volume2, AlertCircle } from 'lucide-react';
+import { Mic, Square, Trash2, Play, Pause, AlertCircle, Circle } from 'lucide-react';
 
 export const AudioRecorder = ({ onRecordingComplete, onRecordingReset, disabled }) => {
   const [isRecording, setIsRecording] = useState(false);
@@ -32,7 +32,7 @@ export const AudioRecorder = ({ onRecordingComplete, onRecordingReset, disabled 
   const startRecording = async () => {
     setError(null);
     if (!navigator.mediaDevices?.getUserMedia) {
-      setError('Audio recording is not supported in this browser environment.');
+      setError('Audio recording is not supported in this browser.');
       return;
     }
 
@@ -54,7 +54,6 @@ export const AudioRecorder = ({ onRecordingComplete, onRecordingReset, disabled 
         const url = URL.createObjectURL(audioBlob);
         setAudioUrl(url);
 
-        // Stop all tracks to release microphone hardware
         stream.getTracks().forEach((track) => track.stop());
 
         if (onRecordingComplete) {
@@ -62,7 +61,7 @@ export const AudioRecorder = ({ onRecordingComplete, onRecordingReset, disabled 
         }
       };
 
-      mediaRecorder.start(250); // Slice data every 250ms
+      mediaRecorder.start(250);
       setIsRecording(true);
       setRecordingSeconds(0);
 
@@ -71,7 +70,7 @@ export const AudioRecorder = ({ onRecordingComplete, onRecordingReset, disabled 
       }, 1000);
     } catch (err) {
       console.warn('Microphone access error:', err);
-      setError('Microphone access was denied or is unavailable. Please grant microphone permission or upload an audio file.');
+      setError('Microphone access was denied. Please allow microphone permission or upload an audio file.');
     }
   };
 
@@ -111,7 +110,7 @@ export const AudioRecorder = ({ onRecordingComplete, onRecordingReset, disabled 
   };
 
   return (
-    <div className={`voice-record-card ${isRecording ? 'recording' : ''}`}>
+    <div className={`voice-record-card ${isRecording ? 'recording' : ''}`} style={{ textAlign: 'center', padding: '1.25rem' }}>
       {error && (
         <div
           style={{
@@ -124,7 +123,8 @@ export const AudioRecorder = ({ onRecordingComplete, onRecordingReset, disabled 
             borderRadius: 'var(--radius-sm)',
             fontSize: '0.8125rem',
             width: '100%',
-            marginBottom: '0.5rem',
+            marginBottom: '0.75rem',
+            textAlign: 'left',
           }}
         >
           <AlertCircle size={15} style={{ flexShrink: 0 }} />
@@ -132,32 +132,33 @@ export const AudioRecorder = ({ onRecordingComplete, onRecordingReset, disabled 
         </div>
       )}
 
-      {/* Recording State */}
+      {/* STATE A: ACTIVE RECORDING */}
       {isRecording ? (
-        <>
-          <div className="recording-timer">
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', color: 'var(--danger)', fontWeight: 700, fontSize: '0.9375rem' }}>
             <span className="record-pulsing-dot" />
-            <span>{formatTimer(recordingSeconds)}</span>
+            <span>🔴 Recording</span>
           </div>
-          <span style={{ fontSize: '0.8125rem', color: 'var(--danger)', fontWeight: 600 }}>
-            Recording call voice note... Speak clearly.
-          </span>
+
+          <div style={{ fontSize: '1.75rem', fontWeight: 800, letterSpacing: '0.05em', color: 'var(--text-main)', fontFamily: 'monospace' }}>
+            {formatTimer(recordingSeconds)}
+          </div>
+
           <button
             type="button"
             className="btn btn-danger"
             onClick={stopRecording}
-            style={{ marginTop: '0.5rem' }}
+            style={{ minWidth: 160, padding: '0.625rem 1.25rem' }}
           >
             <Square size={16} fill="currentColor" />
             <span>Stop Recording</span>
           </button>
-        </>
+        </div>
       ) : audioUrl ? (
-        /* Preview State */
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem' }}>
+        /* STATE B: RECORDING FINISHED / PREVIEW */
+        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.875rem' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--success)', fontWeight: 600, fontSize: '0.875rem' }}>
-            <Volume2 size={18} />
-            <span>Voice Note Captured ({formatTimer(recordingSeconds)})</span>
+            <span>Voice Note Ready ({formatTimer(recordingSeconds)})</span>
           </div>
 
           <audio
@@ -168,7 +169,7 @@ export const AudioRecorder = ({ onRecordingComplete, onRecordingReset, disabled 
             controls
           />
 
-          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+          <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem', justifyContent: 'center' }}>
             <button
               type="button"
               className="btn btn-secondary btn-sm"
@@ -176,35 +177,44 @@ export const AudioRecorder = ({ onRecordingComplete, onRecordingReset, disabled 
               disabled={disabled}
             >
               <Trash2 size={14} color="var(--danger)" />
-              <span>Discard & Re-record</span>
+              <span>Delete</span>
             </button>
           </div>
         </div>
       ) : (
-        /* Idle Ready State */
-        <>
-          <div style={{ width: 44, height: 44, borderRadius: '50%', background: 'var(--primary-subtle)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <Mic size={22} />
+        /* STATE C: IDLE / READY TO RECORD */
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.5rem' }}>
+          <div
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: '50%',
+              background: 'var(--primary-subtle)',
+              color: 'var(--primary)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              margin: '0 auto 0.25rem',
+            }}
+          >
+            <Mic size={26} />
           </div>
-          <div>
-            <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.9375rem' }}>
-              Record Voice Note
-            </div>
-            <div style={{ fontSize: '0.8125rem', color: 'var(--text-dim)', marginTop: '0.125rem' }}>
-              Capture customer conversation details using your device microphone
-            </div>
+
+          <div style={{ fontSize: '1.5rem', fontWeight: 700, letterSpacing: '0.05em', color: 'var(--text-main)', fontFamily: 'monospace' }}>
+            00:00
           </div>
+
           <button
             type="button"
             className="btn btn-primary"
             onClick={startRecording}
             disabled={disabled}
-            style={{ marginTop: '0.25rem' }}
+            style={{ minWidth: 160, padding: '0.625rem 1.25rem', marginTop: '0.25rem' }}
           >
             <Mic size={16} />
             <span>Start Recording</span>
           </button>
-        </>
+        </div>
       )}
     </div>
   );
