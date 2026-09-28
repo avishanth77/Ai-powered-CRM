@@ -105,19 +105,58 @@ class GeminiProvider(BaseAIProvider):
     """
 
     def __init__(self, api_key: Optional[str] = None, model_name: Optional[str] = None):
-        self.api_key = api_key or getattr(settings, 'GEMINI_API_KEY', '') or ''
+        self.api_key = api_key
         self.model_name = model_name or getattr(settings, 'GEMINI_MODEL', 'gemini-2.5-flash')
         self._client = None
+        self._cached_key = None
+
+    def _resolve_api_key(self) -> str:
+        """
+        Dynamically resolves the Gemini API key from:
+        1. Passed in explicit key
+        2. Django settings (settings.GEMINI_API_KEY)
+        3. os.environ ('GEMINI_API_KEY' or 'GOOGLE_API_KEY')
+        4. Fresh reload from backend/.env (ensures keys saved while dev server is running take effect immediately)
+        """
+        key = (self.api_key or getattr(settings, 'GEMINI_API_KEY', '') or '').strip()
+        if not key:
+            key = (os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY') or '').strip()
+
+        # If still empty, dynamically reload backend/.env in case user saved .env while runserver was active
+        if not key:
+            try:
+                from dotenv import load_dotenv
+                from pathlib import Path
+                base_dir = getattr(settings, 'BASE_DIR', None)
+                if not base_dir:
+                    base_dir = Path(__file__).resolve().parent.parent.parent
+                env_path = Path(base_dir) / '.env'
+                if env_path.exists():
+                    load_dotenv(env_path, override=True)
+                    key = (os.getenv('GEMINI_API_KEY') or os.getenv('GOOGLE_API_KEY') or '').strip()
+            except Exception as e:
+                logger.debug(f"Dynamic .env reload failed: {e}")
+
+        # Strip accidental surrounding quotes or whitespace
+        if key and len(key) >= 2:
+            if (key.startswith('"') and key.endswith('"')) or (key.startswith("'") and key.endswith("'")):
+                key = key[1:-1].strip()
+
+        return key
 
     def _get_client(self):
-        if not self.api_key:
+        resolved_key = self._resolve_api_key()
+        if not resolved_key:
             raise AIProviderConfigurationError(
-                "Gemini API key is not configured. Please set GEMINI_API_KEY in backend/.env"
+                "Gemini API key is not configured. Please paste your API key into backend/.env "
+                "(e.g. GEMINI_API_KEY=AIzaSy...) and make sure to SAVE the file (Ctrl+S)."
             )
-        if self._client is None:
+
+        if self._client is None or self._cached_key != resolved_key:
             try:
                 from google import genai
-                self._client = genai.Client(api_key=self.api_key)
+                self._client = genai.Client(api_key=resolved_key)
+                self._cached_key = resolved_key
             except Exception as e:
                 logger.error(f"Failed to initialize Google GenAI client: {e}")
                 raise AIProviderConfigurationError(f"Google GenAI client initialization failed: {e}") from e
