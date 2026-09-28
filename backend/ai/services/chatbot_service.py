@@ -1,185 +1,317 @@
+"""
+Production CRM AI Copilot service.
+Connects to real AI Provider (Gemini) with controlled CRM Tools and safety boundaries for write actions.
+"""
+import logging
+import re
+from typing import Dict, Any, Optional, List
 from django.utils import timezone
-from django.db.models import Sum, Count, Q
+from .crm_tools import CRMTools
+from .ai_provider import get_ai_provider, AIProviderException
 from leads.models import Lead, LeadStage
 from followups.models import FollowUp
+from activity.services import log_activity
 from activity.models import ActivityLog
+
+logger = logging.getLogger(__name__)
+
 
 class ChatbotService:
     """
-    Intelligent chatbot service that queries live CRM data scoped to user permissions,
-    with clean boundaries for connecting LLM providers in Phase 2.
+    Real AI assistant service backed by live CRM tools and the configured AI Provider.
     """
 
     @staticmethod
-    def process_query(user, prompt, context=None):
-        prompt_clean = (prompt or '').strip().lower()
-        now = timezone.now()
+    def _detect_write_intent(user, prompt: str) -> Optional[Dict[str, Any]]:
+        """
+        Detects if user prompt requests a mutating CRM action (e.g., stage change, schedule follow-up)
+        and constructs a confirmation payload instead of executing immediately.
+        """
+        prompt_lower = prompt.lower().strip()
 
-        # Scope leads queryset to user role
-        leads_qs = Lead.objects.all()
-        followups_qs = FollowUp.objects.all()
+        # Check for stage change intent (e.g., "move ABC Technologies to Negotiation")
+        move_match = re.search(r'(?:move|change|set|update)\s+(?:lead\s+)?([a-zA-Z0-9\s]+?)\s+(?:to|stage to)\s+([a-zA-Z0-9\s]+)', prompt_lower)
+        if move_match:
+            lead_query = move_match.group(1).strip()
+            stage_query = move_match.group(2).strip()
 
-        if user.is_authenticated and not (user.role in ['ADMIN', 'MANAGER'] or user.is_superuser):
-            leads_qs = leads_qs.filter(Q(assigned_to=user) | Q(created_by=user))
-            followups_qs = followups_qs.filter(Q(assigned_to=user) | Q(lead__assigned_to=user))
+            lead = CRMTools.get_scoped_leads_qs(user).filter(
+                Lead.objects.filter(name__icontains=lead_query).query.where if hasattr(Lead.objects, 'none') else None
+            ).first() if False else None
 
-        # Intent 1: Overdue leads & tasks
-        if 'overdue' in prompt_clean:
-            overdue_followups = followups_qs.filter(
-                status=FollowUp.Status.OVERDUE
-            ).select_related('lead')
-            overdue_count = overdue_followups.count()
+            # Find matching lead
+            matched_lead = None
+            for ld in CRMTools.get_scoped_leads_qs(user):
+                if ld.name.lower() in lead_query or lead_query in ld.name.lower():
+                    matched_lead = ld
+                    break
 
-            # Find highest value lead among overdue or general leads
-            top_lead = leads_qs.order_by('-expected_value').first()
-            top_lead_name = top_lead.name if top_lead else "ABC Technologies"
-            top_lead_val = f"₹{top_lead.expected_value:,.2f}" if top_lead else "₹1,50,000"
+            # Find matching stage
+            matched_stage = LeadStage.objects.filter(name__icontains=stage_query).first()
 
-            return {
-                "response": (
-                    f"You currently have {overdue_count if overdue_count > 0 else 4} overdue leads / follow-up tasks.\n\n"
-                    f"The highest-value account requiring attention is **{top_lead_name}** with a pipeline value of **{top_lead_val}**.\n\n"
-                    f"Recommended action: Review scheduled follow-ups and initiate contact to prevent deal slippage."
-                ),
-                "intent": "OVERDUE_LEADS",
-                "suggestions": ["Summarize ABC Technologies", "What should I do today?"]
-            }
-
-        # Intent 2: Specific Lead summary (e.g. ABC Technologies)
-        if 'abc technologies' in prompt_clean or 'summarize' in prompt_clean and 'lead' in prompt_clean:
-            target_lead = leads_qs.filter(name__icontains='abc').first()
-            if target_lead:
-                stage_name = target_lead.stage.name if target_lead.stage else "Negotiation"
-                val = f"₹{target_lead.expected_value:,.2f}"
+            if matched_lead and matched_stage:
                 return {
-                    "response": (
-                        f"**{target_lead.name}** is currently in the **{stage_name}** stage.\n\n"
-                        f"• **Opportunity Value:** {val}\n"
-                        f"• **Company:** {target_lead.company_name or 'Independent'}\n"
-                        f"• **Phone:** {target_lead.phone}\n"
-                        f"• **Status Note:** The customer evaluated the enterprise package, requested revised pricing, and has a follow-up scheduled for September 30.\n\n"
-                        f"Recommended action: Send revised quotation with tiered annual billing."
-                    ),
-                    "intent": "LEAD_SUMMARY",
-                    "suggestions": ["What should I do today?", "Summarize my pipeline"]
+                    "action_type": "UPDATE_LEAD_STAGE",
+                    "description": f"Move {matched_lead.name} to {matched_stage.name} stage",
+                    "parameters": {
+                        "lead_id": matched_lead.id,
+                        "lead_name": matched_lead.name,
+                        "stage_id": matched_stage.id,
+                        "stage_name": matched_stage.name,
+                    }
                 }
+
+        return None
+
+    @staticmethod
+    def _build_live_crm_context(user, prompt: str) -> Dict[str, Any]:
+        """
+        Extracts relevant live CRM records tailored to the user's inquiry.
+        """
+        crm_context = {
+            "current_user": {
+                "name": f"{user.first_name} {user.last_name}".strip() or user.email,
+                "role": getattr(user, 'role', 'EXECUTIVE'),
+            },
+            "today_date": timezone.now().strftime('%Y-%m-%d'),
+        }
+
+        prompt_lower = prompt.lower()
+
+        # 1. Pipeline summary
+        if any(w in prompt_lower for w in ['pipeline', 'funnel', 'revenue', 'overview', 'summary', 'status']):
+            crm_context["pipeline_summary"] = CRMTools.get_pipeline_summary(user)
+
+        # 2. Overdue followups
+        if any(w in prompt_lower for w in ['overdue', 'pending', 'late', 'missed', 'slipping']):
+            crm_context["overdue_followups"] = CRMTools.get_overdue_followups(user)
+
+        # 3. Today's agenda
+        if any(w in prompt_lower for w in ['today', 'agenda', 'schedule', 'task', 'call']):
+            crm_context["today_followups"] = CRMTools.get_today_followups(user)
+
+        # 4. Search for specific lead mention
+        # Check against top leads or query
+        leads_qs = CRMTools.get_scoped_leads_qs(user)
+        for ld in leads_qs[:15]:
+            if ld.name.lower() in prompt_lower or (ld.company_name and ld.company_name.lower() in prompt_lower):
+                crm_context["target_lead"] = CRMTools.get_lead_details(user, ld.id)
+                break
+
+        # If user asks for high-value leads
+        if any(w in prompt_lower for w in ['high-value', 'high value', 'top deal', 'biggest']):
+            crm_context["top_leads"] = CRMTools.get_my_leads(user, limit=5)
+
+        # Recent activity
+        if any(w in prompt_lower for w in ['recent', 'activity', 'touchpoint', 'history']):
+            crm_context["recent_activity"] = CRMTools.get_recent_activity(user, limit=5)
+
+        # If context is sparse, always include basic pipeline and overdue stats
+        if "pipeline_summary" not in crm_context and "overdue_followups" not in crm_context:
+            crm_context["pipeline_summary"] = CRMTools.get_pipeline_summary(user)
+            crm_context["overdue_followups"] = CRMTools.get_overdue_followups(user)
+
+        return crm_context
+
+    @staticmethod
+    def process_query(
+        user,
+        prompt: str,
+        context: Optional[Dict[str, Any]] = None,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> Dict[str, Any]:
+        """
+        Executes query against real AI provider with authorized live CRM context.
+        """
+        prompt_clean = (prompt or '').strip()
+        if not prompt_clean:
             return {
-                "response": (
-                    "**ABC Technologies** is currently in the **Negotiation** stage.\n\n"
-                    "• **Opportunity Value:** ₹1,50,000\n"
-                    "• **Primary Contact:** Rahul Sharma\n"
-                    "• **Status:** The customer requested a revised quotation and has a follow-up scheduled for September 30.\n\n"
-                    "Recommended action: Send revised quotation with tiered annual billing."
-                ),
-                "intent": "LEAD_SUMMARY",
-                "suggestions": ["What should I do today?", "Summarize my pipeline"]
+                "response": "Please ask a question about your CRM leads, pipeline, or follow-ups.",
+                "intent": "GENERAL",
+                "suggestions": ["Show my overdue leads", "What should I do today?", "Summarize my pipeline"],
+                "action_required": False,
+                "action_payload": None,
             }
 
-        # Intent 3: Daily briefing / What should I do today
-        if 'what should i do' in prompt_clean or 'today' in prompt_clean or 'agenda' in prompt_clean:
-            today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
-            today_end = now.replace(hour=23, minute=59, second=59, microsecond=999999)
-
-            today_tasks = followups_qs.filter(
-                follow_up_at__range=(today_start, today_end)
-            ).count()
-            overdue_count = followups_qs.filter(status=FollowUp.Status.OVERDUE).count()
-
+        # Step 1: Detect if a WRITE action was proposed
+        write_proposal = ChatbotService._detect_write_intent(user, prompt_clean)
+        if write_proposal:
+            desc = write_proposal["description"]
             return {
-                "response": (
-                    "Here is your daily action briefing for today:\n\n"
-                    f"• **{overdue_count if overdue_count > 0 else 4} overdue follow-ups** requiring immediate contact\n"
-                    f"• **{today_tasks if today_tasks > 0 else 2} scheduled activities** planned for today\n"
-                    "• **1 quotation requested** by a customer (ABC Technologies)\n"
-                    "• **2 leads requiring attention** (no activity logged in past 5 days)\n\n"
-                    "Focus first on your overdue follow-ups to maintain strong customer response rates!"
-                ),
-                "intent": "DAILY_AGENDA",
-                "suggestions": ["Show my overdue leads", "Summarize my pipeline"]
+                "response": f"I can execute this action for you:\n\n**{desc}**\n\nPlease confirm to apply this change to the CRM.",
+                "intent": "ACTION_CONFIRMATION",
+                "suggestions": ["Confirm action", "Cancel action"],
+                "action_required": True,
+                "action_payload": write_proposal,
             }
 
-        # Intent 4: Pipeline summary
-        if 'pipeline' in prompt_clean or 'funnel' in prompt_clean:
-            total_leads = leads_qs.count()
-            total_val = leads_qs.aggregate(total=Sum('expected_value'))['total'] or 0
+        # Step 2: Build authorized live CRM data context
+        crm_context = ChatbotService._build_live_crm_context(user, prompt_clean)
 
-            return {
-                "response": (
-                    "**Pipeline Health Summary:**\n\n"
-                    f"• **Total Active Opportunities:** {total_leads if total_leads > 0 else 34} leads\n"
-                    f"• **Aggregate Pipeline Value:** ₹{total_val:,.2f}\n"
-                    "• **Top Stages:** Qualified, Demo Scheduled, Negotiation\n"
-                    "• **Current Velocity:** Average deal cycle is 18 days with 65% win probability on qualified opportunities."
-                ),
-                "intent": "PIPELINE_SUMMARY",
-                "suggestions": ["Show high-value leads", "What should I do today?"]
-            }
+        # Step 3: Query real AI provider
+        try:
+            provider = get_ai_provider()
+            ai_result = provider.chat(
+                message=prompt_clean,
+                crm_context=crm_context,
+                conversation_history=conversation_history
+            )
+            return ai_result
+        except AIProviderException as ae:
+            logger.warning("AI provider call failed (%s). Falling back to direct CRM summary response.", ae)
+            # Fallback to direct authoritative CRM-grounded response if AI key is missing or offline
+            return ChatbotService._generate_direct_crm_response(user, prompt_clean, crm_context)
+        except Exception as e:
+            logger.error("Unexpected error in ChatbotService: %s", e, exc_info=True)
+            return ChatbotService._generate_direct_crm_response(user, prompt_clean, crm_context)
 
-        # Intent 5: High-value leads
-        if 'high-value' in prompt_clean or 'high value' in prompt_clean or 'top lead' in prompt_clean:
-            top_leads = leads_qs.order_by('-expected_value')[:4]
-            leads_text = ""
-            if top_leads.exists():
-                for idx, ld in enumerate(top_leads, 1):
-                    leads_text += f"{idx}. **{ld.name}** ({ld.company_name or 'N/A'}) — ₹{ld.expected_value:,.2f} [{ld.stage.name if ld.stage else ld.status}]\n"
+    @staticmethod
+    def _generate_direct_crm_response(user, prompt: str, crm_context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Generates a 100% accurate, factual response directly from the authorized CRM query context.
+        Ensures system remains functional even if external AI provider encounters a temporary rate limit or outage.
+        """
+        prompt_lower = prompt.lower()
+
+        # Overdue leads
+        if 'overdue' in prompt_lower:
+            od = crm_context.get("overdue_followups") or CRMTools.get_overdue_followups(user)
+            count = od.get("count", 0)
+            items = od.get("followups", [])
+            lines = []
+            for it in items:
+                lines.append(f"• **{it['lead_name']}** ({it.get('company_name') or 'N/A'}) — Due {it.get('scheduled_at')}: {it.get('notes') or it.get('purpose')}")
+
+            content = f"You currently have **{count} overdue follow-up task(s)** requiring attention:\n\n"
+            if lines:
+                content += "\n".join(lines) + "\n\nRecommended action: Contact these accounts promptly to keep opportunities moving forward."
             else:
-                leads_text = (
-                    "1. **ABC Technologies** — ₹1,50,000 (Negotiation)\n"
-                    "2. **NexGen Cloud Systems** — ₹1,25,000 (Demo Scheduled)\n"
-                    "3. **Global Logistics Hub** — ₹95,000 (Qualified)\n"
-                    "4. **Apex Retail Solutions** — ₹80,000 (Contacted)\n"
+                content += "Great job! You have no overdue follow-ups right now."
+
+            return {
+                "response": content,
+                "intent": "OVERDUE_LEADS",
+                "suggestions": ["What should I do today?", "Summarize my pipeline"],
+                "action_required": False,
+                "action_payload": None,
+            }
+
+        # Target lead summary
+        target_lead = crm_context.get("target_lead")
+        if target_lead or ('summarize' in prompt_lower and 'lead' in prompt_lower):
+            if not target_lead:
+                target_lead = CRMTools.get_my_leads(user, limit=1)
+                target_lead = target_lead[0] if target_lead else None
+
+            if target_lead:
+                val = f"₹{target_lead.get('expected_value', 0):,.2f}"
+                content = (
+                    f"**Lead Summary: {target_lead['name']}**\n\n"
+                    f"• **Company:** {target_lead.get('company_name') or 'Independent'}\n"
+                    f"• **Current Stage:** {target_lead.get('stage')}\n"
+                    f"• **Opportunity Value:** {val}\n"
+                    f"• **Phone:** {target_lead.get('phone') or 'Not provided'}\n"
+                    f"• **Email:** {target_lead.get('email') or 'Not provided'}\n\n"
                 )
+                recent_calls = target_lead.get("recent_calls", [])
+                if recent_calls:
+                    content += "**Recent Call Intelligence:**\n"
+                    for c in recent_calls:
+                        content += f"• *{c.get('started_at')}* ({c.get('call_type')}): {c.get('summary') or 'Call recorded'}\n"
+                        if c.get('next_action'):
+                            content += f"  *Next Action:* {c.get('next_action')}\n"
+
+                return {
+                    "response": content,
+                    "intent": "LEAD_SUMMARY",
+                    "suggestions": ["What should I do today?", "Show my overdue leads"],
+                    "action_required": False,
+                    "action_payload": None,
+                }
+
+        # Daily agenda
+        if any(w in prompt_lower for w in ['today', 'agenda', 'do today', 'schedule']):
+            td = CRMTools.get_today_followups(user)
+            od = CRMTools.get_overdue_followups(user)
+            content = f"**Daily Action Briefing for Today:**\n\n"
+            content += f"• **{od.get('count', 0)} overdue tasks** requiring immediate attention\n"
+            content += f"• **{td.get('count', 0)} activities scheduled** for today\n\n"
+
+            for it in td.get("followups", []):
+                content += f"  - [{it.get('scheduled_at')}] {it.get('lead_name')} • {it.get('purpose')}\n"
 
             return {
-                "response": (
-                    f"**Top High-Value Opportunities in Your Pipeline:**\n\n{leads_text}\n"
-                    "These priority accounts represent the majority of your potential pipeline conversion this month."
-                ),
-                "intent": "HIGH_VALUE_LEADS",
-                "suggestions": ["Summarize ABC Technologies", "Recent customer activity"]
+                "response": content,
+                "intent": "DAILY_AGENDA",
+                "suggestions": ["Show my overdue leads", "Summarize my pipeline"],
+                "action_required": False,
+                "action_payload": None,
             }
 
-        # Intent 6: Recent customer activity
-        if 'recent' in prompt_clean or 'activity' in prompt_clean:
-            recent_logs = ActivityLog.objects.filter(entity_type='LEAD').order_by('-created_at')[:4]
-            log_lines = []
-            for log in recent_logs:
-                actor = log.performed_by.email.split('@')[0] if log.performed_by else 'Team'
-                log_lines.append(f"• **{log.get_action_display()}** on Lead #{log.entity_id} by {actor}")
+        # Pipeline summary
+        pipe = CRMTools.get_pipeline_summary(user)
+        total_leads = pipe.get("total_leads", 0)
+        total_val = f"₹{pipe.get('total_pipeline_value', 0):,.2f}"
+        stage_lines = [f"• **{s['stage_name']}:** {s['count']} leads (~₹{s['value']:,.2f})" for s in pipe.get("stages", [])]
 
-            if not log_lines:
-                log_lines = [
-                    "• 🎙 **Call logged** with Rahul Sharma (ABC Technologies) — Enterprise requirements reviewed.",
-                    "• 📅 **Follow-up completed** with Apex Retail Solutions.",
-                    "• 🔄 **Lead stage updated** to Qualified for Global Logistics Hub.",
-                    "• ✉️ **Quotation dispatched** to NexGen Cloud Systems."
-                ]
-
-            return {
-                "response": (
-                    "**Recent CRM Touchpoints & Activity:**\n\n" +
-                    "\n".join(log_lines)
-                ),
-                "intent": "RECENT_ACTIVITY",
-                "suggestions": ["Show my overdue leads", "What should I do today?"]
-            }
-
-        # Fallback / Demo AI response
         return {
             "response": (
-                "I'm currently operating using **demo AI responses** for CRM Lite.\n\n"
-                "Try asking me:\n"
-                "• *Show my overdue leads*\n"
-                "• *Summarize ABC Technologies*\n"
-                "• *What should I do today?*\n"
-                "• *Summarize my pipeline*\n"
-                "• *Show high-value leads*\n\n"
-                "Real AI provider connections (Gemini, OpenAI, Anthropic, or local LLMs) can be plugged into the backend AI service layer in Phase 2."
+                f"**Live Pipeline Summary:**\n\n"
+                f"• **Total Active Opportunities:** {total_leads} leads\n"
+                f"• **Aggregate Value:** {total_val}\n\n"
+                f"**Breakdown by Stage:**\n" + ("\n".join(stage_lines) if stage_lines else "No deals currently active.")
             ),
-            "intent": "UNKNOWN",
-            "suggestions": [
-                "Show my overdue leads",
-                "What should I do today?",
-                "Summarize my pipeline"
-            ]
+            "intent": "PIPELINE_SUMMARY",
+            "suggestions": ["Show my overdue leads", "What should I do today?"],
+            "action_required": False,
+            "action_payload": None,
         }
+
+    @staticmethod
+    def execute_confirmed_action(user, action_payload: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Executes a user-confirmed write action safely through Django permissions and business rules.
+        """
+        action_type = action_payload.get("action_type")
+        params = action_payload.get("parameters", {})
+
+        if action_type == "UPDATE_LEAD_STAGE":
+            lead_id = params.get("lead_id")
+            stage_id = params.get("stage_id")
+
+            lead = Lead.objects.filter(pk=lead_id).first()
+            if not lead:
+                raise ValueError("Target lead was not found.")
+
+            # Permission check: Executive can only modify assigned leads
+            if user.role not in ['ADMIN', 'MANAGER'] and not user.is_superuser:
+                if lead.assigned_to != user and lead.created_by != user:
+                    raise PermissionError("You do not have permission to modify this lead.")
+
+            stage = LeadStage.objects.filter(pk=stage_id).first()
+            if not stage:
+                raise ValueError("Target lead stage was not found.")
+
+            old_stage_name = lead.stage.name if lead.stage else lead.status
+            lead.stage = stage
+            lead.save(update_fields=['stage', 'updated_at'])
+
+            # Log activity
+            log_activity(
+                entity_type=ActivityLog.EntityType.LEAD,
+                entity_id=str(lead.id),
+                action='STATUS_CHANGED',
+                old_value={'stage': old_stage_name},
+                new_value={'stage': stage.name},
+                performed_by=user,
+                notes=f"Lead stage updated to {stage.name} via AI Assistant confirmation."
+            )
+
+            return {
+                "success": True,
+                "message": f"Successfully moved **{lead.name}** to **{stage.name}**.",
+                "lead_id": lead.id,
+                "new_stage": stage.name,
+            }
+
+        raise ValueError(f"Unknown or unsupported action type: {action_type}")
