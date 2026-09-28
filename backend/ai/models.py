@@ -2,6 +2,7 @@ from django.db import models
 from django.conf import settings
 from django.utils import timezone
 
+
 class Call(models.Model):
     """
     Call record with attached audio, transcript, and AI-extracted deal intelligence.
@@ -9,6 +10,13 @@ class Call(models.Model):
     class CallType(models.TextChoices):
         OUTBOUND = 'Outbound', 'Outbound'
         INBOUND = 'Inbound', 'Inbound'
+
+    class ProcessingStatus(models.TextChoices):
+        UPLOADING = 'UPLOADING', 'Uploading'
+        TRANSCRIBING = 'TRANSCRIBING', 'Transcribing'
+        ANALYZING = 'ANALYZING', 'Analyzing'
+        COMPLETED = 'COMPLETED', 'Completed'
+        FAILED = 'FAILED', 'Failed'
 
     lead = models.ForeignKey(
         'leads.Lead',
@@ -45,6 +53,15 @@ class Call(models.Model):
     next_action = models.TextField(blank=True, default='')
     follow_up_date = models.DateField(null=True, blank=True)
 
+    ai_provider = models.CharField(max_length=50, blank=True, default='gemini')
+    ai_model = models.CharField(max_length=100, blank=True, default='gemini-2.5-flash')
+    processing_status = models.CharField(
+        max_length=20,
+        choices=ProcessingStatus.choices,
+        default=ProcessingStatus.COMPLETED,
+        db_index=True
+    )
+
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -53,8 +70,9 @@ class Call(models.Model):
         indexes = [
             models.Index(fields=['lead', '-started_at']),
             models.Index(fields=['created_by', '-started_at']),
+            models.Index(fields=['processing_status']),
         ]
 
     def __str__(self):
         lead_name = self.lead.name if self.lead else f"Lead #{self.lead_id}"
-        return f"{self.call_type} Call with {lead_name} at {self.started_at:%Y-%m-%d %H:%M}"
+        return f"{self.call_type} Call with {lead_name} at {self.started_at:%Y-%m-%d %H:%M} [{self.processing_status}]"

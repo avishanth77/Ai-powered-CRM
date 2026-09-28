@@ -2,6 +2,7 @@ from rest_framework import serializers
 from .models import Call
 from leads.models import Lead
 
+
 class CallSerializer(serializers.ModelSerializer):
     lead_name = serializers.CharField(source='lead.name', read_only=True)
     lead_company = serializers.CharField(source='lead.company_name', read_only=True)
@@ -28,6 +29,9 @@ class CallSerializer(serializers.ModelSerializer):
             'customer_intent',
             'next_action',
             'follow_up_date',
+            'ai_provider',
+            'ai_model',
+            'processing_status',
             'created_at',
             'updated_at',
         ]
@@ -49,6 +53,11 @@ class CallSerializer(serializers.ModelSerializer):
 class AIChatRequestSerializer(serializers.Serializer):
     prompt = serializers.CharField(required=True, max_length=2000)
     context = serializers.DictField(required=False, default=dict)
+    conversation_history = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        default=list
+    )
 
 
 class CallSummaryRequestSerializer(serializers.Serializer):
@@ -57,3 +66,9 @@ class CallSummaryRequestSerializer(serializers.Serializer):
     audio_file = serializers.FileField(required=False, allow_null=True)
     call_type = serializers.CharField(required=False, default='Outbound')
     duration_seconds = serializers.IntegerField(required=False, default=0)
+    call_id = serializers.IntegerField(required=False, allow_null=True)
+
+
+class UpdateTranscriptSerializer(serializers.Serializer):
+    transcript = serializers.CharField(required=True)
+    reanalyze = serializers.BooleanField(required=False, default=False)
