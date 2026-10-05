@@ -61,6 +61,7 @@ urlpatterns = [
     # Core CRM Modules
     path('api/leads/', include('leads.urls')),
     path('api/leads/', include('icp.lead_urls')),
+    path('api/leads/', include('pld.lead_urls')),
     path('api/customers/', include('customers.urls')),
     path('api/follow-ups/', include('followups.urls')),
     path('api/calendar/events/', CalendarEventsView.as_view(), name='crm-calendar-events'),
@@ -68,6 +69,7 @@ urlpatterns = [
     path('api/reports/', include('reports.urls')),
     path('api/notifications/', include('notifications.urls')),
     path('api/icp/', include('icp.urls')),
+    path('api/pld/', include('pld.urls')),
     path('api/', include('ai.urls')),
 
     # Email Testing Endpoint

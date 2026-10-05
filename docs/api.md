@@ -172,3 +172,91 @@ otherwise `Strong ICP Fit`.
 Each submission stores a **snapshot** of the question text, options and points used at that
 moment, so later edits to the question set never change historical results. `Lead.icp_status`
 tracks the most recent attempt and is filterable via `GET /api/leads/?icp_status=STRONG_ICP_FIT`.
+
+---
+
+## 8. PLD Engine Endpoints
+
+The PLD (Problem-Led Discovery) Engine scores a lead from a configurable list of problems and
+optionally gates pipeline stages on ICP fit / PLD status. Nothing is hard-coded — problems,
+points, severity, the qualification threshold and per-stage requirements are all admin-managed.
+
+### Problem Management
+
+| Method | Endpoint | Description | Permitted Roles |
+|---|---|---|---|
+| `GET` | `/api/pld/problems/` | List problems (active only; `?include_inactive=true` for all) | All |
+| `POST` | `/api/pld/problems/` | Create a problem (`name`, `points`, `severity`, optional `description`) | Admin, Manager |
+| `GET` | `/api/pld/problems/{id}/` | Retrieve a single problem | All |
+| `PUT` | `/api/pld/problems/{id}/` | Update a problem | Admin, Manager |
+| `DELETE` | `/api/pld/problems/{id}/` | Delete a problem (history is unaffected) | Admin, Manager |
+| `PATCH` | `/api/pld/problems/{id}/toggle-active/` | Activate / deactivate — body `{"is_active": bool}` | Admin, Manager |
+| `PATCH` | `/api/pld/problems/{id}/move/` | Reorder — body `{"direction": "up" \| "down"}` or `{"display_order": n}` | Admin, Manager |
+
+Severity is one of `LOW`, `MEDIUM`, `HIGH`, `CRITICAL` (display metadata only — points drive the score).
+
+### Qualification Threshold
+
+| Method | Endpoint | Description | Permitted Roles |
+|---|---|---|---|
+| `GET` | `/api/pld/config/` | Read the Qualified PLD cut-off | All |
+| `PUT` | `/api/pld/config/` | Update `qualified_min_percentage` (0–100) | Admin, Manager |
+
+### Stage Requirements (Gates)
+
+| Method | Endpoint | Description | Permitted Roles |
+|---|---|---|---|
+| `GET` | `/api/pld/gates/` | Every configured gate | All |
+| `POST` | `/api/pld/gates/` | Create a gate for a stage | Admin, Manager |
+| `PATCH` | `/api/pld/gates/{id}/` | Update a gate | Admin, Manager |
+| `DELETE` | `/api/pld/gates/{id}/` | Remove a gate (stage becomes ungated) | Admin, Manager |
+
+Gate body:
+
+```json
+{ "stage": 4,
+  "require_icp_min_status": "GOOD_FIT",
+  "require_pld_qualified": true,
+  "require_problems_assessed": false,
+  "notes": "Signed off by a manager" }
+```
+
+`require_icp_min_status` may be `""` to skip the ICP requirement. One gate per stage; a stage
+without a gate accepts any lead.
+
+### Assessment & History
+
+| Method | Endpoint | Description | Permitted Roles |
+|---|---|---|---|
+| `GET` | `/api/leads/{id}/pld/` | Active problems, current score/status and every gate with its satisfied flag | Lead access |
+| `POST` | `/api/leads/{id}/pld/assess/` | Submit a problem selection; backend scores, saves and returns the result | Lead access |
+| `GET` | `/api/leads/{id}/pld/history/` | All past assessments, newest first (+ `pld_score`, `pld_status`) | Lead access |
+| `GET` | `/api/leads/{id}/pld/gate-check/?stage={stage_id}` | Preview whether a stage move would be allowed | Lead access |
+| `GET` | `/api/pld/assessments/{id}/` | One assessment with the frozen problem snapshot | Lead access |
+
+Submit body — only raw problem IDs, never points:
+
+```json
+{ "problem_ids": [1, 4, 7] }
+```
+
+Scoring: `max_score` is the sum of **all active** problems, `total_score` the sum of the
+selected ones, `percentage = (total_score / max_score) × 100`, then
+`≥ qualified_min_percentage → Qualified PLD`, otherwise `Unqualified`. At least one problem must
+be selected; unknown or inactive IDs are rejected with `400`.
+
+Each submission stores a **snapshot** of the problem names, points and severity in force at that
+moment, so later edits never change historical results. `Lead.pld_score` and `Lead.pld_status`
+track the most recent assessment and `pld_status` is filterable via `GET /api/leads/?pld_status=QUALIFIED_PLD`.
+
+### Stage Gate Enforcement
+
+Moving a lead into a gated stage happens through the normal lead update
+(`PATCH /api/leads/{id}/` with `stage`). The serializer checks the target stage's gate and
+returns `400`. `message` reads
+`stage: Cannot move to stage 'Discovery': ICP fit must be at least 'Good Fit' (currently 'Poor Fit').`,
+and `errors` carries `stage` (human sentence), `missing` (machine-readable codes) and
+`missing_messages`.
+
+Gates are evaluated on **stage moves only**. `POST /api/leads/` is exempt: a brand new lead has
+no assessment history yet, so requirements on the entry stage never block record creation.

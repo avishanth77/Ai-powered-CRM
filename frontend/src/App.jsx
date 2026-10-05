@@ -43,6 +43,7 @@ import './styles/notifications.css';
 import './styles/calendar.css';
 import './styles/ai.css';
 import './styles/icp.css';
+import './styles/pld.css';
 
 
 const AppLayout = () => {

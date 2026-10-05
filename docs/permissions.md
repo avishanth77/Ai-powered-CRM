@@ -27,6 +27,12 @@ CRM Lite implements strict, server-enforced role permissions. Frontend route gua
 | **Change ICP Scoring & Thresholds** | Yes | Yes | **Forbidden (403)** |
 | **Run ICP Qualification Test** | Yes | Yes | On Assigned Leads |
 | **View ICP Results & History** | All Leads | All Leads | On Assigned Leads |
+| **Create / Edit / Delete PLD Problems** | Yes | Yes | **Forbidden (403)** |
+| **Change PLD Qualification Threshold** | Yes | Yes | **Forbidden (403)** |
+| **Configure Stage Requirements (Gates)** | Yes | Yes | **Forbidden (403)** |
+| **Run PLD Assessment** | Yes | Yes | On Assigned Leads |
+| **View PLD Results & History** | All Leads | All Leads | On Assigned Leads |
+| **Move a Lead into a Gated Stage** | When requirements met | When requirements met | When requirements met |
 
 ---
 
@@ -55,6 +61,10 @@ CRM Lite implements strict, server-enforced role permissions. Frontend route gua
    - `GET` is allowed for any authenticated user so the test can be rendered; `POST` / `PUT` / `PATCH` / `DELETE` require `ADMIN` or `MANAGER`.
 6. `ICPQualificationPermission` (`icp/permissions.py`):
    - Executives may only run the test and read results for leads assigned to or created by them; `visible_leads()` applies the same scoping as `LeadViewSet.get_queryset()`.
+7. `PLDConfigPermission` (`pld/permissions.py`):
+   - `GET` is allowed for any authenticated user so the assessment and stage-requirement views can render; `POST` / `PUT` / `PATCH` / `DELETE` on problems, gates and the scoring config require `ADMIN` or `MANAGER`.
+8. `PLDAssessmentPermission` (`pld/permissions.py`):
+   - The same lead scoping as ICP: executives may read a lead's PLD state, submit an assessment and view history only for leads assigned to or created by them.
 
 ---
 
@@ -66,3 +76,6 @@ CRM Lite implements strict, server-enforced role permissions. Frontend route gua
 - **Conversion Safety**: Conversion requires `status == 'QUALIFIED'`. Once converted, duplicate conversion attempts are rejected, and the operation runs within an atomic database transaction (`transaction.atomic()`).
 - **ICP Scoring Integrity**: Scores are always recalculated server-side from the stored question configuration — any client-supplied points are discarded. Only active questions may be answered, option IDs must belong to the question being answered, and every required active question must be answered before submission.
 - **ICP Historical Immutability**: Each qualification stores a snapshot of the question text, options and point values in force at the time. Editing a question's scoring later never changes past results, and deleting a question leaves its history intact.
+- **PLD Scoring Integrity**: Scores are always recalculated server-side from the stored problem list — only problem IDs are accepted, never points. At least one problem must be selected, and unknown or inactive problem IDs are rejected with `400`.
+- **PLD Historical Immutability**: Each assessment stores a snapshot of the problem names, points and severity in force at the time plus the threshold used, so later edits or deletions never change past results.
+- **PLD Stage Gates**: `LeadCreateUpdateSerializer.validate` re-checks the target stage's gate on every actual stage change. Lead creation is deliberately exempt — a new lead has no ICP/PLD history yet, so a requirement on the entry stage can never block `POST /api/leads/`. A gate is opt-in per stage; stages without a gate row are unaffected.

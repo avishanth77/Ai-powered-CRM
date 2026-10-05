@@ -1,0 +1,309 @@
+/* PLD Engine — scoped styles, built on the CRM design tokens. */
+
+/* ---------- Severity / score chips ---------- */
+
+.pld-severity-tag {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pld-score-chip {
+  padding: 0.2rem 0.6rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-full);
+  background: var(--bg-surface-elevated);
+  color: var(--text-main);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+/* ---------- Assessment form ---------- */
+
+.pld-test-container {
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.pld-assess-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 0.9rem 1.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  font-size: 0.85rem;
+}
+
+.pld-problems-body {
+  overflow-y: auto;
+  flex: 1;
+}
+
+.pld-problem-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.pld-problem-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+  cursor: pointer;
+  transition: border-color var(--transition-fast, 120ms ease), background-color var(--transition-fast, 120ms ease);
+}
+
+.pld-problem-item:hover {
+  border-color: var(--border-focus);
+}
+
+.pld-problem-item-selected {
+  border-color: var(--primary);
+  background: var(--primary-subtle);
+}
+
+.pld-problem-main {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.pld-problem-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.pld-problem-points {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.pld-problem-item-selected .pld-problem-points {
+  color: var(--primary);
+}
+
+/* ---------- Result summary ---------- */
+
+.pld-result-body {
+  padding-top: 1.5rem;
+}
+
+.pld-result-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.pld-result-score {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.pld-result-points {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-main);
+  line-height: 1;
+}
+
+.pld-result-max {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+.pld-result-percentage {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--primary);
+}
+
+.pld-result-status {
+  font-size: 0.85rem;
+  padding: 0.35rem 0.85rem;
+}
+
+.pld-result-note {
+  margin: 0.9rem 0 0 0;
+  font-size: 0.85rem;
+}
+
+/* ---------- Stage gate checklist ---------- */
+
+.pld-gate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.pld-gate-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  padding: 0.75rem 0.85rem;
+  border: 1px solid var(--border-subtle);
+  border-left: 3px solid var(--warning);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.pld-gate-item-satisfied {
+  border-left-color: var(--success);
+}
+
+.pld-gate-state {
+  display: inline-flex;
+  color: var(--warning);
+  margin-top: 0.1rem;
+}
+
+.pld-gate-item-satisfied .pld-gate-state {
+  color: var(--success);
+}
+
+.pld-gate-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.pld-gate-stage {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.pld-gate-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.pld-gate-chip {
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  background: var(--bg-surface-elevated);
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pld-gate-missing {
+  list-style: none;
+  margin: 0.15rem 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.pld-gate-missing li {
+  font-size: 0.8rem;
+  color: var(--danger);
+}
+
+.pld-gate-verdict {
+  flex-shrink: 0;
+  padding: 0.15rem 0.55rem;
+  border-radius: var(--radius-sm);
+  background: rgba(234, 88, 12, 0.12);
+  color: #ea580c;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.pld-gate-verdict-ready {
+  background: rgba(5, 150, 105, 0.12);
+  color: #059669;
+}
+
+.pld-gate-summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--text-dim);
+}
+
+/* ---------- Lead details: PLD panel ---------- */
+
+.pld-lead-panel-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(0, 2fr);
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.pld-panel-section {
+  min-width: 0;
+}
+
+.pld-panel-heading {
+  font-size: 0.95rem;
+  margin: 0 0 0.75rem 0;
+  color: var(--text-main);
+}
+
+.pld-lead-panel-grid > .pld-panel-section:first-child .pld-panel-heading {
+  font-size: 1.125rem;
+}
+
+/* ---------- Responsive ---------- */
+
+@media (max-width: 992px) {
+  .pld-lead-panel-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .pld-problem-item {
+    flex-wrap: wrap;
+  }
+
+  .pld-problem-main {
+    flex-basis: 100%;
+    order: 2;
+  }
+
+  .pld-gate-item {
+    flex-wrap: wrap;
+  }
+
+  .pld-gate-verdict {
+    order: -1;
+    margin-left: auto;
+  }
+}

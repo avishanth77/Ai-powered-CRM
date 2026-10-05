@@ -84,6 +84,7 @@ export const AuthProvider = ({ children }) => {
     canManageSources: isManagerOrAdmin,
     canManageStages: isAdmin,
     canManageIcp: isManagerOrAdmin,
+    canManagePld: isManagerOrAdmin,
   };
 
 

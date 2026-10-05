@@ -75,6 +75,11 @@ class Lead(models.Model):
         GOOD_FIT = 'GOOD_FIT', 'Good Fit'
         STRONG_ICP_FIT = 'STRONG_ICP_FIT', 'Strong ICP Fit'
 
+    class PLDStatus(models.TextChoices):
+        NOT_ASSESSED = 'NOT_ASSESSED', 'Not Assessed'
+        UNQUALIFIED = 'UNQUALIFIED', 'Unqualified'
+        QUALIFIED_PLD = 'QUALIFIED_PLD', 'Qualified PLD'
+
     name = models.CharField(max_length=150)
     phone = models.CharField(max_length=25, db_index=True)
     email = models.EmailField(blank=True, null=True, db_index=True)
@@ -128,6 +133,16 @@ class Lead(models.Model):
         max_length=20,
         choices=ICPStatus.choices,
         default=ICPStatus.NOT_TESTED,
+        db_index=True
+    )
+    pld_score = models.PositiveIntegerField(
+        default=0,
+        help_text='Points earned by the most recent PLD assessment.',
+    )
+    pld_status = models.CharField(
+        max_length=20,
+        choices=PLDStatus.choices,
+        default=PLDStatus.NOT_ASSESSED,
         db_index=True
     )
 

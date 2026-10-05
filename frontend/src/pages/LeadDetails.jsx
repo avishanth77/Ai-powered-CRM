@@ -5,6 +5,7 @@ import { followupApi } from '../api/followupApi';
 import { userApi } from '../api/userApi';
 import { aiApi } from '../api/aiApi';
 import { icpApi } from '../api/icpApi';
+import { pldApi } from '../api/pldApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatCurrency, formatDateTime, formatDate, formatRelativeTime, toLocalDateTimeInput } from '../utils/formatters';
@@ -26,6 +27,10 @@ import { InternalCommentsSection } from '../components/InternalCommentsSection';
 import { IcpQualificationHistory } from '../components/IcpQualificationHistory';
 import { IcpQualificationLauncher } from '../components/IcpQualificationTest';
 import { IcpStatusBadge } from '../components/IcpStatusBadge';
+import { PldAssessmentHistory } from '../components/PldAssessmentHistory';
+import { PldAssessmentLauncher } from '../components/PldAssessmentTest';
+import { PldGateChecklist } from '../components/PldGateChecklist';
+import { PldStatusBadge } from '../components/PldStatusBadge';
 import '../styles/comments.css';
 
 import {
@@ -53,6 +58,7 @@ import {
   Check,
   Target,
   ShieldAlert,
+  Gauge,
 } from 'lucide-react';
 
 export const LeadDetails = () => {
@@ -77,6 +83,10 @@ export const LeadDetails = () => {
   // ICP Qualification state
   const [icpCount, setIcpCount] = useState(0);
   const [icpRefreshToken, setIcpRefreshToken] = useState(0);
+
+  // PLD state
+  const [pldState, setPldState] = useState({ gates: [], pld_score: 0, pld_status: 'NOT_ASSESSED', assessment_count: 0 });
+  const [pldRefreshToken, setPldRefreshToken] = useState(0);
 
   // Modals state
   const [convertModalOpen, setConvertModalOpen] = useState(false);
@@ -260,6 +270,21 @@ export const LeadDetails = () => {
     } catch {}
   }, [id]);
 
+  const fetchPldState = useCallback(async () => {
+    try {
+      const res = await pldApi.getLeadPld(id);
+      const data = res?.data;
+      if (data) {
+        setPldState({
+          gates: data.gates || [],
+          pld_score: data.pld_score,
+          pld_status: data.pld_status,
+          assessment_count: data.assessment_count || 0,
+        });
+      }
+    } catch {}
+  }, [id]);
+
   useEffect(() => {
     fetchLeadDetails();
     fetchStages();
@@ -268,17 +293,25 @@ export const LeadDetails = () => {
     fetchFollowups();
     fetchHandovers();
     fetchIcpHistory();
+    fetchPldState();
 
     if (canAssignLeads || canHandoverLeads) {
       userApi.getUsers().then((res) => setUsersList(asList(res.results ?? res))).catch(() => {});
     }
-  }, [fetchLeadDetails, fetchStages, fetchNotes, fetchTimeline, fetchFollowups, fetchHandovers, fetchIcpHistory, canAssignLeads, canHandoverLeads]);
+  }, [fetchLeadDetails, fetchStages, fetchNotes, fetchTimeline, fetchFollowups, fetchHandovers, fetchIcpHistory, fetchPldState, canAssignLeads, canHandoverLeads]);
 
   const handleIcpCompleted = useCallback(() => {
     setIcpRefreshToken((prev) => prev + 1);
     fetchIcpHistory();
     fetchLeadDetails();
   }, [fetchIcpHistory, fetchLeadDetails]);
+
+  const handlePldCompleted = useCallback(() => {
+    setPldRefreshToken((prev) => prev + 1);
+    fetchPldState();
+    fetchLeadDetails();
+    fetchTimeline();
+  }, [fetchPldState, fetchLeadDetails, fetchTimeline]);
 
   // Handle Quick Stage Change
   const handleStageChange = async (newStageId) => {
@@ -791,6 +824,20 @@ export const LeadDetails = () => {
               <span>ICP Qualification</span>
               {icpCount > 0 && <span className="tab-badge">{icpCount}</span>}
             </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'pld'}
+              className={`tab-btn ${activeTab === 'pld' ? 'tab-btn-active' : ''}`}
+              onClick={() => setActiveTab('pld')}
+            >
+              <Gauge size={16} />
+              <span>PLD</span>
+              {pldState.assessment_count > 0 && (
+                <span className="tab-badge">{pldState.assessment_count}</span>
+              )}
+            </button>
           </div>
 
           {/* TAB: ICP QUALIFICATION */}
@@ -814,6 +861,45 @@ export const LeadDetails = () => {
                 ICP Qualification History
               </h3>
               <IcpQualificationHistory leadId={lead.id} refreshToken={icpRefreshToken} />
+            </div>
+          )}
+
+          {/* TAB: PLD ASSESSMENT */}
+          {activeTab === 'pld' && lead && (
+            <div>
+              <div className="icp-lead-panel-header">
+                <div className="icp-lead-status">
+                  <span className="icp-lead-status-label">PLD Status</span>
+                  <PldStatusBadge status={pldState.pld_status} />
+                  <span className="pld-score-chip">
+                    {pldState.pld_score} pts
+                  </span>
+                </div>
+                <PldAssessmentLauncher
+                  leadId={lead.id}
+                  leadName={lead.name}
+                  companyName={lead.company_name}
+                  onCompleted={handlePldCompleted}
+                  buttonLabel={
+                    pldState.assessment_count > 0 ? 'Run PLD Assessment Again' : 'Run PLD Assessment'
+                  }
+                />
+              </div>
+
+              <div className="pld-lead-panel-grid">
+                <section className="pld-panel-section">
+                  <h3 className="pld-panel-heading">Stage Requirements</h3>
+                  <PldGateChecklist gates={pldState.gates} />
+                </section>
+
+                <section className="pld-panel-section pld-panel-section-wide">
+                  <h3 className="pld-panel-heading">Assessment History</h3>
+                  <PldAssessmentHistory
+                    leadId={lead.id}
+                    refreshToken={pldRefreshToken}
+                  />
+                </section>
+              </div>
             </div>
           )}
 

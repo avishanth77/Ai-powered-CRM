@@ -108,3 +108,34 @@ export const ICP_QUESTION_TYPES = [
 
 export const getIcpQuestionType = (value) =>
   ICP_QUESTION_TYPES.find((type) => type.value === value) || ICP_QUESTION_TYPES[0];
+
+export const PLD_STATUS = {
+  NOT_ASSESSED: 'NOT_ASSESSED',
+  UNQUALIFIED: 'UNQUALIFIED',
+  QUALIFIED_PLD: 'QUALIFIED_PLD',
+};
+
+export const PLD_STATUS_CONFIG = {
+  NOT_ASSESSED: { label: 'Not Assessed', color: '#64748b', bg: 'rgba(100, 116, 139, 0.12)', border: '#94a3b8' },
+  UNQUALIFIED: { label: 'Unqualified', color: '#dc2626', bg: 'rgba(220, 38, 38, 0.12)', border: '#fb7185' },
+  QUALIFIED_PLD: { label: 'Qualified PLD', color: '#059669', bg: 'rgba(5, 150, 105, 0.12)', border: '#34d399' },
+};
+
+export const PLD_SEVERITIES = [
+  { value: 'LOW', label: 'Low', color: '#64748b', bg: 'rgba(100, 116, 139, 0.12)' },
+  { value: 'MEDIUM', label: 'Medium', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.12)' },
+  { value: 'HIGH', label: 'High', color: '#ea580c', bg: 'rgba(234, 88, 12, 0.12)' },
+  { value: 'CRITICAL', label: 'Critical', color: '#dc2626', bg: 'rgba(220, 38, 38, 0.15)' },
+];
+
+export const getPLDSeverity = (value) =>
+  PLD_SEVERITIES.find((severity) => severity.value === value) || PLD_SEVERITIES[1];
+
+export const PLD_ICP_MIN_OPTIONS = [
+  { value: '', label: 'Any ICP fit' },
+  { value: 'POOR_FIT', label: 'Poor Fit or better' },
+  { value: 'POTENTIAL_FIT', label: 'Potential Fit or better' },
+  { value: 'GOOD_FIT', label: 'Good Fit or better' },
+  { value: 'STRONG_ICP_FIT', label: 'Strong ICP Fit' },
+];
+

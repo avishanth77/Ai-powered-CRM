@@ -189,6 +189,8 @@ class LeadListSerializer(serializers.ModelSerializer):
             'notes_count',
             'pending_followups_count',
             'icp_status',
+            'pld_score',
+            'pld_status',
         ]
 
 
@@ -230,7 +232,23 @@ class LeadDetailSerializer(serializers.ModelSerializer):
             'handovers',
             'customer_id',
             'icp_status',
+            'pld_score',
+            'pld_status',
         ]
+
+
+def _check_stage_gate(lead, stage):
+    """
+    Return the unmet PLD gate requirements for placing ``lead`` into ``stage``.
+
+    Imported lazily so the ``leads`` app never pulls in ``pld`` at module load.
+    A lead that has not been saved yet starts from the untouched defaults.
+    """
+    from pld.services.gates import check_gate
+
+    if lead is None:
+        lead = Lead(icp_status=Lead.ICPStatus.NOT_TESTED, pld_status=Lead.PLDStatus.NOT_ASSESSED)
+    return check_gate(lead, stage)
 
 
 class LeadCreateUpdateSerializer(serializers.ModelSerializer):
@@ -310,6 +328,19 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
         is_lost = stage_val and (stage_val.slug == 'lost' or stage_val.name.lower() == 'lost')
         if is_lost and not (lost_reason and lost_reason.strip()):
             raise serializers.ValidationError({"lost_reason": "A reason is mandatory when marking a lead as Lost."})
+
+        # PLD stage gates: a lead may not *move* into a stage whose requirements are unmet.
+        # Creation is exempt on purpose — a brand new lead cannot hold assessment history
+        # yet, so a requirement on the entry stage must never block adding a lead.
+        if stage_val and stage_changed:
+            missing = _check_stage_gate(self.instance, stage_val)
+            if missing:
+                raise serializers.ValidationError({
+                    'stage': [f"Cannot move to stage '{stage_val.name}': "
+                              + ' '.join(item['message'] for item in missing)],
+                    'missing': [item['code'] for item in missing],
+                    'missing_messages': [item['message'] for item in missing],
+                })
 
         # Role-based validation for assignment
         request = self.context.get('request')

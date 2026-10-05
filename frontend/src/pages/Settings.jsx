@@ -7,6 +7,7 @@ import { extractErrorMessage } from '../utils/validation';
 import { useDialogA11y } from '../hooks/useDialogA11y';
 import { ROLE_LABELS } from '../utils/constants';
 import { IcpQuestionsManager } from '../components/IcpQuestionsManager';
+import { PldSettingsManager } from '../components/PldSettingsManager';
 import {
   Settings as SettingsIcon,
   Plus,
@@ -25,11 +26,19 @@ import {
   Lock,
   Layers,
   ListChecks,
+  Gauge,
   X,
 } from 'lucide-react';
 
 export const Settings = () => {
-  const { user, updateUserProfile, canManageSources, canManageStages, canManageIcp } = useAuth();
+  const {
+    user,
+    updateUserProfile,
+    canManageSources,
+    canManageStages,
+    canManageIcp,
+    canManagePld,
+  } = useAuth();
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState(canManageStages ? 'stages' : 'profile');
@@ -359,7 +368,7 @@ export const Settings = () => {
             <span>Settings & Configuration</span>
           </h1>
           <p className="page-subtitle">
-            Configure CRM lead stages, ICP qualification questions, sales channels, and your personal profile
+            Configure CRM lead stages, ICP qualification questions, PLD problems, sales channels, and your personal profile
           </p>
         </div>
       </div>
@@ -415,6 +424,19 @@ export const Settings = () => {
           >
             <ListChecks size={16} />
             <span>ICP Questions</span>
+          </button>
+        )}
+
+        {canManagePld && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'pld'}
+            className={`tab-btn ${activeTab === 'pld' ? 'tab-btn-active' : ''}`}
+            onClick={() => setActiveTab('pld')}
+          >
+            <Gauge size={16} />
+            <span>PLD Engine</span>
           </button>
         )}
       </div>
@@ -1195,6 +1217,9 @@ export const Settings = () => {
 
       {/* TAB: ICP QUALIFICATION QUESTIONS (Admin / Manager) */}
       {activeTab === 'icp' && canManageIcp && <IcpQuestionsManager />}
+
+      {/* TAB: PLD ENGINE (Admin / Manager) */}
+      {activeTab === 'pld' && canManagePld && <PldSettingsManager />}
     </div>
   );
 };
