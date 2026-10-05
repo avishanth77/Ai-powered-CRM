@@ -6,6 +6,7 @@ import { useToast } from '../context/ToastContext';
 import { extractErrorMessage } from '../utils/validation';
 import { useDialogA11y } from '../hooks/useDialogA11y';
 import { ROLE_LABELS } from '../utils/constants';
+import { IcpQuestionsManager } from '../components/IcpQuestionsManager';
 import {
   Settings as SettingsIcon,
   Plus,
@@ -23,11 +24,12 @@ import {
   AlertTriangle,
   Lock,
   Layers,
+  ListChecks,
   X,
 } from 'lucide-react';
 
 export const Settings = () => {
-  const { user, updateUserProfile, canManageSources, canManageStages } = useAuth();
+  const { user, updateUserProfile, canManageSources, canManageStages, canManageIcp } = useAuth();
   const { showToast } = useToast();
 
   const [activeTab, setActiveTab] = useState(canManageStages ? 'stages' : 'profile');
@@ -357,7 +359,7 @@ export const Settings = () => {
             <span>Settings & Configuration</span>
           </h1>
           <p className="page-subtitle">
-            Configure CRM lead stages, sales channels, and your personal profile
+            Configure CRM lead stages, ICP qualification questions, sales channels, and your personal profile
           </p>
         </div>
       </div>
@@ -400,6 +402,19 @@ export const Settings = () => {
             <Layers size={16} />
             <span>Lead Sources</span>
             <span className="tab-badge">{sources.length}</span>
+          </button>
+        )}
+
+        {canManageIcp && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'icp'}
+            className={`tab-btn ${activeTab === 'icp' ? 'tab-btn-active' : ''}`}
+            onClick={() => setActiveTab('icp')}
+          >
+            <ListChecks size={16} />
+            <span>ICP Questions</span>
           </button>
         )}
       </div>
@@ -1177,6 +1192,9 @@ export const Settings = () => {
           </div>
         </div>
       )}
+
+      {/* TAB: ICP QUALIFICATION QUESTIONS (Admin / Manager) */}
+      {activeTab === 'icp' && canManageIcp && <IcpQuestionsManager />}
     </div>
   );
 };

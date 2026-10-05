@@ -6,6 +6,7 @@ class LeadFilter(django_filters.FilterSet):
     stage = django_filters.ModelChoiceFilter(queryset=LeadStage.objects.all())
     status = django_filters.CharFilter(method='filter_status')
     priority = django_filters.ChoiceFilter(choices=Lead.Priority.choices)
+    icp_status = django_filters.ChoiceFilter(choices=Lead.ICPStatus.choices)
     source = django_filters.ModelChoiceFilter(queryset=LeadSource.objects.all())
     assigned_to = django_filters.NumberFilter(field_name='assigned_to__id')
     created_after = django_filters.DateTimeFilter(field_name='created_at', lookup_expr='gte')
@@ -22,6 +23,7 @@ class LeadFilter(django_filters.FilterSet):
             'stage',
             'status',
             'priority',
+            'icp_status',
             'source',
             'assigned_to',
             'created_after',

@@ -22,6 +22,11 @@ CRM Lite implements strict, server-enforced role permissions. Frontend route gua
 | **View Reports & Dashboard** | Full Org-Wide | Team-Wide | Own Metric Scope |
 | **Export Reports to CSV** | Yes | Yes | **Forbidden (403)** |
 | **Manage Lead Sources** | Yes | Yes | Read-Only |
+| **Create / Edit ICP Questions** | Yes | Yes | **Forbidden (403)** |
+| **Delete / Deactivate ICP Questions** | Yes | Yes | **Forbidden (403)** |
+| **Change ICP Scoring & Thresholds** | Yes | Yes | **Forbidden (403)** |
+| **Run ICP Qualification Test** | Yes | Yes | On Assigned Leads |
+| **View ICP Results & History** | All Leads | All Leads | On Assigned Leads |
 
 ---
 
@@ -46,6 +51,10 @@ CRM Lite implements strict, server-enforced role permissions. Frontend route gua
    - Scopes `get_queryset()` so executives never leak other reps' records in bulk listing or search queries.
 4. `FollowUpPermission`:
    - Ensures an executive can only view, edit, or complete follow-ups assigned directly to them.
+5. `ICPQuestionPermission` / `ICPScoringConfigPermission` (`icp/permissions.py`):
+   - `GET` is allowed for any authenticated user so the test can be rendered; `POST` / `PUT` / `PATCH` / `DELETE` require `ADMIN` or `MANAGER`.
+6. `ICPQualificationPermission` (`icp/permissions.py`):
+   - Executives may only run the test and read results for leads assigned to or created by them; `visible_leads()` applies the same scoping as `LeadViewSet.get_queryset()`.
 
 ---
 
@@ -55,3 +64,5 @@ CRM Lite implements strict, server-enforced role permissions. Frontend route gua
 - **Follow-up Past Date Prevention**: New follow-up tasks cannot be scheduled in the past (`follow_up_at >= now() - 5min`).
 - **Lost Reason Enforcement**: Transitioning any lead to `status = 'LOST'` mandates a non-empty `lost_reason` field.
 - **Conversion Safety**: Conversion requires `status == 'QUALIFIED'`. Once converted, duplicate conversion attempts are rejected, and the operation runs within an atomic database transaction (`transaction.atomic()`).
+- **ICP Scoring Integrity**: Scores are always recalculated server-side from the stored question configuration — any client-supplied points are discarded. Only active questions may be answered, option IDs must belong to the question being answered, and every required active question must be answered before submission.
+- **ICP Historical Immutability**: Each qualification stores a snapshot of the question text, options and point values in force at the time. Editing a question's scoring later never changes past results, and deleting a question leaves its history intact.

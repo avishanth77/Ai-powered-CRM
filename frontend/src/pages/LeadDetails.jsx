@@ -4,6 +4,7 @@ import { leadApi } from '../api/leadApi';
 import { followupApi } from '../api/followupApi';
 import { userApi } from '../api/userApi';
 import { aiApi } from '../api/aiApi';
+import { icpApi } from '../api/icpApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatCurrency, formatDateTime, formatDate, formatRelativeTime, toLocalDateTimeInput } from '../utils/formatters';
@@ -22,6 +23,9 @@ import { EmptyState } from '../components/EmptyState';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { LostReasonModal } from '../components/LostReasonModal';
 import { InternalCommentsSection } from '../components/InternalCommentsSection';
+import { IcpQualificationHistory } from '../components/IcpQualificationHistory';
+import { IcpQualificationLauncher } from '../components/IcpQualificationTest';
+import { IcpStatusBadge } from '../components/IcpStatusBadge';
 import '../styles/comments.css';
 
 import {
@@ -60,7 +64,7 @@ export const LeadDetails = () => {
 
   const [lead, setLead] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'notes'); // notes | followups | handovers | timeline | comments
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'notes'); // notes | followups | handovers | timeline | comments | icp
 
   // Data for tabs & dropdowns
   const [stages, setStages] = useState([]);
@@ -69,6 +73,10 @@ export const LeadDetails = () => {
   const [followups, setFollowups] = useState([]);
   const [handovers, setHandovers] = useState([]);
   const [usersList, setUsersList] = useState([]);
+
+  // ICP Qualification state
+  const [icpCount, setIcpCount] = useState(0);
+  const [icpRefreshToken, setIcpRefreshToken] = useState(0);
 
   // Modals state
   const [convertModalOpen, setConvertModalOpen] = useState(false);
@@ -245,6 +253,13 @@ export const LeadDetails = () => {
     } catch {}
   }, [id]);
 
+  const fetchIcpHistory = useCallback(async () => {
+    try {
+      const res = await icpApi.getQualificationHistory(id);
+      setIcpCount(asList(res.results).length);
+    } catch {}
+  }, [id]);
+
   useEffect(() => {
     fetchLeadDetails();
     fetchStages();
@@ -252,11 +267,18 @@ export const LeadDetails = () => {
     fetchTimeline();
     fetchFollowups();
     fetchHandovers();
+    fetchIcpHistory();
 
     if (canAssignLeads || canHandoverLeads) {
       userApi.getUsers().then((res) => setUsersList(asList(res.results ?? res))).catch(() => {});
     }
-  }, [fetchLeadDetails, fetchStages, fetchNotes, fetchTimeline, fetchFollowups, fetchHandovers, canAssignLeads, canHandoverLeads]);
+  }, [fetchLeadDetails, fetchStages, fetchNotes, fetchTimeline, fetchFollowups, fetchHandovers, fetchIcpHistory, canAssignLeads, canHandoverLeads]);
+
+  const handleIcpCompleted = useCallback(() => {
+    setIcpRefreshToken((prev) => prev + 1);
+    fetchIcpHistory();
+    fetchLeadDetails();
+  }, [fetchIcpHistory, fetchLeadDetails]);
 
   // Handle Quick Stage Change
   const handleStageChange = async (newStageId) => {
@@ -500,6 +522,7 @@ export const LeadDetails = () => {
             <h1 className="page-title">{lead.name}</h1>
             <StatusBadge status={lead.stage_details || lead.status} />
             <PriorityBadge priority={lead.priority} />
+            <IcpStatusBadge status={lead.icp_status} />
           </div>
           <p className="page-subtitle">
             {lead.company_name ? `${lead.company_name} • ` : ''}Created on {formatDate(lead.created_at)}
@@ -756,7 +779,43 @@ export const LeadDetails = () => {
                 Team
               </span>
             </button>
+
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'icp'}
+              className={`tab-btn ${activeTab === 'icp' ? 'tab-btn-active' : ''}`}
+              onClick={() => setActiveTab('icp')}
+            >
+              <Target size={16} />
+              <span>ICP Qualification</span>
+              {icpCount > 0 && <span className="tab-badge">{icpCount}</span>}
+            </button>
           </div>
+
+          {/* TAB: ICP QUALIFICATION */}
+          {activeTab === 'icp' && lead && (
+            <div>
+              <div className="icp-lead-panel-header">
+                <div className="icp-lead-status">
+                  <span className="icp-lead-status-label">ICP Status</span>
+                  <IcpStatusBadge status={lead.icp_status} />
+                </div>
+                <IcpQualificationLauncher
+                  leadId={lead.id}
+                  leadName={lead.name}
+                  companyName={lead.company_name}
+                  onCompleted={handleIcpCompleted}
+                  buttonLabel={icpCount > 0 ? 'Retake ICP Qualification' : 'Start ICP Qualification'}
+                />
+              </div>
+
+              <h3 style={{ fontSize: '1.125rem', margin: '0 0 0.75rem 0' }}>
+                ICP Qualification History
+              </h3>
+              <IcpQualificationHistory leadId={lead.id} refreshToken={icpRefreshToken} />
+            </div>
+          )}
 
           {/* TAB 1: Communication Notes */}
           {activeTab === 'notes' && (

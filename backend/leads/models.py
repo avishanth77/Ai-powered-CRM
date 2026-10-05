@@ -68,6 +68,13 @@ class Lead(models.Model):
         HIGH = 'HIGH', 'High'
         URGENT = 'URGENT', 'Urgent'
 
+    class ICPStatus(models.TextChoices):
+        NOT_TESTED = 'NOT_TESTED', 'Not Tested'
+        POOR_FIT = 'POOR_FIT', 'Poor Fit'
+        POTENTIAL_FIT = 'POTENTIAL_FIT', 'Potential Fit'
+        GOOD_FIT = 'GOOD_FIT', 'Good Fit'
+        STRONG_ICP_FIT = 'STRONG_ICP_FIT', 'Strong ICP Fit'
+
     name = models.CharField(max_length=150)
     phone = models.CharField(max_length=25, db_index=True)
     email = models.EmailField(blank=True, null=True, db_index=True)
@@ -117,6 +124,12 @@ class Lead(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     converted_at = models.DateTimeField(null=True, blank=True)
     lost_reason = models.TextField(blank=True, null=True)
+    icp_status = models.CharField(
+        max_length=20,
+        choices=ICPStatus.choices,
+        default=ICPStatus.NOT_TESTED,
+        db_index=True
+    )
 
     class Meta:
         ordering = ['-created_at']

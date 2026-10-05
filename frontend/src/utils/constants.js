@@ -80,3 +80,31 @@ export const NOTE_TYPES = [
   { value: 'OBJECTION', label: 'Objection', icon: 'ShieldAlert' },
   { value: 'GENERAL', label: 'General Note', icon: 'FileText' },
 ];
+
+export const ICP_STATUS = {
+  NOT_TESTED: 'NOT_TESTED',
+  POOR_FIT: 'POOR_FIT',
+  POTENTIAL_FIT: 'POTENTIAL_FIT',
+  GOOD_FIT: 'GOOD_FIT',
+  STRONG_ICP_FIT: 'STRONG_ICP_FIT',
+};
+
+export const ICP_STATUS_CONFIG = {
+  NOT_TESTED: { label: 'Not Tested', color: '#64748b', bg: 'rgba(100, 116, 139, 0.12)', border: '#94a3b8' },
+  POOR_FIT: { label: 'Poor Fit', color: '#dc2626', bg: 'rgba(220, 38, 38, 0.12)', border: '#fb7185' },
+  POTENTIAL_FIT: { label: 'Potential Fit', color: '#d97706', bg: 'rgba(217, 119, 6, 0.12)', border: '#fbbf24' },
+  GOOD_FIT: { label: 'Good Fit', color: '#0284c7', bg: 'rgba(2, 132, 199, 0.12)', border: '#38bdf8' },
+  STRONG_ICP_FIT: { label: 'Strong ICP Fit', color: '#059669', bg: 'rgba(5, 150, 105, 0.12)', border: '#34d399' },
+};
+
+export const ICP_QUESTION_TYPES = [
+  { value: 'SINGLE_CHOICE', label: 'Single Choice', isChoice: true, usesRules: false, usesPoints: false },
+  { value: 'MULTI_CHOICE', label: 'Multiple Choice', isChoice: true, usesRules: false, usesPoints: false },
+  { value: 'YES_NO', label: 'Yes / No', isChoice: true, usesRules: false, usesPoints: false },
+  { value: 'NUMBER', label: 'Number', isChoice: false, usesRules: true, usesPoints: false },
+  { value: 'TEXT', label: 'Text', isChoice: false, usesRules: false, usesPoints: true },
+  { value: 'DROPDOWN', label: 'Dropdown', isChoice: true, usesRules: false, usesPoints: false },
+];
+
+export const getIcpQuestionType = (value) =>
+  ICP_QUESTION_TYPES.find((type) => type.value === value) || ICP_QUESTION_TYPES[0];

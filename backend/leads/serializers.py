@@ -188,6 +188,7 @@ class LeadListSerializer(serializers.ModelSerializer):
             'lost_reason',
             'notes_count',
             'pending_followups_count',
+            'icp_status',
         ]
 
 
@@ -228,6 +229,7 @@ class LeadDetailSerializer(serializers.ModelSerializer):
             'notes',
             'handovers',
             'customer_id',
+            'icp_status',
         ]
 
 

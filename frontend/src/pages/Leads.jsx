@@ -10,7 +10,8 @@ import { useToast } from '../context/ToastContext';
 import { formatCurrency, formatDate, formatDateTime, toLocalDateTimeInput } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
 import { useDialogA11y } from '../hooks/useDialogA11y';
-import { LEAD_STATUS, LEAD_PRIORITY, FOLLOWUP_PURPOSES } from '../utils/constants';
+import { LEAD_STATUS, LEAD_PRIORITY, FOLLOWUP_PURPOSES, ICP_STATUS_CONFIG } from '../utils/constants';
+import { IcpStatusBadge } from '../components/IcpStatusBadge';
 
 import { StatusBadge } from '../components/StatusBadge';
 import { PriorityBadge } from '../components/PriorityBadge';
@@ -66,6 +67,7 @@ export const Leads = () => {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
+  const [icpStatusFilter, setIcpStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [assignedToFilter, setAssignedToFilter] = useState('');
 
@@ -197,6 +199,7 @@ export const Leads = () => {
         keyword: search || undefined,
         status: statusFilter || undefined,
         priority: priorityFilter || undefined,
+        icp_status: icpStatusFilter || undefined,
         source: sourceFilter || undefined,
         assigned_to: assignedToFilter || undefined,
       };
@@ -216,7 +219,7 @@ export const Leads = () => {
     } finally {
       if (requestId === leadsRequestId.current) setLoading(false);
     }
-  }, [currentPage, search, statusFilter, priorityFilter, sourceFilter, assignedToFilter, showToast]);
+  }, [currentPage, search, statusFilter, priorityFilter, icpStatusFilter, sourceFilter, assignedToFilter, showToast]);
 
   useEffect(() => {
     fetchLeads();
@@ -234,6 +237,11 @@ export const Leads = () => {
 
   const handlePriorityChange = (e) => {
     setPriorityFilter(e.target.value);
+    setCurrentPage(1);
+  };
+
+  const handleIcpStatusChange = (e) => {
+    setIcpStatusFilter(e.target.value);
     setCurrentPage(1);
   };
 
@@ -724,6 +732,20 @@ export const Leads = () => {
 
           <select
             className="filter-select"
+            value={icpStatusFilter}
+            onChange={handleIcpStatusChange}
+            aria-label="Filter by ICP Status"
+          >
+            <option value="">All ICP Status</option>
+            {Object.entries(ICP_STATUS_CONFIG).map(([key, cfg]) => (
+              <option key={key} value={key}>
+                {cfg.label}
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="filter-select"
             value={sourceFilter}
             onChange={handleSourceChange}
             aria-label="Filter by Source"
@@ -819,6 +841,7 @@ export const Leads = () => {
                 <th>Contact</th>
                 <th>Status</th>
                 <th>Priority</th>
+                <th>ICP</th>
                 <th>Assigned To</th>
                 <th>Expected Value</th>
                 <th>Created</th>
@@ -865,6 +888,9 @@ export const Leads = () => {
                   </td>
                   <td>
                     <PriorityBadge priority={lead.priority} />
+                  </td>
+                  <td>
+                    <IcpStatusBadge status={lead.icp_status} size="sm" />
                   </td>
                   <td>
                     <span className="text-main font-semibold font-sm">
