@@ -48,6 +48,7 @@ dist-ssr/
 # Logs
 *.log
 backend.err.log
+backend.out.log
 
 # OS
 Thumbs.db
