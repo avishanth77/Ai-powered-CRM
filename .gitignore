@@ -54,3 +54,11 @@ Thumbs.db
 Desktop.ini
 .DS_Store
 
+# Generated Documents & PDFs
+*.pdf
+docs/*.pdf
+AI_FEATURES_IMPLEMENTATION.txt
+INTERVIEW_QUESTIONS_AND_ANSWERS.txt
+PROJECT_QUESTIONS_AND_ANSWERS.txt
+generate_crm_*.py
+
