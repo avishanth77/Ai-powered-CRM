@@ -15,13 +15,25 @@ export function extractErrorMessage(error, defaultMessage = 'An unexpected error
     const data = error.response.data;
     if (data.message) return data.message;
     if (data.detail) return data.detail;
-    if (data.errors) {
-      const firstKey = Object.keys(data.errors)[0];
-      const errVal = data.errors[firstKey];
-      if (Array.isArray(errVal) && errVal.length > 0) {
-        return `${firstKey}: ${errVal[0]}`;
+    const errObj = data.errors || (typeof data === 'object' && !Array.isArray(data) ? data : null);
+    if (errObj && typeof errObj === 'object') {
+      const ignoredKeys = new Set(['missing', 'missing_messages', 'missing_details', 'target_stage_id', 'target_stage_name', 'success']);
+      const keys = Object.keys(errObj).filter((k) => !ignoredKeys.has(k));
+      if (keys.length > 0) {
+        const firstKey = keys[0];
+        const errVal = errObj[firstKey];
+        if (Array.isArray(errVal) && errVal.length > 0) {
+          const valStr = String(errVal[0]);
+          return firstKey === 'non_field_errors' || firstKey === 'stage' || valStr.toLowerCase().startsWith(firstKey.toLowerCase())
+            ? valStr
+            : `${firstKey}: ${valStr}`;
+        }
+        if (typeof errVal === 'string') {
+          return firstKey === 'non_field_errors' || firstKey === 'stage' || errVal.toLowerCase().startsWith(firstKey.toLowerCase())
+            ? errVal
+            : `${firstKey}: ${errVal}`;
+        }
       }
-      return `${firstKey}: ${errVal}`;
     }
   }
   return error.message || defaultMessage;

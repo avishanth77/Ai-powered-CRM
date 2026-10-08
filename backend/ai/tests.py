@@ -380,3 +380,37 @@ class AIFeaturesTestCase(TestCase):
         }
         response = self.client.post('/api/ai/execute-action/', payload, format='json')
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_execute_confirmed_reassign_lead_action(self):
+        """Manager/Admin can execute a confirmed reassign_lead action successfully"""
+        self.client.force_authenticate(user=self.admin)
+        payload = {
+            'action_payload': {
+                'action_type': 'reassign_lead',
+                'description': f'Reassign ABC Technologies to {self.other_exec.email}',
+                'parameters': {
+                    'lead_id': self.exec_lead.id,
+                    'user_email': self.other_exec.email,
+                }
+            }
+        }
+        response = self.client.post('/api/ai/execute-action/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.exec_lead.refresh_from_db()
+        self.assertEqual(self.exec_lead.assigned_to, self.other_exec)
+
+    def test_executive_cannot_reassign_lead(self):
+        """Sales Executive cannot reassign leads via AI Assistant (RBAC enforcement)"""
+        self.client.force_authenticate(user=self.executive)
+        payload = {
+            'action_payload': {
+                'action_type': 'reassign_lead',
+                'description': f'Reassign ABC Technologies to {self.other_exec.email}',
+                'parameters': {
+                    'lead_id': self.exec_lead.id,
+                    'user_email': self.other_exec.email,
+                }
+            }
+        }
+        response = self.client.post('/api/ai/execute-action/', payload, format='json')
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)

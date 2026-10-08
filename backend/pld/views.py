@@ -38,13 +38,22 @@ class PLDProblemViewSet(viewsets.ModelViewSet):
     serializer_class = PLDProblemSerializer
     permission_classes = [PLDConfigPermission]
     search_fields = ['name', 'description']
-    filterset_fields = ['is_active', 'severity']
+    filterset_fields = ['is_active', 'severity', 'stage']
 
     def get_queryset(self):
-        queryset = PLDProblem.objects.order_by('display_order', 'id')
+        queryset = PLDProblem.objects.select_related('stage').order_by('display_order', 'id')
         user = self.request.user
         if not user.is_authenticated:
             return queryset.none()
+
+        stage_id = self.request.query_params.get('stage')
+        if stage_id in ['global', 'null', 'none']:
+            queryset = queryset.filter(stage__isnull=True)
+        elif stage_id:
+            try:
+                queryset = queryset.filter(stage_id=int(stage_id))
+            except (ValueError, TypeError):
+                pass
 
         include_inactive = (
             self.request.query_params.get('include_inactive') == 'true'
@@ -139,7 +148,7 @@ class PLDProblemViewSet(viewsets.ModelViewSet):
 
         if direction == 'up':
             previous = (
-                PLDProblem.objects.filter(display_order__lt=problem.display_order)
+                PLDProblem.objects.filter(stage=problem.stage, display_order__lt=problem.display_order)
                 .order_by('-display_order', '-id')
                 .first()
             )
@@ -149,7 +158,7 @@ class PLDProblemViewSet(viewsets.ModelViewSet):
                 previous.save(update_fields=['display_order'])
         elif direction == 'down':
             following = (
-                PLDProblem.objects.filter(display_order__gt=problem.display_order)
+                PLDProblem.objects.filter(stage=problem.stage, display_order__gt=problem.display_order)
                 .order_by('display_order', 'id')
                 .first()
             )
@@ -282,7 +291,7 @@ class PLDAssessmentDetailView(APIView):
 
     def get(self, request, pk):
         assessment = get_object_or_404(
-            PLDAssessment.objects.select_related('lead', 'assessed_by').prefetch_related('problems'),
+            PLDAssessment.objects.select_related('lead', 'stage', 'assessed_by').prefetch_related('problems'),
             id=pk,
         )
         if not PLDAssessmentPermission.user_can_access_lead(request.user, assessment.lead):
@@ -324,8 +333,20 @@ class LeadPLDView(APIView):
         if error:
             return error
 
-        history = PLDAssessment.objects.filter(lead=lead)
+        stage_param = request.query_params.get('stage')
+        target_stage = None
+        if stage_param:
+            try:
+                target_stage = LeadStage.objects.filter(id=int(stage_param)).first()
+            except (ValueError, TypeError):
+                target_stage = None
+
+        history = PLDAssessment.objects.filter(lead=lead).select_related('stage')
         latest = history.order_by('-assessed_at', '-id').first()
+
+        active_problems = get_active_problems(stage=target_stage)
+
+        all_stages = LeadStage.objects.filter(is_active=True).order_by('display_order', 'id')
 
         return Response({
             'success': True,
@@ -337,7 +358,16 @@ class LeadPLDView(APIView):
                 'icp_status': lead.icp_status,
                 'assessment_count': history.count(),
                 'latest_assessment': PLDAssessmentListSerializer(latest).data if latest else None,
-                'problems': PLDProblemSerializer(get_active_problems(), many=True).data,
+                'selected_stage': {
+                    'id': target_stage.id,
+                    'name': target_stage.name,
+                    'slug': target_stage.slug,
+                } if target_stage else None,
+                'stages': [
+                    {'id': s.id, 'name': s.name, 'slug': s.slug, 'display_order': s.display_order}
+                    for s in all_stages
+                ],
+                'problems': PLDProblemSerializer(active_problems, many=True).data,
                 'gates': gate_report(lead),
             },
         })
@@ -356,14 +386,23 @@ class LeadPLDAssessView(APIView):
         serializer = PLDAssessSubmitSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        stage_id = serializer.validated_data.get('stage_id')
+        stage = LeadStage.objects.filter(id=stage_id).first() if stage_id else None
+
         try:
-            assessment = submit_assessment(lead, request.user, serializer.validated_data['problem_ids'])
+            assessment = submit_assessment(
+                lead=lead,
+                user=request.user,
+                problem_ids_payload=serializer.validated_data['problem_ids'],
+                stage=stage,
+            )
         except PLDValidationError as exc:
             payload = {'success': False, 'message': exc.message}
             if exc.errors:
                 payload['errors'] = exc.errors
             return Response(payload, status=status.HTTP_400_BAD_REQUEST)
 
+        stage_label = f" for '{stage.name}'" if stage else ''
         log_activity(
             entity_type='lead',
             entity_id=lead.id,
@@ -371,13 +410,13 @@ class LeadPLDAssessView(APIView):
             old_value=lead.pld_status,
             new_value=assessment.pld_status,
             performed_by=request.user,
-            notes=f'PLD score {assessment.total_score}/{assessment.max_score} ({assessment.percentage}%)',
+            notes=f'PLD assessment{stage_label}: score {assessment.total_score}/{assessment.max_score} ({assessment.percentage}%) - {assessment.get_pld_status_display()}',
         )
 
         detail = PLDAssessmentDetailSerializer(assessment)
         return Response({
             'success': True,
-            'message': 'PLD assessment submitted and scored.',
+            'message': f'PLD assessment submitted and scored{stage_label}.',
             'data': detail.data,
         }, status=status.HTTP_201_CREATED)
 
@@ -392,10 +431,16 @@ class LeadPLDHistoryView(APIView):
         if error:
             return error
 
+        stage_id = request.query_params.get('stage')
+        history_qs = PLDAssessment.objects.filter(lead=lead).select_related('stage', 'assessed_by')
+        if stage_id:
+            try:
+                history_qs = history_qs.filter(stage_id=int(stage_id))
+            except (ValueError, TypeError):
+                pass
+
         history = list(
-            PLDAssessment.objects.filter(lead=lead)
-            .select_related('assessed_by')
-            .annotate(problems_count=Count('problems'))
+            history_qs.annotate(problems_count=Count('problems'))
             .order_by('-assessed_at', '-id')
         )
 

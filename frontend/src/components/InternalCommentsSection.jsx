@@ -1,40 +1,39 @@
+
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   MessageSquare,
   Lock,
   Reply,
   Edit2,
-  Trash2
+  Trash2,
+  Check,
+  X,
+  AlertCircle
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { commentApi } from '../api/commentApi';
 import { MentionInput } from './MentionInput';
-import { ConfirmModal } from './ConfirmModal';
 import { getInitials } from '../utils/formatters';
 
 export const InternalCommentsSection = ({ leadId }) => {
   const { user, isAdmin, isManager } = useAuth();
-  const { showToast } = useToast();
+  const { addToast } = useToast();
 
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [loadError, setLoadError] = useState(null);
   const [replyingToId, setReplyingToId] = useState(null);
   const [editingCommentId, setEditingCommentId] = useState(null);
-  const [commentToDelete, setCommentToDelete] = useState(null);
-  const [deleting, setDeleting] = useState(false);
 
   const fetchComments = useCallback(async () => {
     if (!leadId) return;
     setLoading(true);
-    setLoadError(null);
     try {
       const res = await commentApi.getLeadComments(leadId);
       setComments(res.results || []);
     } catch (err) {
       console.error('Failed to load internal comments:', err);
-      setLoadError('Could not load the discussion. Please retry.');
     } finally {
       setLoading(false);
     }
@@ -75,9 +74,9 @@ export const InternalCommentsSection = ({ leadId }) => {
         mentioned_user_ids,
       });
       setComments((prev) => [...prev, created]);
-      showToast('Internal comment posted', 'success');
+      addToast('Internal comment posted', 'success');
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to post comment', 'error');
+      addToast(err.response?.data?.message || 'Failed to post comment', 'error');
       throw err;
     }
   };
@@ -92,9 +91,9 @@ export const InternalCommentsSection = ({ leadId }) => {
       });
       setComments((prev) => [...prev, created]);
       setReplyingToId(null);
-      showToast('Reply posted', 'success');
+      addToast('Reply posted', 'success');
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to post reply', 'error');
+      addToast(err.response?.data?.message || 'Failed to post reply', 'error');
       throw err;
     }
   };
@@ -110,32 +109,28 @@ export const InternalCommentsSection = ({ leadId }) => {
         prev.map((c) => (c.id === commentId ? updated : c))
       );
       setEditingCommentId(null);
-      showToast('Comment updated', 'success');
+      addToast('Comment updated', 'success');
     } catch (err) {
-      showToast(err.response?.data?.message || 'Failed to update comment', 'error');
+      addToast(err.response?.data?.message || 'Failed to update comment', 'error');
       throw err;
     }
   };
 
   // Handle delete comment
-  const handleDeleteComment = async () => {
-    if (!commentToDelete) return;
-    setDeleting(true);
+  const handleDeleteComment = async (commentId) => {
+    if (!window.confirm('Are you sure you want to delete this comment?')) return;
     try {
-      await commentApi.deleteComment(commentToDelete);
+      await commentApi.deleteComment(commentId);
       setComments((prev) =>
         prev.map((c) =>
-          c.id === commentToDelete
+          c.id === commentId
             ? { ...c, is_deleted: true, display_content: '[This comment has been deleted]' }
             : c
         )
       );
-      setCommentToDelete(null);
-      showToast('Comment deleted', 'info');
+      addToast('Comment deleted', 'info');
     } catch (err) {
-      showToast('Failed to delete comment', 'error');
-    } finally {
-      setDeleting(false);
+      addToast('Failed to delete comment', 'error');
     }
   };
 
@@ -198,7 +193,7 @@ export const InternalCommentsSection = ({ leadId }) => {
           </div>
 
           <div className="comment-meta-group">
-            <time dateTime={comment.created_at}>{formatRelativeTime(comment.created_at)}</time>
+            <span>{formatRelativeTime(comment.created_at)}</span>
             {comment.is_edited && !comment.is_deleted && (
               <span className="comment-edited-badge">(edited)</span>
             )}
@@ -253,7 +248,7 @@ export const InternalCommentsSection = ({ leadId }) => {
                 <button
                   type="button"
                   className="comment-btn delete"
-                  onClick={() => setCommentToDelete(comment.id)}
+                  onClick={() => handleDeleteComment(comment.id)}
                 >
                   <Trash2 size={13} />
                   <span>Delete</span>
@@ -311,15 +306,6 @@ export const InternalCommentsSection = ({ leadId }) => {
           <div style={{ padding: '30px', textAlign: 'center', color: 'var(--text-dim)' }}>
             Loading internal discussion...
           </div>
-        ) : loadError ? (
-          <div style={{ padding: '30px 20px', textAlign: 'center', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '16px' }}>
-            <p style={{ margin: '0 0 1rem', fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-              {loadError}
-            </p>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={fetchComments}>
-              Retry
-            </button>
-          </div>
         ) : commentTree.length === 0 ? (
           <div style={{ padding: '40px 20px', textAlign: 'center', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '16px' }}>
             <MessageSquare size={32} style={{ color: 'var(--text-dim)', opacity: 0.5, marginBottom: '8px' }} />
@@ -332,18 +318,6 @@ export const InternalCommentsSection = ({ leadId }) => {
           commentTree.map((rootComment) => renderCommentCard(rootComment))
         )}
       </div>
-
-      <ConfirmModal
-        isOpen={Boolean(commentToDelete)}
-        title="Delete this comment?"
-        message="The comment will be removed for everyone. This cannot be undone."
-        confirmText="Delete Comment"
-        cancelText="Keep"
-        isDestructive={true}
-        loading={deleting}
-        onConfirm={handleDeleteComment}
-        onCancel={() => setCommentToDelete(null)}
-      />
     </div>
   );
 };

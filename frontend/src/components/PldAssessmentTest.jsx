@@ -7,9 +7,21 @@ import { extractErrorMessage } from '../utils/validation';
 import { PLD_STATUS_CONFIG, getPLDSeverity } from '../utils/constants';
 import { LoadingSpinner } from './LoadingSpinner';
 
-export const PldAssessmentTest = ({ isOpen, leadId, leadName, companyName, onClose, onCompleted }) => {
+export const PldAssessmentTest = ({
+  isOpen,
+  leadId,
+  leadName,
+  companyName,
+  initialStageId = null,
+  stages = [],
+  onClose,
+  onCompleted,
+  onMoveStage,
+}) => {
   const { showToast } = useToast();
 
+  const [availableStages, setAvailableStages] = useState(stages || []);
+  const [selectedStageId, setSelectedStageId] = useState(initialStageId || null);
   const [problems, setProblems] = useState([]);
   const [selected, setSelected] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -22,15 +34,30 @@ export const PldAssessmentTest = ({ isOpen, leadId, leadName, companyName, onClo
     if (!submitting) onClose();
   });
 
+  // Sync initialStageId when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      if (initialStageId) {
+        setSelectedStageId(Number(initialStageId));
+      }
+      setSelected([]);
+      setResult(null);
+      setNoProblems(false);
+    }
+  }, [isOpen, initialStageId]);
+
   const loadProblems = useCallback(async () => {
     if (!leadId) return;
     setLoading(true);
     setNoProblems(false);
     const currentRequest = ++requestId.current;
     try {
-      const res = await pldApi.getLeadPld(leadId);
+      const res = await pldApi.getLeadPld(leadId, selectedStageId);
       if (currentRequest !== requestId.current) return;
       const loaded = res?.data?.problems || [];
+      if (res?.data?.stages && res.data.stages.length > 0) {
+        setAvailableStages(res.data.stages);
+      }
       setProblems(loaded);
       setNoProblems(loaded.length === 0);
     } catch (err) {
@@ -40,15 +67,12 @@ export const PldAssessmentTest = ({ isOpen, leadId, leadName, companyName, onClo
     } finally {
       if (currentRequest === requestId.current) setLoading(false);
     }
-  }, [leadId, showToast]);
+  }, [leadId, selectedStageId, showToast]);
 
   useEffect(() => {
     if (!isOpen) return;
-    setSelected([]);
-    setResult(null);
-    setNoProblems(false);
     loadProblems();
-  }, [isOpen, loadProblems]);
+  }, [isOpen, selectedStageId, loadProblems]);
 
   const totalPoints = problems.reduce((sum, problem) => sum + problem.points, 0);
   const selectedPoints = problems
@@ -61,6 +85,15 @@ export const PldAssessmentTest = ({ isOpen, leadId, leadName, companyName, onClo
     );
   };
 
+  const handleStageChange = (newStageId) => {
+    const nextId = newStageId ? Number(newStageId) : null;
+    setSelectedStageId(nextId);
+    setSelected([]);
+    setResult(null);
+  };
+
+  const currentStageObj = availableStages.find((s) => s.id === selectedStageId);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (selected.length === 0) {
@@ -70,10 +103,14 @@ export const PldAssessmentTest = ({ isOpen, leadId, leadName, companyName, onClo
 
     setSubmitting(true);
     try {
-      const res = await pldApi.submitAssessment(leadId, selected);
+      const res = await pldApi.submitAssessment(leadId, selected, selectedStageId);
       if (res?.data) {
         setResult(res.data);
-        showToast('PLD assessment submitted and scored.', 'success');
+        const stageName = res.data.stage_name || currentStageObj?.name;
+        const msg = res.data.pld_status === 'QUALIFIED_PLD'
+          ? `Qualified PLD for ${stageName || 'this stage'}!`
+          : `Assessment completed (${res.data.percentage}%). Did not meet qualification threshold.`;
+        showToast(msg, res.data.pld_status === 'QUALIFIED_PLD' ? 'success' : 'warning');
       }
       onCompleted?.(res?.data);
     } catch (err) {
@@ -86,6 +123,7 @@ export const PldAssessmentTest = ({ isOpen, leadId, leadName, companyName, onClo
   if (!isOpen) return null;
 
   const statusConfig = result ? PLD_STATUS_CONFIG[result.pld_status] : null;
+  const isQualified = result?.pld_status === 'QUALIFIED_PLD';
 
   return (
     <div className="modal-backdrop" onClick={() => !submitting && onClose()}>
@@ -103,7 +141,9 @@ export const PldAssessmentTest = ({ isOpen, leadId, leadName, companyName, onClo
               <Target size={20} />
             </div>
             <div>
-              <h3>PLD Assessment</h3>
+              <h3>
+                {currentStageObj ? `${currentStageObj.name} PLD Assessment` : 'PLD Assessment'}
+              </h3>
               {leadName && (
                 <p className="text-dim font-sm" style={{ margin: '0.15rem 0 0 0' }}>
                   {leadName}
@@ -122,13 +162,48 @@ export const PldAssessmentTest = ({ isOpen, leadId, leadName, companyName, onClo
           </button>
         </div>
 
+        {/* Stage selection selector */}
+        {!result && availableStages.length > 0 && (
+          <div style={{ padding: '0.75rem 1.5rem', background: 'var(--bg-card)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <span className="font-sm" style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                Target Stage:
+              </span>
+              <select
+                className="form-control"
+                style={{ padding: '0.35rem 0.75rem', fontSize: '0.85rem', width: 'auto' }}
+                value={selectedStageId || ''}
+                onChange={(e) => handleStageChange(e.target.value)}
+                disabled={loading || submitting}
+              >
+                <option value="">General / Shared Pool</option>
+                {availableStages.map((stg) => (
+                  <option key={stg.id} value={stg.id}>
+                    {stg.name} Assessment
+                  </option>
+                ))}
+              </select>
+            </div>
+            <span className="text-dim font-sm">
+              {currentStageObj
+                ? `Assessing requirements to advance to ${currentStageObj.name}`
+                : 'General discovery problem assessment'}
+            </span>
+          </div>
+        )}
+
         {loading ? (
-          <LoadingSpinner text="Loading active problems..." />
+          <LoadingSpinner text={`Loading problems for ${currentStageObj?.name || 'PLD'}...`} />
         ) : noProblems ? (
           <div className="modal-body">
-            <p className="text-muted">
-              There are no active PLD problems configured yet. Ask an admin to add them in Settings.
-            </p>
+            <div className="card text-center" style={{ padding: '2rem 1.5rem', textAlign: 'center' }}>
+              <p className="text-muted" style={{ marginBottom: '0.75rem' }}>
+                There are no active PLD problems configured for {currentStageObj?.name || 'this stage'} yet.
+              </p>
+              <p className="text-dim font-sm">
+                Ask an Admin to configure {currentStageObj?.name || 'PLD'} problems in Settings → PLD Engine.
+              </p>
+            </div>
           </div>
         ) : result ? (
           <div className="modal-body pld-result-body">
@@ -147,16 +222,26 @@ export const PldAssessmentTest = ({ isOpen, leadId, leadName, companyName, onClo
                 {statusConfig.label}
               </span>
             </div>
+            <div style={{ marginTop: '0.5rem', textAlign: 'center' }}>
+              {isQualified ? (
+                <p style={{ color: 'var(--success, #059669)', fontWeight: 600, margin: '0.25rem 0' }}>
+                  Lead successfully qualified for {result.stage_name || currentStageObj?.name || 'this stage'}!
+                </p>
+              ) : (
+                <p style={{ color: 'var(--danger, #dc2626)', fontWeight: 600, margin: '0.25rem 0' }}>
+                  Lead did not meet the qualification threshold for {result.stage_name || currentStageObj?.name || 'this stage'}.
+                </p>
+              )}
+            </div>
             <p className="text-muted pld-result-note">
-              This result has been saved. Running the assessment again adds a new entry to the history —
-              earlier results are never rewritten.
+              This assessment has been recorded in the lead's history.
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="pld-test-form">
             <div className="pld-assess-meta" aria-live="polite">
               <span className="font-semibold text-main">
-                {selected.length} of {problems.length} problems selected
+                {selected.length} of {problems.length} problems identified
               </span>
               <span className="text-dim font-sm">
                 {selectedPoints} of {totalPoints} points
@@ -165,8 +250,8 @@ export const PldAssessmentTest = ({ isOpen, leadId, leadName, companyName, onClo
 
             <div className="modal-body pld-problems-body">
               <p className="text-muted font-sm" style={{ margin: '0 0 0.75rem' }}>
-                Select every problem this lead is experiencing. The score is calculated automatically from
-                the points configured by an admin.
+                Select every verified pain point or problem statement for this lead. Scoring and qualification
+                are derived automatically from the stage pool.
               </p>
               <div className="pld-problem-list" role="group" aria-label="Problems for this lead">
                 {problems.map((problem) => {
@@ -221,23 +306,38 @@ export const PldAssessmentTest = ({ isOpen, leadId, leadName, companyName, onClo
         )}
 
         {result && (
-          <div className="modal-footer">
+          <div className="modal-footer" style={{ justifyContent: 'space-between' }}>
             <button type="button" className="btn btn-secondary" onClick={onClose}>
               <ArrowLeft size={15} />
               <span>Back to Lead</span>
             </button>
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                setResult(null);
-                setSelected([]);
-                loadProblems();
-              }}
-            >
-              <CheckCircle2 size={15} />
-              <span>Run Again</span>
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => {
+                  setResult(null);
+                  setSelected([]);
+                  loadProblems();
+                }}
+              >
+                <span>Retake Assessment</span>
+              </button>
+              {isQualified && onMoveStage && (result.stage || selectedStageId) && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const targetId = result.stage || selectedStageId;
+                    onMoveStage(targetId);
+                    onClose();
+                  }}
+                >
+                  <CheckCircle2 size={15} />
+                  <span>Move Lead to {result.stage_name || currentStageObj?.name || 'Stage'}</span>
+                </button>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -249,7 +349,10 @@ export const PldAssessmentLauncher = ({
   leadId,
   leadName,
   companyName,
+  initialStageId = null,
+  stages = [],
   onCompleted,
+  onMoveStage,
   buttonLabel = 'Run PLD Assessment',
 }) => {
   const [open, setOpen] = useState(false);
@@ -264,8 +367,11 @@ export const PldAssessmentLauncher = ({
         leadId={leadId}
         leadName={leadName}
         companyName={companyName}
+        initialStageId={initialStageId}
+        stages={stages}
         onClose={() => setOpen(false)}
         onCompleted={onCompleted}
+        onMoveStage={onMoveStage}
       />
     </>
   );

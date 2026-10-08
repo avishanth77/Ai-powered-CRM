@@ -296,7 +296,7 @@ export const IcpQualificationTest = ({ isOpen, leadId, leadName, companyName, on
             </p>
           </div>
         ) : (
-          <form onSubmit={handleSubmit}>
+          <form onSubmit={handleSubmit} className="icp-test-form">
             {/* Progress indicator */}
             <div className="icp-progress" aria-live="polite">
               <div className="icp-progress-labels">

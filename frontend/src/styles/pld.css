@@ -29,6 +29,19 @@
   flex-direction: column;
 }
 
+/* Same layout contract as the ICP test: the form fills the container so the
+   problem list scrolls and the action footer stays visible. */
+.pld-test-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.pld-test-form .modal-footer {
+  flex-shrink: 0;
+}
+
 .pld-assess-meta {
   display: flex;
   justify-content: space-between;
@@ -43,6 +56,7 @@
 .pld-problems-body {
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
 }
 
 .pld-problem-list {
@@ -280,6 +294,86 @@
   font-size: 1.125rem;
 }
 
+/* ---------- Lead details: current PLD stage / next action ---------- */
+
+.pld-next-action {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-bottom: 0.75rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--bg-surface);
+}
+
+.pld-next-action-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.pld-next-action-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: var(--primary);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pld-next-action-stage,
+.pld-next-action-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.pld-next-action-label {
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.pld-next-action-stage strong {
+  color: var(--text-main);
+  font-size: 0.875rem;
+  text-align: right;
+}
+
+.pld-next-action-title {
+  margin: 0;
+  color: var(--text-main);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.pld-next-action-detail {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.pld-next-action-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.pld-next-action-actions .btn {
+  min-height: 44px;
+}
+
+.pld-next-action-gates {
+  display: flex;
+  justify-content: flex-start;
+}
+
 /* ---------- Responsive ---------- */
 
 @media (max-width: 992px) {
@@ -289,6 +383,10 @@
 }
 
 @media (max-width: 768px) {
+  .pld-next-action-actions .btn {
+    flex: 1 1 100%;
+  }
+
   .pld-problem-item {
     flex-wrap: wrap;
   }

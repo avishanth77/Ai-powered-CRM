@@ -41,7 +41,15 @@ ICP_MIN_STATUS_CHOICES = [
 class PLDProblem(models.Model):
     """Admin-configured problem statement that contributes points to the PLD score."""
 
-    name = models.CharField(max_length=200, unique=True)
+    stage = models.ForeignKey(
+        'leads.LeadStage',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pld_problems',
+        help_text='Stage this problem/question belongs to. Blank applies globally or when stage has no specific questions.',
+    )
+    name = models.CharField(max_length=200)
     description = models.TextField(blank=True, null=True)
     points = models.PositiveIntegerField(
         default=10,
@@ -71,7 +79,8 @@ class PLDProblem(models.Model):
         verbose_name_plural = 'PLD Problems'
 
     def __str__(self):
-        return f'{self.name} ({self.points} pts)'
+        stage_label = f' [{self.stage.name}]' if self.stage else ''
+        return f'{self.name}{stage_label} ({self.points} pts)'
 
     @property
     def max_points(self):
@@ -81,6 +90,8 @@ class PLDProblem(models.Model):
         """Immutable copy of the problem configuration captured at assessment time."""
         return {
             'id': self.id,
+            'stage_id': self.stage_id,
+            'stage_name': self.stage.name if self.stage else None,
             'name': self.name,
             'description': self.description or '',
             'points': self.points,
@@ -129,6 +140,14 @@ class PLDAssessment(models.Model):
         on_delete=models.CASCADE,
         related_name='pld_assessments',
     )
+    stage = models.ForeignKey(
+        'leads.LeadStage',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='pld_assessments',
+        help_text='The pipeline stage this assessment was completed for.',
+    )
     assessed_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -154,7 +173,8 @@ class PLDAssessment(models.Model):
         verbose_name_plural = 'PLD Assessments'
 
     def __str__(self):
-        return f'{self.lead} - {self.total_score}/{self.max_score} ({self.get_pld_status_display()})'
+        stage_label = f' [{self.stage.name}]' if self.stage else ''
+        return f'{self.lead}{stage_label} - {self.total_score}/{self.max_score} ({self.get_pld_status_display()})'
 
 
 class PLDAssessmentProblem(models.Model):
@@ -207,11 +227,16 @@ class PLDStageGate(models.Model):
     )
     require_pld_qualified = models.BooleanField(
         default=False,
-        help_text='Require the lead to hold the Qualified PLD status.',
+        help_text='Require the lead to hold the Qualified PLD status for this stage.',
     )
     require_problems_assessed = models.BooleanField(
         default=False,
-        help_text='Require at least one completed PLD assessment on the lead.',
+        help_text='Require a completed PLD assessment for this stage.',
+    )
+    qualified_min_percentage = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text='Optional stage-specific percentage threshold. If blank, uses global scoring config.',
     )
     notes = models.CharField(max_length=300, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)

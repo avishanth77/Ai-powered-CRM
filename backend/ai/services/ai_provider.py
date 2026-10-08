@@ -325,7 +325,15 @@ class GeminiProvider(BaseAIProvider):
             f'  "suggestions": ["Follow-up question 1", "Follow-up question 2"],\n'
             f'  "action_required": false,\n'
             f'  "action_payload": null\n'
-            f"}}"
+            f"}}\n\n"
+            f"If the user requests a CRM mutation (e.g. reassigning a lead, moving a lead stage, or scheduling a follow-up), "
+            f"set action_required to true and populate action_payload with one of these standard schemas:\n"
+            f'- For reassigning a lead:\n'
+            f'{{"action_type": "REASSIGN_LEAD", "description": "Reassign <Lead Name> to <User Email>", "parameters": {{"lead_id": 123, "lead_name": "...", "user_email": "...", "user_id": null}}}}\n'
+            f'- For updating/moving lead stage:\n'
+            f'{{"action_type": "UPDATE_LEAD_STAGE", "description": "Move <Lead Name> to <Stage Name> stage", "parameters": {{"lead_id": 123, "stage_id": 2, "stage_name": "..."}}}}\n'
+            f'- For scheduling follow-up:\n'
+            f'{{"action_type": "SCHEDULE_FOLLOWUP", "description": "Schedule follow-up for <Lead Name> on <Date>", "parameters": {{"lead_id": 123, "date": "YYYY-MM-DD", "purpose": "..."}}}}\n'
         )
 
         try:

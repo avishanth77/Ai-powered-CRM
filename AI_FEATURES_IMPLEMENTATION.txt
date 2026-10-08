@@ -1,0 +1,528 @@
+================================================================================
+CRM LITE — ARTIFICIAL INTELLIGENCE (AI) ARCHITECTURE & IMPLEMENTATION GUIDE
+================================================================================
+Document Version : 1.0.0
+Author / Project : CRM Lite Engineering Team
+Scope            : Detailed explanation of all AI features, services, prompts,
+                   backend endpoints, data models, and frontend integration.
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+1. High-Level AI Architecture Overview
+2. Provider Abstraction Layer (BaseAIProvider & GeminiProvider)
+3. Feature 1: Multimodal Speech-to-Text & Call Deal Intelligence
+4. Feature 2: Conversational CRM AI Copilot (Assistant Drawer)
+5. Feature 3: Lead Dossier AI Synthesis & Recommendations
+6. Prompt Engineering & Strict Fact-Grounding Rules
+7. Security, Role-Based Access Control (RBAC) & Safe Write Actions
+8. Resiliency & Deterministic Offline Fallbacks
+9. Complete AI API Specification & Payloads
+10. Environment Configuration & Setup
+
+================================================================================
+1. HIGH-LEVEL AI ARCHITECTURE OVERVIEW
+================================================================================
+
+CRM Lite implements enterprise AI capabilities designed to streamline sales 
+workflows, reduce manual data entry, extract verified deal intelligence, and 
+empower sales reps and managers with live natural-language pipeline querying.
+
+The system incorporates three core AI modules:
+  1. Multimodal Speech-to-Text & Call Deal Summary:
+     Transcribes audio recordings (.mp3, .wav, .m4a, .webm) and analyzes
+     customer intent, milestones, objections, and next actions into structured JSON.
+  2. Live Conversational CRM Copilot:
+     A drawer chatbot grounded directly in the authenticated user's live CRM
+     database records with a confirmation safety protocol for mutating actions.
+  3. Lead Dossier Synthesis:
+     Aggregates all communication history, notes, and stage progressions into an
+     executive briefing with prescriptive stage-specific action recommendations.
+
+ARCHITECTURAL FLOW DIAGRAM:
+---------------------------
+  +-------------------------------------------------------------------------+
+  |                   React 19 Frontend SPA (Vite :5173)                    |
+  |  - AiCallSummaryPage.jsx (Audio recording & file upload)                |
+  |  - AiAssistantDrawer.jsx (Chatbot with action confirmation buttons)     |
+  |  - LeadDetails.jsx (AI synthesis modal & dossier review)                |
+  +------------------------------------+------------------------------------+
+                                       | Axios HTTP (Bearer JWT)
+                                       v
+  +-------------------------------------------------------------------------+
+  |                     Django REST Framework (:8000)                       |
+  |  /api/ai/call-summary/  --> AICallSummaryView                           |
+  |  /api/ai/chat/          --> AIChatView                                  |
+  |  /api/ai/execute-action/--> AIActionExecuteView                         |
+  |  /api/calls/            --> CallViewSet (CRUD, re-analyze, retry)       |
+  |  /api/leads/:id/ai_summary/ --> LeadViewSet.ai_summary                  |
+  +------------------------------------+------------------------------------+
+                                       |
+                   +-------------------+-------------------+
+                   |                                       |
+                   v                                       v
+  +---------------------------------+     +---------------------------------+
+  |      CRM Services & Tools       |     |      AI Provider Subsystem      |
+  | - CallSummaryService            |     | - BaseAIProvider (Interface)    |
+  | - TranscriptionService          |     | - GeminiProvider (Google GenAI) |
+  | - ChatbotService                |     | - prompts.py (Strict Schemas)   |
+  | - CRMTools (Role-scoped data)   |     +----------------+----------------+
+  +----------------+----------------+                      |
+                   |                                       v
+                   | QuerySets            +---------------------------------+
+                   v                      |   External LLM (Google Gemini)  |
+  +---------------------------------+     |        gemini-2.5-flash         |
+  |   Database (PostgreSQL/SQLite)  |     |   - Native Audio Understanding  |
+  | - Call model (ai_summary, etc.) |     |   - Structured JSON Mode        |
+  | - ActivityLog (Timeline sync)   |     +---------------------------------+
+  +---------------------------------+
+
+
+================================================================================
+2. PROVIDER ABSTRACTION LAYER (BaseAIProvider & GeminiProvider)
+================================================================================
+
+File: backend/ai/services/ai_provider.py
+
+To ensure the CRM backend remains decoupled from vendor-specific APIs (preventing
+vendor lock-in), the codebase employs an abstract base provider interface.
+
+2.1. BaseAIProvider Interface
+-----------------------------
+Defines three mandatory contracts:
+  - transcribe_audio(audio_bytes, mime_type, filename) -> str
+  - summarize_call(transcript, lead_context) -> Dict[str, Any]
+  - chat(message, crm_context, conversation_history) -> Dict[str, Any]
+
+2.2. GeminiProvider Concrete Implementation
+-------------------------------------------
+Uses the official Google GenAI SDK (`google.genai.Client`) with the 
+`gemini-2.5-flash` model.
+
+Key architectural highlights:
+  - Multimodal Audio Processing: Audio binary bytes are packaged via 
+    `types.Part.from_bytes(data=audio_bytes, mime_type=clean_mime)` and submitted
+    directly to Gemini without requiring external speech-to-text intermediaries.
+  - Temperature Control:
+      * 0.2 for Call Summaries: Enforces factual precision and eliminates creative
+        embellishment or hallucinations.
+      * 0.3 for Chat Copilot: Delivers crisp, concise answers with grounded data.
+  - Dynamic .env Reloading:
+    `_resolve_api_key()` checks passed parameters, Django settings, OS environment,
+    and dynamically re-reads `backend/.env` on the fly. If an admin pastes an API
+    key while `runserver` is active, it takes effect instantly without server restart.
+  - JSON Sanitization (_clean_json_response):
+    Handles markdown wrappers (```json ... ```) and includes a regex fallback 
+    (`re.search(r'\{.*\}', cleaned, re.DOTALL)`) to guarantee clean JSON parsing.
+
+2.3. Provider Factory (get_ai_provider)
+---------------------------------------
+A factory function reads `settings.AI_PROVIDER` (default: 'gemini'). Adding future
+providers (e.g., OpenAI, Claude, or local Ollama) only requires subclassing 
+`BaseAIProvider` and registering the name in the factory.
+
+
+================================================================================
+3. FEATURE 1: MULTIMODAL SPEECH-TO-TEXT & CALL DEAL INTELLIGENCE
+================================================================================
+
+Files: 
+  - backend/ai/models.py (Call model)
+  - backend/ai/services/transcription_service.py
+  - backend/ai/services/call_summary_service.py
+  - backend/ai/views.py (AICallSummaryView, CallViewSet)
+  - frontend/src/pages/AiCallSummaryPage.jsx
+  - frontend/src/components/AudioRecorder.jsx
+
+3.1. Audio Capture & Preprocessing
+----------------------------------
+- In-Browser Recording: The `AudioRecorder` component uses the browser MediaStream
+  Recording API (`navigator.mediaDevices.getUserMedia`) to capture audio in 
+  `audio/webm` format, updating recording timer and audio visualizer in real time.
+- File Upload: Accepts `.mp3`, `.wav`, `.m4a`, `.webm`, `.ogg`, and `.aac` up to 25MB.
+- Pre-validation: `TranscriptionService.validate_audio_file` checks file presence, 
+  verifies non-zero byte size, checks extension whitelist, and rejects files > 25MB.
+
+3.2. Audio Transcription
+------------------------
+- Streamed as raw binary to Gemini.
+- Guided by `CALL_TRANSCRIPTION_SYSTEM_PROMPT`.
+- Outputs verbatim dialogue with identified speaker labels 
+  (e.g., "Sales Executive:", "Customer:").
+- Names, numbers, technical terms, and pricing metrics are transcribed verbatim.
+
+3.3. Deal Intelligence Extraction
+---------------------------------
+Once transcribed, `CallSummaryService` attaches contextual metadata about the lead 
+(lead name, company, stage, pipeline deal value) and prompts Gemini to extract 
+structured sales intelligence matching this schema:
+  {
+    "summary": "1-3 sentence executive synopsis",
+    "key_points": ["Milestone 1", "Milestone 2"],
+    "customer_requirements": ["Specific operational/feature requests"],
+    "objections": ["Price resistance, competitor evaluation, SLA concerns"],
+    "customer_intent": "Interested | Evaluating alternatives | Hesitant | etc.",
+    "next_action": "Concrete next step for sales rep",
+    "follow_up_date": "YYYY-MM-DD or null"
+  }
+
+3.4. Database Persistence & Activity Timeline Sync
+--------------------------------------------------
+- Saved to the `Call` model (`leads_call` table) linked to `Lead` and `User`.
+- Status states: `UPLOADING` -> `TRANSCRIBING` -> `ANALYZING` -> `COMPLETED` (or `FAILED`).
+- `CallSummaryService.record_call_activity()` automatically fires an `ActivityLog`
+  record (`action='CALL_LOGGED'`), making the call summary and recommended next 
+  action visible on the prospect's chronological audit timeline.
+
+3.5. Human-in-the-Loop Editing & Retry Support
+----------------------------------------------
+- Editable Transcript: Reps can manually fix misspelled proper names or acoustic 
+  anomalies directly in the UI.
+- Re-analysis: Triggered via `POST /api/calls/<id>/transcript/` with `reanalyze=true`.
+  Gemini re-extracts deal intelligence from the corrected transcript.
+- Retry: `POST /api/calls/<id>/retry/` re-runs failed audio processing without
+  duplicating records or generating orphan database rows.
+
+
+================================================================================
+4. FEATURE 2: CONVERSATIONAL CRM AI COPILOT (ASSISTANT DRAWER)
+================================================================================
+
+Files:
+  - backend/ai/services/chatbot_service.py
+  - backend/ai/services/crm_tools.py
+  - backend/ai/views.py (AIChatView, AIActionExecuteView)
+  - frontend/src/components/AiAssistantDrawer.jsx
+
+4.1. Role-Scoped Data Grounding (CRMTools)
+------------------------------------------
+To avoid hallucinations, the copilot never makes up CRM figures. Before dispatching
+a question to the LLM, `ChatbotService._build_live_crm_context` gathers real-time
+data filtered through `CRMTools`:
+  - Pipeline Summary: Total active opportunities, aggregate deal value, and 
+    breakdown by pipeline stage.
+  - Overdue Follow-ups: Overdue tasks with due dates, notes, and prospect names.
+  - Today's Agenda: Follow-up tasks scheduled for the current calendar day.
+  - Prospect Dossier: Full contact info, expected value, priority, recent calls,
+    and upcoming touchpoints if a specific lead is referenced.
+  - Role Scoping: Sales Executives only receive their assigned or created leads.
+    Admins and Managers receive team-wide or org-wide pipeline aggregates.
+
+4.2. Safe Mutation Protocol (Read vs. Write Intent)
+---------------------------------------------------
+A core security requirement in enterprise CRM is preventing autonomous AI agents 
+from modifying customer databases without human approval.
+
+  1. Intent Detection:
+     `ChatbotService._detect_write_intent` analyzes prompts for mutation verbs 
+     (e.g., "move", "change", "set", "update lead stage").
+  2. Action Proposal:
+     If a mutation is requested (e.g., "Move Acme Corp to Negotiation"), the bot 
+     does NOT alter the database. Instead, it returns:
+       {
+         "intent": "ACTION_CONFIRMATION",
+         "action_required": true,
+         "action_payload": {
+           "action_type": "UPDATE_LEAD_STAGE",
+           "description": "Move Acme Corp to Negotiation stage",
+           "parameters": { "lead_id": 4, "stage_id": 3, "stage_name": "Negotiation" }
+         }
+       }
+  3. User Confirmation:
+     The frontend displays confirmation buttons: [Confirm Action] and [Cancel].
+  4. Execution Endpoint:
+     Only when the user clicks [Confirm Action], the frontend dispatches
+     `POST /api/ai/execute-action/`.
+     `ChatbotService.execute_confirmed_action` checks:
+       - User authentication
+       - Ownership & RBAC permissions (Executives cannot modify other reps' leads)
+       - Target stage validity
+     It updates the lead and logs an `ActivityLog` event:
+       "Lead stage updated to Negotiation via AI Assistant confirmation."
+
+4.3. Multi-Turn Conversation Context
+------------------------------------
+The frontend retains recent message history (`messages.slice(-6)`) and submits
+conversation history to `POST /api/ai/chat/`, allowing coherent follow-up questions 
+(e.g., User: "What are my top deals?" -> Assistant: [Lists top 3] -> User: "Summarize the first one").
+
+
+================================================================================
+5. FEATURE 3: LEAD DOSSIER AI SYNTHESIS & RECOMMENDATIONS
+================================================================================
+
+Files:
+  - backend/leads/views.py (LeadViewSet.ai_summary)
+  - frontend/src/pages/LeadDetails.jsx
+
+5.1. Context Aggregation
+------------------------
+When a sales rep opens a lead and clicks "AI Synthesis":
+  - Endpoint: `GET /api/leads/<id>/ai_summary/`
+  - Scans all logged interaction notes (`LeadNote` table: CALL, WHATSAPP, EMAIL, 
+    MEETING, DEMO, OBJECTION, GENERAL).
+  - Evaluates pipeline stage history, expected value, and scheduled activities.
+
+5.2. Synthesis Rules & Action Engine
+------------------------------------
+  - Executive Summary:
+    Synthesizes prospect company, stage, deal value, and touchpoint counts.
+  - Requirement Identification:
+    Detects operational themes (e.g. infrastructure scaling, SLA guarantees, 
+    workflow integration).
+  - Objection Analysis:
+    Identifies price sensitivity (discount requests, budget constraints) or 
+    market competition.
+  - Prescriptive Next Step Recommendation:
+    Recommends specific next actions according to pipeline stage:
+      * QUALIFIED      -> Initiate commercial review & customer conversion meeting.
+      * DEMO_SCHEDULED -> Prepare custom demo tailored to operational requirements.
+      * NEGOTIATION    -> Follow up with procurement regarding SLA & payment terms.
+      * LOST           -> Enroll in quarterly re-engagement nurture campaign.
+      * NEW / CONTACTED-> Conduct discovery call to map decision makers.
+
+5.3. UI Presentation & Compliance
+---------------------------------
+  - Displays inside a high-contrast modal dialog.
+  - Prominent AI Advisory Banner: "This summary is synthesized by CRM Lite AI 
+    Assistant. Review information before making business commitments."
+  - One-click copy buttons for executive summary and recommended action.
+
+
+================================================================================
+6. PROMPT ENGINEERING & STRICT FACT-GROUNDING RULES
+================================================================================
+
+File: backend/ai/services/prompts.py
+
+The CRM implements three dedicated system prompts designed with strict guardrails
+to eliminate hallucinations:
+
+6.1. Call Transcription Prompt
+------------------------------
+- Directives:
+  * Transcribe verbatim word-for-word.
+  * Identify and label distinct speakers.
+  * Accurately capture proper nouns, numbers, currencies, and dates.
+  * If segments are unintelligible, transcribe clear parts; NEVER invent dialogue.
+  * Return plain text without chit-chat or code backticks.
+
+6.2. Call Summary & Deal Intelligence Prompt
+--------------------------------------------
+- Directives:
+  * Strict Grounding: Rely ONLY on facts stated in the transcript.
+  * Unknowns: Return `null` for unmentioned dates and `[]` for absent objections.
+  * Categorize customer intent into standardized sales statuses.
+  * Suggest follow-up dates in `YYYY-MM-DD` ONLY if agreed upon during the call.
+  * Output strictly valid JSON matching the exact schema.
+
+6.3. Copilot Assistant Prompt
+-----------------------------
+- Directives:
+  * Ground answers strictly in provided JSON CRM context.
+  * Never fabricate revenue numbers, overdue tasks, or contact details.
+  * Distinguish read-only responses from write actions.
+  * Always require confirmation before executing mutations.
+
+
+================================================================================
+7. SECURITY, ROLE-BASED ACCESS CONTROL (RBAC) & SAFE ACTIONS
+================================================================================
+
+All AI features inherit Django's server-enforced security boundaries:
+
+7.1. Authentication
+-------------------
+All AI endpoints enforce `IsAuthenticated`. Anonymous calls are rejected with 
+HTTP 401 Unauthorized.
+
+7.2. Role Scoping
+-----------------
+  - Sales Executive:
+    Can only transcribe, analyze, or view calls for leads assigned to or created 
+    by them. Cannot query or modify other reps' leads through the AI Copilot.
+  - Sales Manager & Admin:
+    Can query and review AI call intelligence org-wide.
+
+7.3. Action Authorization
+-------------------------
+In `AIActionExecuteView`, if an executive attempts to confirm a stage change on a 
+lead owned by another rep, the backend raises `PermissionError` and returns 
+HTTP 403 Forbidden.
+
+7.4. Immutable Audit Trail
+--------------------------
+Every AI-assisted action emits an `ActivityLog` row with the authenticated 
+`performed_by` user ID, previous state, new state, and timestamp.
+
+
+================================================================================
+8. RESILIENCY & DETERMINISTIC OFFLINE FALLBACKS
+================================================================================
+
+External AI APIs can experience rate limits (HTTP 429), regional outages, or 
+unconfigured API keys. CRM Lite is engineered to remain fully operational:
+
+8.1. Direct CRM Aggregation Fallback
+------------------------------------
+If `get_ai_provider().chat()` raises `AIProviderException`:
+  - `ChatbotService` catches the exception cleanly.
+  - Automatically redirects to `_generate_direct_crm_response()`.
+  - Calculates answers directly from Django ORM QuerySets:
+    * "Show my overdue leads" -> Formatted bulleted list of overdue followups.
+    * "What should I do today?" -> Aggregated summary of today's schedule.
+    * "Summarize pipeline" -> Real-time counts and dollar values per stage.
+  - Result: The user receives 100% accurate, factual data with zero UI crashes.
+
+8.2. Error Classification
+-------------------------
+`AICallSummaryView` maps backend exceptions to standard HTTP status codes:
+  - `ValueError` -> HTTP 400 Bad Request (invalid audio format, missing notes)
+  - `AIProviderConfigurationError` -> HTTP 503 Service Unavailable (missing API key)
+  - `AIProviderServiceError` -> HTTP 502 Bad Gateway (upstream Gemini rate limit)
+  - `PermissionError` -> HTTP 403 Forbidden (unauthorized access)
+
+
+================================================================================
+9. COMPLETE AI API SPECIFICATION & PAYLOADS
+================================================================================
+
+1. POST /api/ai/call-summary/
+-----------------------------
+Purpose: Uploads audio or notes, transcribes speech, and extracts deal summary.
+Content-Type: multipart/form-data or application/json
+Request Fields:
+  - lead_id (int, optional): Associated lead ID
+  - call_id (int, optional): Existing call ID for retry
+  - call_type (string): 'Outbound' | 'Inbound'
+  - duration_seconds (int): Call duration
+  - notes (string, optional): Call discussion notes
+  - audio_file (binary file, optional): .mp3, .wav, .m4a, .webm (max 25MB)
+Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "transcript": "Sales Executive: Hello... \nCustomer: Hi...",
+      "summary": {
+        "summary": "Customer discussed 50-seat rollout...",
+        "key_points": ["Budget approved for Q4", "Requires SSO"],
+        "customer_requirements": ["SAML 2.0 SSO", "99.9% uptime SLA"],
+        "objections": ["Need price discount for annual commitment"],
+        "customer_intent": "High purchase interest",
+        "next_action": "Send revised annual enterprise quotation",
+        "follow_up_date": "2026-10-05"
+      },
+      "ai_provider": "gemini",
+      "ai_model": "gemini-2.5-flash"
+    }
+  }
+
+2. POST /api/ai/chat/
+---------------------
+Purpose: Natural language queries against authorized CRM context.
+Request:
+  {
+    "prompt": "Show my overdue follow-ups",
+    "context": {},
+    "conversation_history": [
+      {"role": "user", "content": "Hello"},
+      {"role": "assistant", "content": "How can I help you today?"}
+    ]
+  }
+Response (200 OK):
+  {
+    "success": true,
+    "data": {
+      "response": "You currently have **2 overdue follow-up tasks**...",
+      "intent": "OVERDUE_LEADS",
+      "suggestions": ["What should I do today?", "Summarize my pipeline"],
+      "action_required": false,
+      "action_payload": null
+    }
+  }
+
+3. POST /api/ai/execute-action/
+-------------------------------
+Purpose: Executes a user-confirmed CRM mutation proposed by the AI assistant.
+Request:
+  {
+    "action_payload": {
+      "action_type": "UPDATE_LEAD_STAGE",
+      "description": "Move Acme Corp to Negotiation stage",
+      "parameters": {
+        "lead_id": 14,
+        "stage_id": 4
+      }
+    }
+  }
+  Or for reassigning a lead:
+  {
+    "action_payload": {
+      "action_type": "REASSIGN_LEAD",
+      "description": "Reassign Don Bosco to john@crmlite.com",
+      "parameters": {
+        "lead_id": 11,
+        "user_email": "john@crmlite.com"
+      }
+    }
+  }
+Response (200 OK):
+  {
+    "success": true,
+    "message": "Successfully moved **Acme Corp** to **Negotiation**.",
+    "lead_id": 14,
+    "new_stage": "Negotiation"
+  }
+
+4. GET /api/leads/<id>/ai_summary/
+----------------------------------
+Purpose: Generates historical lead dossier synthesis and stage recommendations.
+Response (200 OK):
+  {
+    "success": true,
+    "is_ai_generated": true,
+    "disclaimer": "This summary is synthesized by CRM Lite AI Assistant...",
+    "data": {
+      "lead_id": 5,
+      "lead_name": "Apex Logistics",
+      "current_stage": "QUALIFIED",
+      "executive_summary": "Prospect Apex Logistics is currently in QUALIFIED stage...",
+      "customer_requirements": ["Infrastructure scaling and multi-seat team automation"],
+      "main_objections": ["Pricing sensitivity: Customer requested discount/tier adjustment"],
+      "recommended_next_action": "Initiate commercial proposal review and schedule executive customer conversion meeting.",
+      "generated_at": "2026-09-30T12:00:00Z"
+    }
+  }
+
+5. Calls CRUD Endpoints:
+------------------------
+  - GET   /api/calls/              -> List calls (filtered by user role)
+  - POST  /api/calls/              -> Create/save call with AI summary
+  - GET   /api/calls/<id>/         -> Retrieve single call detail
+  - POST  /api/calls/<id>/transcript/ -> Update transcript & optionally reanalyze
+  - POST  /api/calls/<id>/retry/   -> Retry transcription/analysis on failed call
+  - GET   /api/leads/<id>/calls/   -> List all call records linked to a lead
+
+
+================================================================================
+10. ENVIRONMENT CONFIGURATION & SETUP
+================================================================================
+
+In backend/.env:
+----------------
+  # AI Provider Settings
+  AI_PROVIDER=gemini
+  GEMINI_MODEL=gemini-2.5-flash
+  GEMINI_API_KEY=AIzaSy...your_gemini_api_key_here
+
+How to Verify:
+  1. Set GEMINI_API_KEY in backend/.env.
+  2. Run backend: python backend/manage.py runserver 8000
+  3. Run frontend: cd frontend && npm run dev
+  4. Navigate to http://localhost:5173/ai/center
+  5. Test microphone recording or sample audio upload on /ai/call-summary.
+  6. Open AI Assistant drawer from the top navbar or sidebar to test queries.
+
+================================================================================
+END OF AI FEATURES IMPLEMENTATION GUIDE
+================================================================================

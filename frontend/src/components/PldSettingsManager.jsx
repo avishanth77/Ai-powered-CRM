@@ -24,6 +24,7 @@ import { FieldError } from './FieldError';
 import { LoadingSpinner } from './LoadingSpinner';
 
 const emptyProblemForm = () => ({
+  stage: '',
   name: '',
   description: '',
   points: 0,
@@ -36,6 +37,7 @@ const emptyGateForm = () => ({
   require_icp_min_status: '',
   require_pld_qualified: false,
   require_problems_assessed: false,
+  qualified_min_percentage: '',
   notes: '',
 });
 
@@ -50,7 +52,9 @@ const gateSummary = (gate) => {
     const label = PLD_ICP_MIN_OPTIONS.find((o) => o.value === gate.require_icp_min_status);
     parts.push(label ? label.label : gate.require_icp_min_status);
   }
-  if (gate.require_pld_qualified) parts.push('Qualified PLD');
+  if (gate.require_pld_qualified) {
+    parts.push(gate.qualified_min_percentage ? `Qualified PLD (≥${gate.qualified_min_percentage}%)` : 'Qualified PLD');
+  }
   if (gate.require_problems_assessed) parts.push('Assessment recorded');
   return parts;
 };
@@ -68,6 +72,7 @@ export const PldSettingsManager = () => {
   const [submittingProblem, setSubmittingProblem] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [deleting, setDeleting] = useState(false);
+  const [selectedStageFilter, setSelectedStageFilter] = useState('ALL');
 
   // Threshold
   const [config, setConfig] = useState({ qualified_min_percentage: 60 });
@@ -158,7 +163,10 @@ export const PldSettingsManager = () => {
   /* ---------------- Problems ---------------- */
 
   const openProblemCreate = () => {
-    setProblemForm(emptyProblemForm());
+    setProblemForm({
+      ...emptyProblemForm(),
+      stage: selectedStageFilter !== 'ALL' && selectedStageFilter !== 'GLOBAL' ? Number(selectedStageFilter) : '',
+    });
     setProblemFormErrors({});
     setEditingProblem(null);
     setProblemFormOpen(true);
@@ -166,6 +174,7 @@ export const PldSettingsManager = () => {
 
   const openProblemEdit = (problem) => {
     setProblemForm({
+      stage: problem.stage || '',
       name: problem.name,
       description: problem.description || '',
       points: problem.points,
@@ -191,6 +200,7 @@ export const PldSettingsManager = () => {
 
     setSubmittingProblem(true);
     const payload = {
+      stage: problemForm.stage ? Number(problemForm.stage) : null,
       name: problemForm.name.trim(),
       description: problemForm.description.trim(),
       points: toNumber(problemForm.points),
@@ -294,6 +304,7 @@ export const PldSettingsManager = () => {
       require_icp_min_status: gate.require_icp_min_status || '',
       require_pld_qualified: Boolean(gate.require_pld_qualified),
       require_problems_assessed: Boolean(gate.require_problems_assessed),
+      qualified_min_percentage: gate.qualified_min_percentage ?? '',
       notes: gate.notes || '',
     });
     setGateFormErrors({});
@@ -325,6 +336,10 @@ export const PldSettingsManager = () => {
       require_icp_min_status: gateForm.require_icp_min_status || '',
       require_pld_qualified: Boolean(gateForm.require_pld_qualified),
       require_problems_assessed: Boolean(gateForm.require_problems_assessed),
+      qualified_min_percentage:
+        gateForm.qualified_min_percentage !== '' && gateForm.qualified_min_percentage !== null
+          ? toNumber(gateForm.qualified_min_percentage)
+          : null,
       notes: gateForm.notes.trim(),
     };
     try {
@@ -365,6 +380,12 @@ export const PldSettingsManager = () => {
     .filter((problem) => problem.is_active)
     .reduce((sum, problem) => sum + problem.points, 0);
 
+  const displayedProblems = problems.filter((p) => {
+    if (selectedStageFilter === 'ALL') return true;
+    if (selectedStageFilter === 'GLOBAL') return !p.stage;
+    return String(p.stage) === String(selectedStageFilter);
+  });
+
   return (
     <div className="icp-manager">
       {/* Problems */}
@@ -373,12 +394,12 @@ export const PldSettingsManager = () => {
           <div>
             <h3 className="icp-section-title">
               <ListChecks size={20} color="var(--primary)" />
-              <span>PLD Problems</span>
+              <span>PLD Problems & Assessment Questions</span>
             </h3>
             <p className="text-muted font-sm icp-section-subtitle">
-              Sales users pick from this list during an assessment. The score is the sum of the
-              selected problems' points; max score is the sum of every active problem
-              {totalPoints > 0 ? ` (${totalPoints} pts)` : ''}.
+              Configure different PLD discovery problems for each pipeline stage. Staff must assess and
+              qualify these problems to advance leads to that stage
+              {totalPoints > 0 ? ` (${totalPoints} pts total configured)` : ''}.
             </p>
           </div>
           <button type="button" className="btn btn-primary" onClick={openProblemCreate}>
@@ -387,13 +408,49 @@ export const PldSettingsManager = () => {
           </button>
         </div>
 
+        {/* Stage Filter */}
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem', alignItems: 'center' }}>
+          <span className="text-dim font-sm" style={{ fontWeight: 600 }}>Filter by Stage:</span>
+          <button
+            type="button"
+            className={`btn btn-sm ${selectedStageFilter === 'ALL' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setSelectedStageFilter('ALL')}
+          >
+            All Stages ({problems.length})
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${selectedStageFilter === 'GLOBAL' ? 'btn-primary' : 'btn-secondary'}`}
+            onClick={() => setSelectedStageFilter('GLOBAL')}
+          >
+            Shared / Global ({problems.filter((p) => !p.stage).length})
+          </button>
+          {stages.map((stg) => {
+            const count = problems.filter((p) => p.stage === stg.id).length;
+            return (
+              <button
+                key={stg.id}
+                type="button"
+                className={`btn btn-sm ${String(selectedStageFilter) === String(stg.id) ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setSelectedStageFilter(stg.id)}
+              >
+                {stg.name} ({count})
+              </button>
+            );
+          })}
+        </div>
+
         {loadingProblems ? (
           <LoadingSpinner text="Loading PLD problems..." />
-        ) : problems.length === 0 ? (
+        ) : displayedProblems.length === 0 ? (
           <EmptyState
             icon={ListChecks}
-            title="No PLD problems configured"
-            message="Create the first problem to build your PLD assessment."
+            title={selectedStageFilter !== 'ALL' ? 'No problems for this stage' : 'No PLD problems configured'}
+            message={
+              selectedStageFilter !== 'ALL'
+                ? 'Create a problem specifically for this stage to require it during stage progression.'
+                : 'Create the first problem to build your PLD assessment.'
+            }
             actionLabel="Add Problem"
             onAction={openProblemCreate}
           />
@@ -403,7 +460,8 @@ export const PldSettingsManager = () => {
               <thead>
                 <tr>
                   <th style={{ width: '70px' }}>Order</th>
-                  <th>Problem</th>
+                  <th style={{ width: '130px' }}>Stage</th>
+                  <th>Problem Statement</th>
                   <th>Severity</th>
                   <th style={{ width: '90px' }}>Points</th>
                   <th>Status</th>
@@ -411,12 +469,17 @@ export const PldSettingsManager = () => {
                 </tr>
               </thead>
               <tbody>
-                {problems.map((problem, index) => {
+                {displayedProblems.map((problem, index) => {
                   const severity = getPLDSeverity(problem.severity);
                   return (
                     <tr key={problem.id} style={{ opacity: problem.is_active ? 1 : 0.65 }}>
                       <td>
                         <span className="icp-order-chip">{problem.display_order}</span>
+                      </td>
+                      <td>
+                        <span className="pld-gate-chip" style={{ fontSize: '0.72rem' }}>
+                          {problem.stage_name || 'All Stages'}
+                        </span>
                       </td>
                       <td>
                         <div className="font-semibold text-main">{problem.name}</div>
@@ -717,8 +780,33 @@ export const PldSettingsManager = () => {
               <div className="modal-body">
                 <div className="form-grid-2">
                   <div className="form-group icp-span-2">
+                    <label className="form-label" htmlFor="pld-problem-stage">
+                      Target Pipeline Stage
+                    </label>
+                    <select
+                      id="pld-problem-stage"
+                      className="form-control"
+                      value={problemForm.stage || ''}
+                      onChange={(e) =>
+                        setProblemForm({ ...problemForm, stage: e.target.value })
+                      }
+                    >
+                      <option value="">All Stages (Global / Shared)</option>
+                      {stages.map((stg) => (
+                        <option key={stg.id} value={stg.id}>
+                          {stg.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-dim font-sm" style={{ margin: '0.25rem 0 0 0' }}>
+                      Assign this problem to a specific stage to make it part of that stage's assessment.
+                    </p>
+                    <FieldError message={problemFormErrors.stage} />
+                  </div>
+
+                  <div className="form-group icp-span-2">
                     <label className="form-label form-label-required" htmlFor="pld-problem-name">
-                      Problem
+                      Problem Statement
                     </label>
                     <input
                       id="pld-problem-name"
@@ -735,7 +823,7 @@ export const PldSettingsManager = () => {
 
                   <div className="form-group icp-span-2">
                     <label className="form-label" htmlFor="pld-problem-desc">
-                      Description
+                      Description / Discovery Question
                     </label>
                     <input
                       id="pld-problem-desc"
@@ -745,7 +833,7 @@ export const PldSettingsManager = () => {
                       onChange={(e) =>
                         setProblemForm({ ...problemForm, description: e.target.value })
                       }
-                      placeholder="Optional context shown while assessing"
+                      placeholder="Optional question or context shown to reps during assessment"
                     />
                     <FieldError message={problemFormErrors.description} />
                   </div>
@@ -907,7 +995,7 @@ export const PldSettingsManager = () => {
                     className="form-label"
                     style={{ margin: 0, cursor: 'pointer' }}
                   >
-                    Requires Qualified PLD
+                    Requires Qualified PLD (pass stage assessment)
                   </label>
                 </div>
 
@@ -929,8 +1017,29 @@ export const PldSettingsManager = () => {
                     className="form-label"
                     style={{ margin: 0, cursor: 'pointer' }}
                   >
-                    Requires a completed assessment
+                    Requires a completed assessment for this stage
                   </label>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label" htmlFor="pld-gate-threshold">
+                    Stage Qualification Threshold (%)
+                  </label>
+                  <input
+                    id="pld-gate-threshold"
+                    type="number"
+                    className="form-control"
+                    min="0"
+                    max="100"
+                    placeholder={`Global default (${config.qualified_min_percentage}%)`}
+                    value={gateForm.qualified_min_percentage}
+                    onChange={(e) =>
+                      setGateForm({ ...gateForm, qualified_min_percentage: e.target.value })
+                    }
+                  />
+                  <p className="text-dim font-sm" style={{ margin: '0.25rem 0 0 0' }}>
+                    Leave blank to inherit the global threshold ({config.qualified_min_percentage}%).
+                  </p>
                 </div>
 
                 <div className="form-group">
@@ -943,7 +1052,7 @@ export const PldSettingsManager = () => {
                     className="form-control"
                     value={gateForm.notes}
                     onChange={(e) => setGateForm({ ...gateForm, notes: e.target.value })}
-                    placeholder="e.g. Must be signed off by a manager"
+                    placeholder="e.g. Must qualify PLD discovery before demo"
                   />
                 </div>
 

@@ -28,8 +28,9 @@ import { IcpQualificationHistory } from '../components/IcpQualificationHistory';
 import { IcpQualificationLauncher } from '../components/IcpQualificationTest';
 import { IcpStatusBadge } from '../components/IcpStatusBadge';
 import { PldAssessmentHistory } from '../components/PldAssessmentHistory';
-import { PldAssessmentLauncher } from '../components/PldAssessmentTest';
+import { PldAssessmentLauncher, PldAssessmentTest } from '../components/PldAssessmentTest';
 import { PldGateChecklist } from '../components/PldGateChecklist';
+import { PldNextAction } from '../components/PldNextAction';
 import { PldStatusBadge } from '../components/PldStatusBadge';
 import '../styles/comments.css';
 
@@ -87,6 +88,13 @@ export const LeadDetails = () => {
   // PLD state
   const [pldState, setPldState] = useState({ gates: [], pld_score: 0, pld_status: 'NOT_ASSESSED', assessment_count: 0 });
   const [pldRefreshToken, setPldRefreshToken] = useState(0);
+  const [pldModalOpen, setPldModalOpen] = useState(false);
+  const [pldModalStageId, setPldModalStageId] = useState(null);
+
+  const openPldAssessment = useCallback((stageId = null) => {
+    setPldModalStageId(stageId);
+    setPldModalOpen(true);
+  }, []);
 
   // Modals state
   const [convertModalOpen, setConvertModalOpen] = useState(false);
@@ -333,8 +341,24 @@ export const LeadDetails = () => {
       showToast(`Stage changed to ${targetStageObj.name}`, 'success');
       fetchLeadDetails();
       fetchTimeline();
+      fetchPldState();
     } catch (err) {
-      showToast(extractErrorMessage(err, 'Stage update failed'), 'error');
+      const errData = err.response?.data;
+      const missingList = errData?.missing || errData?.missing_codes || [];
+      const hasPldMissing =
+        missingList.includes('pld_status') ||
+        missingList.includes('pld_assessment') ||
+        Boolean(errData?.missing_details?.some((m) => m.code === 'pld_status' || m.code === 'pld_assessment'));
+
+      if (hasPldMissing) {
+        showToast(
+          `Stage "${targetStageObj.name}" requires qualifying its PLD assessment first. Please complete the assessment below.`,
+          'warning'
+        );
+        openPldAssessment(targetStageObj.id);
+      } else {
+        showToast(extractErrorMessage(err, 'Stage update failed'), 'error');
+      }
     }
   };
 
@@ -692,6 +716,16 @@ export const LeadDetails = () => {
                   )}
                 </div>
               </div>
+              <PldNextAction
+                lead={lead}
+                stages={stages}
+                pldState={pldState}
+                icpCount={icpCount}
+                onSelectTab={setActiveTab}
+                onMoveStage={handleStageChange}
+                onRunStageAssessment={(stageId) => openPldAssessment(stageId)}
+                onConvert={canConvertLeads && isQualified ? () => setConvertModalOpen(true) : undefined}
+              />
                 <div className="lead-info-item">
                 <span className="lead-info-label">Phone</span>
                 <span className="lead-info-value contact-item">
@@ -879,7 +913,9 @@ export const LeadDetails = () => {
                   leadId={lead.id}
                   leadName={lead.name}
                   companyName={lead.company_name}
+                  stages={stages}
                   onCompleted={handlePldCompleted}
+                  onMoveStage={handleStageChange}
                   buttonLabel={
                     pldState.assessment_count > 0 ? 'Run PLD Assessment Again' : 'Run PLD Assessment'
                   }
@@ -889,7 +925,10 @@ export const LeadDetails = () => {
               <div className="pld-lead-panel-grid">
                 <section className="pld-panel-section">
                   <h3 className="pld-panel-heading">Stage Requirements</h3>
-                  <PldGateChecklist gates={pldState.gates} />
+                  <PldGateChecklist
+                    gates={pldState.gates}
+                    onRunStageAssessment={(stageId) => openPldAssessment(stageId)}
+                  />
                 </section>
 
                 <section className="pld-panel-section pld-panel-section-wide">
@@ -1815,6 +1854,21 @@ export const LeadDetails = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Target Stage PLD Assessment Modal */}
+      {lead && (
+        <PldAssessmentTest
+          isOpen={pldModalOpen}
+          leadId={lead.id}
+          leadName={lead.name}
+          companyName={lead.company_name}
+          initialStageId={pldModalStageId}
+          stages={stages}
+          onClose={() => setPldModalOpen(false)}
+          onCompleted={handlePldCompleted}
+          onMoveStage={handleStageChange}
+        />
       )}
     </div>
   );

@@ -516,3 +516,42 @@ class PLDGateTests(PLDTestBase):
     def test_check_gate_helper_returns_empty_for_ungated(self):
         self.assertEqual(check_gate(self.lead, self.stage_new), [])
         self.assertEqual(check_gate(self.lead, None), [])
+
+    def test_qualifying_stage_a_does_not_unlock_stage_b_with_its_own_pld_questions(self):
+        # Stage A (Contacted) has its own problem
+        prob_a = PLDProblem.objects.create(
+            stage=self.stage_contacted, name='Problem A for Contacted',
+            points=20, severity=PLDSeverity.HIGH, is_active=True, display_order=1,
+        )
+        self.make_gate(self.stage_contacted, require_pld_qualified=True)
+
+        # Stage B (Qualified) has its own problem
+        prob_b = PLDProblem.objects.create(
+            stage=self.stage_qualified, name='Problem B for Qualified',
+            points=30, severity=PLDSeverity.CRITICAL, is_active=True, display_order=1,
+        )
+        self.make_gate(self.stage_qualified, require_pld_qualified=True)
+
+        # Qualify Contacted PLD assessment
+        submit_assessment(self.lead, self.sales, [prob_a.id], stage=self.stage_contacted)
+
+        # Moving to Contacted should now be allowed
+        self.assertEqual(check_gate(self.lead, self.stage_contacted), [])
+
+        # BUT moving to Qualified should STILL BE BLOCKED because Qualified has its own assessment!
+        missing_qualified = check_gate(self.lead, self.stage_qualified)
+        self.assertTrue(len(missing_qualified) > 0)
+        self.assertEqual(missing_qualified[0]['code'], 'pld_status')
+        self.assertIn('Qualified', missing_qualified[0]['message'])
+
+        # Now qualify the assessment specifically for Qualified stage
+        submit_assessment(self.lead, self.sales, [prob_b.id], stage=self.stage_qualified)
+
+        # Now Qualified gate should also pass!
+        self.assertEqual(check_gate(self.lead, self.stage_qualified), [])
+
+    def test_moving_to_lost_is_not_blocked_by_pld_gates(self):
+        stage_lost, _ = LeadStage.objects.get_or_create(slug='lost', defaults={'name': 'Lost', 'is_active': True})
+        self.make_gate(stage_lost, require_pld_qualified=True)
+        # Check gate should return empty for lost stage
+        self.assertEqual(check_gate(self.lead, stage_lost), [])

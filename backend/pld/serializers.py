@@ -23,11 +23,16 @@ class UserRefSerializer(serializers.ModelSerializer):
 
 class PLDProblemSerializer(serializers.ModelSerializer):
     created_by_details = UserRefSerializer(source='created_by', read_only=True)
+    stage_name = serializers.CharField(source='stage.name', read_only=True)
+    stage_slug = serializers.CharField(source='stage.slug', read_only=True)
 
     class Meta:
         model = PLDProblem
         fields = [
             'id',
+            'stage',
+            'stage_name',
+            'stage_slug',
             'name',
             'description',
             'points',
@@ -39,31 +44,45 @@ class PLDProblemSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'created_by', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'stage_name', 'stage_slug', 'created_by', 'created_at', 'updated_at']
 
 
 class PLDProblemCreateUpdateSerializer(serializers.ModelSerializer):
+    stage = serializers.PrimaryKeyRelatedField(
+        queryset=LeadStage.objects.all(),
+        required=False,
+        allow_null=True,
+    )
     display_order = serializers.IntegerField(required=False, min_value=1)
     points = serializers.IntegerField(required=True, min_value=0, max_value=10000)
 
     class Meta:
         model = PLDProblem
-        fields = ['name', 'description', 'points', 'severity', 'is_active', 'display_order']
+        fields = ['stage', 'name', 'description', 'points', 'severity', 'is_active', 'display_order']
 
     def validate_name(self, value):
         value = value.strip()
         if not value:
             raise serializers.ValidationError('Problem name is required.')
-        queryset = PLDProblem.objects.filter(name__iexact=value)
-        if self.instance:
-            queryset = queryset.exclude(pk=self.instance.pk)
-        if queryset.exists():
-            raise serializers.ValidationError('A problem with this name already exists.')
         return value
+
+    def validate(self, attrs):
+        name = attrs.get('name') or getattr(self.instance, 'name', '')
+        if name:
+            name = name.strip()
+            stage = attrs.get('stage') if 'stage' in attrs else getattr(self.instance, 'stage', None)
+            qs = PLDProblem.objects.filter(name__iexact=name, stage=stage)
+            if self.instance:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                stage_str = f" for stage '{stage.name}'" if stage else ""
+                raise serializers.ValidationError({'name': f'A problem with this name already exists{stage_str}.'})
+        return attrs
 
     def create(self, validated_data):
         if not validated_data.get('display_order'):
-            last = PLDProblem.objects.order_by('-display_order', '-id').values_list(
+            stage = validated_data.get('stage')
+            last = PLDProblem.objects.filter(stage=stage).order_by('-display_order', '-id').values_list(
                 'display_order', flat=True
             ).first()
             validated_data['display_order'] = (last or 0) + 1
@@ -88,6 +107,7 @@ class PLDScoringConfigSerializer(serializers.ModelSerializer):
 class PLDStageGateSerializer(serializers.ModelSerializer):
     stage_name = serializers.CharField(source='stage.name', read_only=True)
     stage_slug = serializers.CharField(source='stage.slug', read_only=True)
+    qualified_min_percentage = serializers.IntegerField(required=False, allow_null=True, min_value=0, max_value=100)
 
     class Meta:
         model = PLDStageGate
@@ -99,6 +119,7 @@ class PLDStageGateSerializer(serializers.ModelSerializer):
             'require_icp_min_status',
             'require_pld_qualified',
             'require_problems_assessed',
+            'qualified_min_percentage',
             'notes',
             'updated_at',
         ]
@@ -127,13 +148,29 @@ class PLDAssessmentProblemSerializer(serializers.ModelSerializer):
 
 class PLDAssessmentListSerializer(serializers.ModelSerializer):
     lead_name = serializers.CharField(source='lead.name', read_only=True)
+    stage_name = serializers.CharField(source='stage.name', read_only=True)
+    stage_slug = serializers.CharField(source='stage.slug', read_only=True)
     assessed_by_details = UserRefSerializer(source='assessed_by', read_only=True)
     pld_status_display = serializers.CharField(source='get_pld_status_display', read_only=True)
 
     class Meta:
         model = PLDAssessment
-        fields = ['id', 'lead', 'lead_name', 'assessed_by', 'assessed_by_details', 'total_score',
-                  'max_score', 'percentage', 'pld_status', 'pld_status_display', 'assessed_at']
+        fields = [
+            'id',
+            'lead',
+            'lead_name',
+            'stage',
+            'stage_name',
+            'stage_slug',
+            'assessed_by',
+            'assessed_by_details',
+            'total_score',
+            'max_score',
+            'percentage',
+            'pld_status',
+            'pld_status_display',
+            'assessed_at',
+        ]
         read_only_fields = fields
 
 
@@ -152,9 +189,10 @@ class PLDAssessmentDetailSerializer(PLDAssessmentListSerializer):
 
 
 class PLDAssessSubmitSerializer(serializers.Serializer):
-    """Only the raw problem ids are accepted. Scores are always computed server-side."""
+    """Problem IDs and optional target stage ID."""
 
     problem_ids = serializers.ListField(child=serializers.IntegerField(), allow_empty=True)
+    stage_id = serializers.IntegerField(required=False, allow_null=True)
 
 
 class LeadStageTargetSerializer(serializers.Serializer):

@@ -246,3 +246,18 @@ class CRMTools:
             "phone": target.phone or "",
             "is_active": target.is_active,
         }
+
+    @staticmethod
+    def get_team_members(limit: int = 25) -> List[Dict[str, Any]]:
+        """Retrieve active team members for assignment context."""
+        from accounts.models import User
+        users = User.objects.filter(is_active=True).order_by('role', 'first_name')[:limit]
+        return [
+            {
+                "id": u.id,
+                "email": u.email,
+                "name": u.get_full_name() or u.email,
+                "role": u.role,
+            }
+            for u in users
+        ]

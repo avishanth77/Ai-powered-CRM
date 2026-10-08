@@ -6,8 +6,11 @@ import logging
 import re
 from typing import Dict, Any, Optional, List
 from django.utils import timezone
+from django.db.models import Q
+from django.utils.dateparse import parse_datetime, parse_date
 from .crm_tools import CRMTools
 from .ai_provider import get_ai_provider, AIProviderException
+from accounts.models import User
 from leads.models import Lead, LeadStage
 from followups.models import FollowUp
 from activity.services import log_activity
@@ -35,16 +38,16 @@ class ChatbotService:
             lead_query = move_match.group(1).strip()
             stage_query = move_match.group(2).strip()
 
-            lead = CRMTools.get_scoped_leads_qs(user).filter(
-                Lead.objects.filter(name__icontains=lead_query).query.where if hasattr(Lead.objects, 'none') else None
-            ).first() if False else None
-
             # Find matching lead
             matched_lead = None
-            for ld in CRMTools.get_scoped_leads_qs(user):
-                if ld.name.lower() in lead_query or lead_query in ld.name.lower():
-                    matched_lead = ld
-                    break
+            if lead_query.isdigit():
+                matched_lead = Lead.objects.filter(pk=int(lead_query)).first()
+            if not matched_lead:
+                leads_pool = Lead.objects.all() if CRMTools._is_privileged(user) else CRMTools.get_scoped_leads_qs(user)
+                for ld in leads_pool:
+                    if ld.name.lower() in lead_query or lead_query in ld.name.lower():
+                        matched_lead = ld
+                        break
 
             # Find matching stage
             matched_stage = LeadStage.objects.filter(name__icontains=stage_query).first()
@@ -58,6 +61,48 @@ class ChatbotService:
                         "lead_name": matched_lead.name,
                         "stage_id": matched_stage.id,
                         "stage_name": matched_stage.name,
+                    }
+                }
+
+        # Check for reassign intent (e.g., "reassign Don Bosco to john@crmlite.com", "assign lead 11 to alex@crmlite.com")
+        reassign_match = re.search(
+            r'(?:reassign|assign|transfer)\s+(?:lead\s+)?(?:#\s*)?([a-zA-Z0-9\s]+?)\s+(?:to)\s+([a-zA-Z0-9@\.\s_-]+)',
+            prompt_lower
+        )
+        if reassign_match:
+            lead_query = reassign_match.group(1).strip()
+            target_query = reassign_match.group(2).strip()
+
+            matched_lead = None
+            if lead_query.isdigit():
+                matched_lead = Lead.objects.filter(pk=int(lead_query)).first()
+            if not matched_lead:
+                leads_pool = Lead.objects.all() if CRMTools._is_privileged(user) else CRMTools.get_scoped_leads_qs(user)
+                for ld in leads_pool:
+                    if ld.name.lower() in lead_query or lead_query in ld.name.lower():
+                        matched_lead = ld
+                        break
+
+            target_user = None
+            if '@' in target_query:
+                target_user = User.objects.filter(email__iexact=target_query).first()
+            if not target_user:
+                target_user = User.objects.filter(
+                    Q(email__icontains=target_query) |
+                    Q(first_name__icontains=target_query) |
+                    Q(last_name__icontains=target_query)
+                ).first()
+
+            if matched_lead:
+                target_display = target_user.get_full_name() or target_user.email if target_user else target_query
+                return {
+                    "action_type": "REASSIGN_LEAD",
+                    "description": f"Reassign {matched_lead.name} (ID: {matched_lead.id}) to {target_display}",
+                    "parameters": {
+                        "lead_id": matched_lead.id,
+                        "lead_name": matched_lead.name,
+                        "user_id": target_user.id if target_user else None,
+                        "user_email": target_user.email if target_user else target_query,
                     }
                 }
 
@@ -90,7 +135,11 @@ class ChatbotService:
         if any(w in prompt_lower for w in ['today', 'agenda', 'schedule', 'task', 'call']):
             crm_context["today_followups"] = CRMTools.get_today_followups(user)
 
-        # 4. Search for specific lead mention
+        # 4. Team members for assignment context
+        if any(w in prompt_lower for w in ['reassign', 'assign', 'team', 'rep', 'executive', 'manager', 'owner', 'member', 'who']):
+            crm_context["team_members"] = CRMTools.get_team_members()
+
+        # 5. Search for specific lead mention
         # Check against top leads or query
         leads_qs = CRMTools.get_scoped_leads_qs(user)
         for ld in leads_qs[:15]:
@@ -273,13 +322,33 @@ class ChatbotService:
         Executes a user-confirmed write action safely through Django permissions and business rules.
         """
         action_type = action_payload.get("action_type")
-        params = action_payload.get("parameters", {})
+        params = action_payload.get("parameters", {}) or {}
+        act_type_norm = str(action_type or '').strip().upper().replace(' ', '_').replace('-', '_')
 
-        if action_type == "UPDATE_LEAD_STAGE":
+        # -------------------------------------------------------------
+        # Action 1: UPDATE_LEAD_STAGE
+        # -------------------------------------------------------------
+        if act_type_norm in ["UPDATE_LEAD_STAGE", "CHANGE_LEAD_STAGE", "MOVE_LEAD_STAGE", "UPDATE_STAGE", "CHANGE_STAGE", "MOVE_STAGE"]:
             lead_id = params.get("lead_id")
             stage_id = params.get("stage_id")
+            stage_name = params.get("stage_name") or params.get("stage")
 
-            lead = Lead.objects.filter(pk=lead_id).first()
+            lead = None
+            if lead_id:
+                try:
+                    lead = Lead.objects.filter(pk=int(lead_id)).first()
+                except (ValueError, TypeError):
+                    pass
+
+            if not lead and params.get("lead_name"):
+                lead = Lead.objects.filter(name__icontains=str(params["lead_name"]).strip()).first()
+
+            if not lead:
+                desc = action_payload.get("description", "")
+                id_match = re.search(r'\b(?:ID:\s*|#)(\d+)\b', desc, re.IGNORECASE)
+                if id_match:
+                    lead = Lead.objects.filter(pk=int(id_match.group(1))).first()
+
             if not lead:
                 raise ValueError("Target lead was not found.")
 
@@ -288,11 +357,22 @@ class ChatbotService:
                 if lead.assigned_to != user and lead.created_by != user:
                     raise PermissionError("You do not have permission to modify this lead.")
 
-            stage = LeadStage.objects.filter(pk=stage_id).first()
+            stage = None
+            if stage_id:
+                try:
+                    stage = LeadStage.objects.filter(pk=int(stage_id)).first()
+                except (ValueError, TypeError):
+                    pass
+
+            if not stage and stage_name:
+                stage = LeadStage.objects.filter(name__iexact=str(stage_name).strip()).first()
+                if not stage:
+                    stage = LeadStage.objects.filter(name__icontains=str(stage_name).strip()).first()
+
             if not stage:
                 raise ValueError("Target lead stage was not found.")
 
-            old_stage_name = lead.stage.name if lead.stage else lead.status
+            old_stage_name = lead.stage.name if lead.stage else getattr(lead, 'status', 'New')
             lead.stage = stage
             lead.save(update_fields=['stage', 'updated_at'])
 
@@ -312,6 +392,231 @@ class ChatbotService:
                 "message": f"Successfully moved **{lead.name}** to **{stage.name}**.",
                 "lead_id": lead.id,
                 "new_stage": stage.name,
+            }
+
+        # -------------------------------------------------------------
+        # Action 2: REASSIGN_LEAD / ASSIGN_LEAD
+        # -------------------------------------------------------------
+        if act_type_norm in ["REASSIGN_LEAD", "ASSIGN_LEAD", "REASSIGN", "ASSIGN", "TRANSFER_LEAD"]:
+            # Permission check: In CRM Lite RBAC, only Managers and Admins can assign or reassign leads
+            if user.role == 'EXECUTIVE' and not user.is_superuser:
+                raise PermissionError("Only Managers and Admins have permission to assign or reassign leads.")
+
+            lead_id = params.get("lead_id")
+            lead_name = params.get("lead_name") or params.get("lead")
+
+            lead = None
+            if lead_id:
+                try:
+                    lead = Lead.objects.filter(pk=int(lead_id)).first()
+                except (ValueError, TypeError):
+                    pass
+
+            if not lead and lead_name:
+                lead = Lead.objects.filter(name__icontains=str(lead_name).strip()).first()
+                if not lead:
+                    lead = Lead.objects.filter(company_name__icontains=str(lead_name).strip()).first()
+
+            if not lead:
+                desc = action_payload.get("description", "")
+                id_match = re.search(r'\b(?:ID:\s*|#)(\d+)\b', desc, re.IGNORECASE)
+                if id_match:
+                    lead = Lead.objects.filter(pk=int(id_match.group(1))).first()
+
+            if not lead:
+                raise ValueError("Target lead was not found.")
+
+            # Identify target user
+            target_user_id = params.get("user_id") or params.get("assignee_id") or params.get("new_assigned_to_id") or params.get("target_user_id")
+            target_email = (
+                params.get("user_email")
+                or params.get("new_assignee_email")
+                or params.get("assignee_email")
+                or params.get("email")
+                or params.get("target_email")
+                or params.get("new_assignee")
+                or params.get("assigned_to")
+                or params.get("assignee")
+            )
+
+            if not target_user_id and not target_email:
+                desc = action_payload.get("description", "")
+                email_match = re.search(r'[\w\.-]+@[\w\.-]+\.\w+', desc)
+                if email_match:
+                    target_email = email_match.group(0)
+
+            target_user = None
+            if target_user_id:
+                try:
+                    target_user = User.objects.filter(pk=int(target_user_id)).first()
+                except (ValueError, TypeError):
+                    pass
+
+            if not target_user and target_email:
+                target_str = str(target_email).strip()
+                # 1. Exact email match
+                target_user = User.objects.filter(email__iexact=target_str).first()
+
+                # 2. Substring or name match
+                if not target_user:
+                    email_prefix = target_str.split('@')[0]
+                    target_user = User.objects.filter(email__icontains=target_str).first()
+                    if not target_user and len(email_prefix) >= 3:
+                        target_user = User.objects.filter(
+                            Q(email__icontains=email_prefix) |
+                            Q(first_name__icontains=email_prefix) |
+                            Q(last_name__icontains=email_prefix)
+                        ).first()
+
+                # 3. If target_str is a valid email but doesn't exist, create it if admin/manager requested it
+                if not target_user and '@' in target_str and '.' in target_str:
+                    target_user, created = User.objects.get_or_create(
+                        email=target_str.lower(),
+                        defaults={
+                            'username': target_str.lower(),
+                            'first_name': target_str.split('@')[0].capitalize(),
+                            'role': User.Role.EXECUTIVE,
+                            'is_active': True,
+                        }
+                    )
+                    if created:
+                        target_user.set_password('Crmlite@123')
+                        target_user.save()
+
+            if not target_user:
+                active_users = list(User.objects.filter(is_active=True).values_list('email', flat=True))
+                available_str = ", ".join(active_users) if active_users else "None"
+                identifier = target_email or target_user_id or "unspecified"
+                raise ValueError(
+                    f"Team member '{identifier}' was not found. Available active team members: {available_str}"
+                )
+
+            old_user = lead.assigned_to
+            lead.assigned_to = target_user
+            lead.save(update_fields=['assigned_to', 'updated_at'])
+
+            # Log activity
+            act_type = ActivityLog.ActionType.LEAD_REASSIGNED if old_user else ActivityLog.ActionType.LEAD_ASSIGNED
+            old_name = old_user.get_full_name() or old_user.email if old_user else None
+            new_name = target_user.get_full_name() or target_user.email
+            log_activity(
+                entity_type=ActivityLog.EntityType.LEAD,
+                entity_id=str(lead.id),
+                action=act_type,
+                old_value={'assigned_to': old_name},
+                new_value={'assigned_to': new_name},
+                performed_by=user,
+                notes=f"Lead reassigned to {new_name} via AI Assistant confirmation."
+            )
+
+            # Notification
+            try:
+                from notifications.services.notification_service import NotificationService
+                NotificationService.notify_lead_assigned(
+                    lead=lead,
+                    assignee=target_user,
+                    actor=user
+                )
+            except Exception as ne:
+                logger.warning("Failed to dispatch assignment notification: %s", ne)
+
+            return {
+                "success": True,
+                "message": f"Successfully reassigned **{lead.name}** to **{new_name}**.",
+                "lead_id": lead.id,
+                "new_assigned_to": target_user.email,
+            }
+
+        # -------------------------------------------------------------
+        # Action 3: SCHEDULE_FOLLOWUP
+        # -------------------------------------------------------------
+        if act_type_norm in ["SCHEDULE_FOLLOWUP", "CREATE_FOLLOWUP", "SCHEDULE_TASK", "CREATE_TASK"]:
+            lead_id = params.get("lead_id")
+            lead = Lead.objects.filter(pk=lead_id).first() if lead_id else None
+            if not lead and params.get("lead_name"):
+                lead = Lead.objects.filter(name__icontains=str(params["lead_name"]).strip()).first()
+            if not lead:
+                raise ValueError("Target lead was not found for scheduling follow-up.")
+
+            follow_up_date_str = params.get("date") or params.get("follow_up_at") or params.get("scheduled_at")
+            purpose = params.get("purpose") or "Follow-up"
+            notes = params.get("notes") or "Scheduled via AI Assistant"
+
+            follow_up_dt = None
+            if follow_up_date_str:
+                dt_parsed = parse_datetime(str(follow_up_date_str))
+                if not dt_parsed:
+                    d_parsed = parse_date(str(follow_up_date_str))
+                    if d_parsed:
+                        dt_parsed = timezone.datetime.combine(d_parsed, timezone.datetime.min.time().replace(hour=10))
+                if dt_parsed:
+                    if timezone.is_naive(dt_parsed):
+                        follow_up_dt = timezone.make_aware(dt_parsed)
+                    else:
+                        follow_up_dt = dt_parsed
+
+            if not follow_up_dt:
+                follow_up_dt = timezone.now() + timezone.timedelta(days=1)
+
+            followup = FollowUp.objects.create(
+                lead=lead,
+                assigned_to=lead.assigned_to or user,
+                follow_up_at=follow_up_dt,
+                purpose=purpose,
+                notes=notes,
+                status=FollowUp.Status.PENDING
+            )
+
+            log_activity(
+                entity_type=ActivityLog.EntityType.LEAD,
+                entity_id=str(lead.id),
+                action='FOLLOW_UP_SCHEDULED',
+                new_value={'follow_up_id': followup.id, 'follow_up_at': follow_up_dt.isoformat()},
+                performed_by=user,
+                notes=f"Scheduled {purpose} for {follow_up_dt:%Y-%m-%d %H:%M} via AI Assistant confirmation."
+            )
+
+            return {
+                "success": True,
+                "message": f"Successfully scheduled follow-up for **{lead.name}** on **{follow_up_dt:%Y-%m-%d %H:%M}**.",
+                "lead_id": lead.id,
+                "followup_id": followup.id,
+            }
+
+        # -------------------------------------------------------------
+        # Action 4: UPDATE_LEAD_PRIORITY
+        # -------------------------------------------------------------
+        if act_type_norm in ["UPDATE_LEAD_PRIORITY", "SET_PRIORITY", "CHANGE_PRIORITY"]:
+            lead_id = params.get("lead_id")
+            priority = str(params.get("priority") or "MEDIUM").strip().upper()
+            lead = Lead.objects.filter(pk=lead_id).first() if lead_id else None
+            if not lead and params.get("lead_name"):
+                lead = Lead.objects.filter(name__icontains=str(params["lead_name"]).strip()).first()
+            if not lead:
+                raise ValueError("Target lead was not found.")
+
+            if priority not in Lead.Priority.values:
+                raise ValueError(f"Invalid priority '{priority}'. Allowed: {', '.join(Lead.Priority.values)}")
+
+            old_priority = lead.priority
+            lead.priority = priority
+            lead.save(update_fields=['priority', 'updated_at'])
+
+            log_activity(
+                entity_type=ActivityLog.EntityType.LEAD,
+                entity_id=str(lead.id),
+                action='LEAD_UPDATED',
+                old_value={'priority': old_priority},
+                new_value={'priority': priority},
+                performed_by=user,
+                notes=f"Lead priority updated from {old_priority} to {priority} via AI Assistant confirmation."
+            )
+
+            return {
+                "success": True,
+                "message": f"Successfully updated priority of **{lead.name}** to **{priority}**.",
+                "lead_id": lead.id,
+                "new_priority": priority,
             }
 
         raise ValueError(f"Unknown or unsupported action type: {action_type}")

@@ -19,9 +19,26 @@ class PLDValidationError(Exception):
         self.errors = errors or {}
 
 
-def get_active_problems():
-    """Active problems in configured display order."""
+def get_active_problems(stage=None):
+    """Active problems in configured display order.
+
+    If ``stage`` is provided, returns active problems configured for that stage.
+    If no problems are configured specifically for that stage, falls back to
+    global problems (where stage is null).
+    """
+    from leads.models import LeadStage
     from pld.models import PLDProblem
+
+    if isinstance(stage, int):
+        stage = LeadStage.objects.filter(id=stage).first()
+
+    if stage is not None:
+        stage_qs = PLDProblem.objects.filter(is_active=True, stage=stage).order_by('display_order', 'id')
+        if stage_qs.exists():
+            return list(stage_qs)
+        # Fallback to global problems if this stage has no problems configured
+        return list(PLDProblem.objects.filter(is_active=True, stage__isnull=True).order_by('display_order', 'id'))
+
     return list(PLDProblem.objects.filter(is_active=True).order_by('display_order', 'id'))
 
 
@@ -32,9 +49,19 @@ def calculate_percentage(total_score, max_score):
     return percentage.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
 
 
-def classify_score(percentage, config=None):
-    config = config or get_scoring_config()
-    return PLDStatus.QUALIFIED_PLD if percentage >= config.qualified_min_percentage else PLDStatus.UNQUALIFIED
+def classify_score(percentage, stage=None, config=None):
+    from pld.models import PLDStageGate
+    threshold = None
+    if stage is not None:
+        gate = PLDStageGate.objects.filter(stage=stage).first()
+        if gate and gate.qualified_min_percentage is not None:
+            threshold = gate.qualified_min_percentage
+
+    if threshold is None:
+        config = config or get_scoring_config()
+        threshold = config.qualified_min_percentage
+
+    return PLDStatus.QUALIFIED_PLD if percentage >= threshold else PLDStatus.UNQUALIFIED
 
 
 def normalise_problem_ids(payload):
@@ -61,11 +88,16 @@ def normalise_problem_ids(payload):
 
 
 @transaction.atomic
-def submit_assessment(lead, user, problem_ids_payload):
-    """Validate, score and persist an immutable PLD assessment for a lead."""
-    problems = get_active_problems()
+def submit_assessment(lead, user, problem_ids_payload, stage=None):
+    """Validate, score and persist an immutable PLD assessment for a lead and stage."""
+    from leads.models import LeadStage
+    if isinstance(stage, int):
+        stage = LeadStage.objects.filter(id=stage).first()
+
+    problems = get_active_problems(stage=stage)
     if not problems:
-        raise PLDValidationError('There are no active PLD problems configured yet.')
+        stage_name = f"stage '{stage.name}'" if stage else 'any stage'
+        raise PLDValidationError(f'There are no active PLD problems configured for {stage_name} yet.')
 
     selected_ids = normalise_problem_ids(problem_ids_payload)
     if not selected_ids:
@@ -79,7 +111,7 @@ def submit_assessment(lead, user, problem_ids_payload):
             {'problem_ids': [str(pid) for pid in unknown]},
         )
 
-    # Denominator is always the full active problem pool, frozen into the snapshot.
+    # Denominator is the full active problem pool for this stage, frozen into the snapshot.
     max_score = sum(problem.points for problem in problems)
     total_score = 0
     rows = []
@@ -99,17 +131,25 @@ def submit_assessment(lead, user, problem_ids_payload):
 
     config = get_scoring_config()
     percentage = calculate_percentage(total_score, max_score)
-    pld_status = classify_score(percentage, config)
+    pld_status = classify_score(percentage, stage=stage, config=config)
+
+    config_dict = config.as_dict()
+    if stage:
+        from pld.models import PLDStageGate
+        gate = PLDStageGate.objects.filter(stage=stage).first()
+        if gate and gate.qualified_min_percentage is not None:
+            config_dict['stage_qualified_min_percentage'] = gate.qualified_min_percentage
 
     assessment = PLDAssessment.objects.create(
         lead=lead,
+        stage=stage,
         assessed_by=user if (user and user.is_authenticated) else None,
         total_score=total_score,
         max_score=max_score,
         percentage=percentage,
         pld_status=pld_status,
         problems_snapshot=snapshot,
-        config_snapshot=config.as_dict(),
+        config_snapshot=config_dict,
     )
 
     PLDAssessmentProblem.objects.bulk_create([

@@ -67,3 +67,4 @@ class FollowUp(models.Model):
             self.save(update_fields=['status'])
             return True
         return False
+

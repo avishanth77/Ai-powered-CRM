@@ -8,6 +8,7 @@ import { LEAD_STATUS_CONFIG } from '../utils/constants';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { PriorityBadge } from '../components/PriorityBadge';
 import { LostReasonModal } from '../components/LostReasonModal';
+import { PldAssessmentTest } from '../components/PldAssessmentTest';
 import { Kanban, Plus, ChevronLeft, ChevronRight, LayoutGrid, GripVertical } from 'lucide-react';
 
 export const Pipeline = () => {
@@ -19,6 +20,7 @@ export const Pipeline = () => {
   const [movingLeadId, setMovingLeadId] = useState(null);
   const [lostModalData, setLostModalData] = useState(null);
   const [lostSubmitting, setLostSubmitting] = useState(false);
+  const [pldModalData, setPldModalData] = useState(null);
 
   // Drag and Drop state & refs
   const [draggedLead, setDraggedLead] = useState(null);
@@ -165,7 +167,38 @@ export const Pipeline = () => {
       if (previousData) {
         setPipelineData(previousData);
       }
-      showToast(extractErrorMessage(err, 'Move failed'), 'error');
+      const errData = err.response?.data;
+      const missingList = errData?.missing || errData?.missing_codes || [];
+      const hasPldMissing =
+        missingList.includes('pld_status') ||
+        missingList.includes('pld_assessment') ||
+        Boolean(errData?.missing_details?.some((m) => m.code === 'pld_status' || m.code === 'pld_assessment'));
+
+      if (hasPldMissing) {
+        let leadObj = null;
+        if (pipelineData) {
+          for (const col of Object.values(pipelineData)) {
+            const found = col.leads?.find((l) => l.id === leadId);
+            if (found) {
+              leadObj = found;
+              break;
+            }
+          }
+        }
+        showToast(
+          `Stage "${targetStageObj?.label || targetStage}" requires qualifying its PLD assessment first. Please complete the assessment below.`,
+          'warning'
+        );
+        setPldModalData({
+          leadId,
+          leadName: leadObj?.name || `Lead #${leadId}`,
+          companyName: leadObj?.company_name || '',
+          stageId: targetStageId,
+          stageName: targetStageObj?.label || targetStage,
+        });
+      } else {
+        showToast(extractErrorMessage(err, 'Move failed'), 'error');
+      }
     } finally {
       setMovingLeadId(null);
     }
@@ -732,6 +765,38 @@ export const Pipeline = () => {
         onConfirm={handleConfirmLost}
         onCancel={handleCancelLost}
       />
+
+      {/* Stage-Specific PLD Assessment Modal */}
+      {pldModalData && (
+        <PldAssessmentTest
+          isOpen={Boolean(pldModalData)}
+          leadId={pldModalData.leadId}
+          leadName={pldModalData.leadName}
+          companyName={pldModalData.companyName}
+          initialStageId={pldModalData.stageId}
+          stages={Object.entries(pipelineData || {}).map(([key, col]) => ({
+            id: col.id,
+            name: col.label || key,
+            slug: key,
+          }))}
+          onClose={() => setPldModalData(null)}
+          onCompleted={() => {
+            fetchPipeline();
+          }}
+          onMoveStage={async (targetStageId) => {
+            const currentLeadId = pldModalData?.leadId;
+            setPldModalData(null);
+            if (!currentLeadId) return;
+            try {
+              await leadApi.updateLead(currentLeadId, { stage: targetStageId });
+              showToast('Lead qualified and moved to target stage!', 'success');
+              fetchPipeline();
+            } catch (e) {
+              showToast(extractErrorMessage(e, 'Stage move failed'), 'error');
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

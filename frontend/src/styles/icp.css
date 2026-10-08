@@ -143,6 +143,20 @@
   flex-direction: column;
 }
 
+/* The form owns the space below the header so the question list scrolls and
+   the action footer (Back / Submit) stays pinned instead of being pushed
+   outside the modal on longer tests. */
+.icp-test-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.icp-test-form .modal-footer {
+  flex-shrink: 0;
+}
+
 .icp-progress {
   padding: 0.9rem 1.5rem;
   border-bottom: 1px solid var(--border-subtle);
@@ -174,6 +188,7 @@
 .icp-questions-body {
   overflow-y: auto;
   flex: 1;
+  min-height: 0;
 }
 
 .icp-question {

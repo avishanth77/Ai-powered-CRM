@@ -340,6 +340,9 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
                               + ' '.join(item['message'] for item in missing)],
                     'missing': [item['code'] for item in missing],
                     'missing_messages': [item['message'] for item in missing],
+                    'missing_details': missing,
+                    'target_stage_id': stage_val.id,
+                    'target_stage_name': stage_val.name,
                 })
 
         # Role-based validation for assignment

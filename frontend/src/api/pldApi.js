@@ -58,16 +58,20 @@ export const pldApi = {
   },
 
   // Lead scoped assessment + history + gates
-  getLeadPld: async (leadId) => {
-    const response = await api.get(`/api/leads/${leadId}/pld/`);
+  getLeadPld: async (leadId, params = {}) => {
+    const queryParams = typeof params === 'object' ? params : { stage: params };
+    const response = await api.get(`/api/leads/${leadId}/pld/`, { params: queryParams });
     return response.data;
   },
-  submitAssessment: async (leadId, problemIds) => {
-    const response = await api.post(`/api/leads/${leadId}/pld/assess/`, { problem_ids: problemIds });
+  submitAssessment: async (leadId, problemIds, stageId = null) => {
+    const payload = { problem_ids: problemIds };
+    if (stageId) payload.stage_id = stageId;
+    const response = await api.post(`/api/leads/${leadId}/pld/assess/`, payload);
     return response.data;
   },
-  getAssessmentHistory: async (leadId) => {
-    const response = await api.get(`/api/leads/${leadId}/pld/history/`);
+  getAssessmentHistory: async (leadId, params = {}) => {
+    const queryParams = typeof params === 'object' ? params : { stage: params };
+    const response = await api.get(`/api/leads/${leadId}/pld/history/`, { params: queryParams });
     return { ...response.data, results: asList(response.data) };
   },
   getAssessment: async (assessmentId) => {

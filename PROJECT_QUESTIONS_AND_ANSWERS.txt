@@ -1,0 +1,428 @@
+================================================================================
+CRM LITE — COMPREHENSIVE PROJECT QUESTIONS & ANSWERS (PROJECT Q&A)
+================================================================================
+Document Version : 1.0.0
+Project          : CRM Lite — Customer Follow-Up & Lead Management Web App
+Scope            : Detailed technical and functional questions & answers 
+                   covering every feature, architecture component, database 
+                   model, security rule, and business workflow.
+================================================================================
+
+TABLE OF CONTENTS
+-----------------
+Section 1 : Project Overview, Business Domain & Architecture
+Section 2 : Technology Stack & Engineering Choices
+Section 3 : Sales Pipeline Lifecycle & Deal Flow
+Section 4 : Atomic Customer Conversion & Transaction Safety
+Section 5 : Role-Based Access Control (RBAC) & Security Enforcement
+Section 6 : Smart Follow-Up Engine & Overdue Detection
+Section 7 : Communication Audit Trail & Activity Logging
+Section 8 : Real-Time KPI Dashboards & Reporting Analytics
+Section 9 : FastAPI Federated Search Microservice
+Section 10: Authentication, JWT Lifecycles & Axios Interceptors
+Section 11: Artificial Intelligence (AI) Features & Provider Integration
+Section 12: Data Integrity, Constraints & Model Validators
+Section 13: Automated Testing & Deployment Readiness
+
+
+================================================================================
+SECTION 1: PROJECT OVERVIEW, BUSINESS DOMAIN & ARCHITECTURE
+================================================================================
+
+Q1.1: What is CRM Lite and what primary business problem does it solve?
+A1.1: 
+CRM Lite is a production-grade Customer Relationship Management (CRM) web 
+application engineered for B2B sales teams. It solves the critical operational 
+challenges of pipeline opacity, missed follow-ups, lost deal context, and 
+unauthorized deal modifications. 
+
+It provides:
+  - An interactive visual Kanban sales pipeline.
+  - A smart follow-up scheduling engine with automatic overdue detection.
+  - An immutable communication audit trail for calls, meetings, and WhatsApp logs.
+  - ACID-compliant atomic customer conversion preventing orphan records.
+  - Role-based data access separating sales reps, managers, and administrators.
+  - Real-time KPI analytics calculating conversion rates and expected values.
+  - Multimodal AI voice transcription, call intelligence, and CRM copilot.
+
+Q1.2: What is the high-level system architecture of CRM Lite?
+A1.2:
+The system uses a decoupled client-server architecture:
+  1. Frontend Client: Single Page Application (SPA) built with React 19 and Vite,
+     communicating over HTTP using Axios with JWT Bearer authentication.
+  2. Main Backend: Django 6.x and Django REST Framework (DRF) running on port 8000,
+     encapsulating all business logic, ORM models, validation, and permissions.
+  3. Relational Database: PostgreSQL (production) or SQLite (zero-config local dev).
+  4. Search Microservice: FastAPI running on port 8001 providing ultra-low-latency 
+     federated global search across prospects and customers.
+  5. AI Service Layer: Google GenAI SDK integration (`gemini-2.5-flash`) for 
+     multimodal speech-to-text call transcription, deal summarization, and chat.
+
+
+================================================================================
+SECTION 2: TECHNOLOGY STACK & ENGINEERING CHOICES
+================================================================================
+
+Q2.1: Why was Django & Django REST Framework (DRF) chosen for the backend?
+A2.1:
+  - Built-in ORM with robust ACID transaction management (`transaction.atomic()`).
+  - Strict declarative validation through DRF Serializers.
+  - Pluggable authentication and permission architecture (`BasePermission`).
+  - Battle-tested migration framework ensuring seamless database schema evolution.
+  - Built-in OpenAPI 3.0 documentation support via `drf-spectacular` (Swagger UI).
+  - High developer velocity and strong enterprise reliability.
+
+Q2.2: Why React 19 + Vite instead of Next.js or a traditional server-rendered template?
+A2.2:
+CRM Lite is an internal, authenticated, high-interaction SaaS dashboard where 
+SEO is irrelevant. A Client-Side Rendered (CSR) SPA with React 19 and Vite offers:
+  - Instantaneous client-side page transitions without page reloads.
+  - Sub-second Hot Module Replacement (HMR) and fast build times using Vite.
+  - Dynamic interactive components: Drag-and-drop Kanban board, audio recorder, 
+    floating copilot drawer, and live filtering.
+  - Clean separation of concerns between frontend state and backend REST APIs.
+
+Q2.3: Why Vanilla CSS rather than Tailwind CSS or component libraries like Material UI?
+A2.3:
+  - Zero framework lock-in and minimal bundle size (faster initial load times).
+  - Direct control over design tokens (CSS custom properties) enabling sleek 
+    dark mode glassmorphism, tailored gradients, and custom responsive breakpoints.
+  - Eliminates dependency conflicts, build complexity, and class-name bloat.
+
+Q2.4: How are database queries optimized to avoid the N+1 problem?
+A2.4:
+In all DRF ViewSets and services, querysets strictly utilize:
+  - `select_related()` for single-valued foreign keys (e.g. `lead.stage`, 
+    `lead.assigned_to`, `lead.created_by`, `customer.created_by`).
+  - `prefetch_related()` for multi-valued reverse relations (e.g. `lead.notes`, 
+    `lead.follow_ups`, `lead.calls`).
+  - Targeted database indexing on high-frequency lookup columns (`phone`, `email`, 
+    `status`, `assigned_to`, `created_at`).
+
+
+================================================================================
+SECTION 3: SALES PIPELINE LIFECYCLE & DEAL FLOW
+================================================================================
+
+Q3.1: What are the stages in the CRM Lite sales pipeline?
+A3.1:
+The pipeline represents the full journey of a prospect:
+  1. NEW: Freshly registered lead from marketing campaigns, forms, or manual entry.
+  2. CONTACTED: First outreach completed (email sent, introductory call made).
+  3. DEMO_SCHEDULED: Product demonstration arranged with stakeholders.
+  4. NEGOTIATION: Pricing, SLA terms, scope, and contract terms under review.
+  5. QUALIFIED: Customer has confirmed budget, timeline, and purchase authority.
+     (Only leads in this stage can be converted to Customers).
+  6. WON: Final closed-won state; automatically set upon customer conversion.
+  7. LOST: Opportunity closed without purchase; requires a mandatory lost reason.
+
+Q3.2: How does the Kanban pipeline view work?
+A3.2:
+The Kanban board (`/leads/pipeline`) renders columns for each active stage.
+Sales reps and managers can visualize deals by stage with cumulative deal value 
+and lead count badges per column. Moving a lead across columns dispatches an 
+immediate PATCH request updating `stage_id` and logs an `ActivityLog` event.
+
+Q3.3: What happens when a lead is marked as "LOST"?
+A3.3:
+To prevent unrecorded churn and allow data-driven post-mortems:
+  - The backend serializer and model validators enforce that `lost_reason` 
+    must not be empty when transitioning to `LOST`.
+  - The frontend opens a `LostReasonModal` requiring the user to specify whether 
+    the loss was due to Budget, Competitor, Bad Timing, Missing Feature, or Other.
+  - The reason is permanently recorded on the lead and included in lost-deal reports.
+
+
+================================================================================
+SECTION 4: ATOMIC CUSTOMER CONVERSION & TRANSACTION SAFETY
+================================================================================
+
+Q4.1: What is Atomic Customer Conversion?
+A4.1:
+Customer conversion is the critical transition point where a prospective `Lead` 
+becomes an official paying `Customer`. 
+
+It is implemented inside `django.db.transaction.atomic()`:
+```python
+with transaction.atomic():
+    customer = Customer.objects.create(
+        lead=lead,
+        name=lead.name,
+        company_name=lead.company_name,
+        phone=lead.phone,
+        email=lead.email,
+        address=lead.address,
+        created_by=request.user
+    )
+    lead.status = Lead.Status.WON
+    lead.converted_at = timezone.now()
+    lead.save()
+    log_activity(...)
+```
+
+Q4.2: Why is `transaction.atomic()` essential here?
+A4.2:
+Without an atomic transaction, if the customer row is created but the subsequent
+lead update or audit log fails (e.g., due to a network blip or constraint violation),
+the database enters an inconsistent, corrupted state with an orphan customer 
+record while the lead remains active in the pipeline. With `transaction.atomic()`,
+any failure rolls back all operations completely.
+
+Q4.3: What prevents converting the same lead twice?
+A4.3:
+Two layers of defense:
+  1. Database constraint: `Customer.lead` is defined as a `OneToOneField(Lead, ...)` 
+     with a unique foreign key constraint (`FK_UK`). Any duplicate insert triggers 
+     an `IntegrityError`.
+  2. Application validation: The conversion view explicitly checks:
+     `if hasattr(lead, 'customer_profile') or lead.status == 'WON': raise ValidationError()`
+
+Q4.4: What happens to historical notes, calls, and follow-ups when a lead is converted?
+A4.4:
+They are fully preserved! All notes (`LeadNote`), calls (`Call`), and follow-ups 
+(`FollowUp`) remain linked to the original `lead_id`. In addition, `FollowUp` has 
+an optional `customer_id` foreign key. The converted Customer profile provides 
+direct reverse access to the entire pre-sales communication dossier.
+
+Q4.5: Why does `Customer.lead` use `on_delete=models.PROTECT`?
+A4.5:
+To prevent accidental or malicious deletion of financial and client history. If an 
+administrator attempts to delete a converted Lead, the database rejects the 
+deletion because an active Customer entity depends on it.
+
+
+================================================================================
+SECTION 5: ROLE-BASED ACCESS CONTROL (RBAC) & SECURITY ENFORCEMENT
+================================================================================
+
+Q5.1: What are the three user roles in CRM Lite?
+A5.1:
+  1. ADMIN: Full system governance. Can create/deactivate users, view all leads, 
+     reassign leads, convert customers, delete records, and export reports.
+  2. SALES MANAGER: Team leadership. Can view all team leads, assign/reassign leads 
+     to executives, convert qualified leads, and view org-wide analytics. Cannot 
+     delete leads or manage user credentials.
+  3. SALES EXECUTIVE: Frontline sales rep. Can only view and edit leads assigned to 
+     or created by them. Cannot reassign leads, convert leads, view other reps' leads, 
+     or export CSV reports.
+
+Q5.2: How is role isolation enforced in the backend?
+A5.2:
+Permissions are NEVER left to frontend checks alone.
+  1. QuerySet Scoping: In `LeadViewSet.get_queryset()`:
+     ```python
+     if user.role in ['ADMIN', 'MANAGER']:
+         return Lead.objects.all()
+     return Lead.objects.filter(Q(assigned_to=user) | Q(created_by=user))
+     ```
+     An executive attempting to list leads will never receive other reps' records.
+  2. Object-level permissions: Custom DRF classes (`IsAdmin`, `IsManagerOrAdmin`, 
+     `LeadPermission`) validate that update/delete operations match ownership.
+  3. Restricted endpoints: Conversion (`/api/leads/:id/convert/`) and assignment 
+     (`/api/leads/:id/assign/`) enforce `IsManagerOrAdmin` and return HTTP 403 Forbidden
+     if invoked by an executive.
+
+Q5.3: Can a Sales Executive access another rep's lead by guessing its ID in the URL?
+A5.3:
+No. When an executive requests `/api/leads/99/`, DRF evaluates `get_queryset()` first.
+Because lead #99 does not belong to that executive, the queryset returns empty, 
+and DRF responds with `HTTP 404 Not Found` (preventing even the disclosure of the 
+lead's existence).
+
+
+================================================================================
+SECTION 6: SMART FOLLOW-UP ENGINE & OVERDUE DETECTION
+================================================================================
+
+Q6.1: How does CRM Lite detect overdue follow-ups?
+A6.1:
+Overdue detection is computed dynamically against the database clock:
+```python
+now = timezone.now()
+overdue_qs = FollowUp.objects.filter(
+    Q(status='OVERDUE') | (Q(status='PENDING') & Q(follow_up_at__lt=now))
+)
+```
+Tasks scheduled in the past that have not been marked `COMPLETED` or `CANCELLED` 
+are instantly surfaced on the dashboard, lead dossier, and AI copilot as overdue.
+
+Q6.2: What validation prevents invalid follow-up scheduling?
+A6.2:
+The serializer validates `follow_up_at >= timezone.now() - timedelta(minutes=5)`.
+A sales rep cannot accidentally schedule a future follow-up with a past timestamp.
+
+Q6.3: What is required when completing a follow-up task?
+A6.3:
+When calling `/api/follow-ups/:id/complete/`, the rep must provide an `outcome` 
+string (minimum 3 characters) describing what happened during the interaction.
+The task status changes to `COMPLETED`, `completed_at` is set, and an `ActivityLog`
+event is recorded.
+
+
+================================================================================
+SECTION 7: COMMUNICATION AUDIT TRAIL & ACTIVITY LOGGING
+================================================================================
+
+Q7.1: What is the difference between `LeadNote` and `ActivityLog`?
+A7.1:
+  - `LeadNote`: Human-entered communication records. Reps log customer discussions 
+    classified by type (`CALL`, `WHATSAPP`, `EMAIL`, `MEETING`, `DEMO`, `OBJECTION`, 
+    `GENERAL`).
+  - `ActivityLog`: Immutable, automated system event ledger. Records state changes 
+    (e.g., status changes, reassignments, customer conversion, follow-up completions) 
+    capturing `performed_by`, `old_value`, `new_value`, and timestamps.
+
+Q7.2: Why is the Activity Log designed to be immutable?
+A7.2:
+To meet enterprise compliance and auditability requirements. No API endpoint exists
+to modify or delete an `ActivityLog` entry. It serves as an unalterable chronological
+history of who did what, when, and why.
+
+
+================================================================================
+SECTION 8: REAL-TIME KPI DASHBOARDS & REPORTING ANALYTICS
+================================================================================
+
+Q8.1: What metrics does the real-time KPI dashboard calculate?
+A8.1:
+Zero metrics are hardcoded. The dashboard calculates live database aggregates:
+  - Total Active Pipeline Value: `Sum('expected_value')` across non-terminal deals.
+  - Conversion Rate %: `(Won Leads / Total Concluded Leads) * 100`.
+  - Overdue Task Count: Total pending follow-ups with timestamps < now.
+  - Pipeline Stage Distribution: Count and dollar value of deals per stage.
+  - Monthly Deal Volume Trends: Grouped by `created_at` month.
+  - Team Performance: Deals assigned, converted, and revenue closed per rep.
+
+Q8.2: How does CSV report export work?
+A8.2:
+Admins and Managers can request `/api/reports/export_leads_csv/`.
+The backend streams a UTF-8 formatted CSV file with dynamic filter parameters 
+(date range, stage, assigned rep). Executives attempting to access this endpoint 
+receive HTTP 403 Forbidden.
+
+
+================================================================================
+SECTION 9: FASTAPI FEDERATED SEARCH MICROSERVICE
+================================================================================
+
+Q9.1: What is the purpose of the FastAPI search microservice?
+A9.1:
+While Django handles all business logic and mutations, high-frequency global search
+across tens of thousands of records requires ultra-low latency. 
+The FastAPI service (`fastapi_service/main.py`) runs as an asynchronous microservice 
+on port 8001 dedicated to sub-10ms federated search across Leads and Customers.
+
+Q9.2: How does the FastAPI service interact with the database?
+A9.2:
+It opens a high-concurrency read-only connection to the database. It executes 
+parameterized SQL queries matching keywords against `name`, `company_name`, 
+`phone`, and `email`, returning a unified payload of matches and latency metrics.
+
+
+================================================================================
+SECTION 10: AUTHENTICATION, JWT LIFECYCLES & AXIOS INTERCEPTORS
+================================================================================
+
+Q10.1: How does authentication work in CRM Lite?
+A10.1:
+  - Authentication uses JSON Web Tokens (JWT) via `django-rest-framework-simplejwt`.
+  - Credentials: `email` (custom user model identifier) and `password`.
+  - Token Pair:
+      * Access Token: Short-lived (60 minutes) for authorizing API requests.
+      * Refresh Token: Long-lived (7 days) for renewing access tokens.
+
+Q10.2: How does the frontend handle token expiration?
+A10.2:
+The frontend Axios client (`frontend/src/api/axios.js`) installs a response 
+interceptor. When any API call returns `401 Unauthorized`:
+  1. The interceptor pauses outgoing requests and queues them.
+  2. It dispatches a silent refresh request to `POST /api/auth/refresh/` using 
+     the refresh token stored in `localStorage`.
+  3. Upon receiving a fresh access token, it updates `localStorage`, rewrites the 
+     failed request's `Authorization: Bearer <token>` header, and replays the 
+     original call seamlessly without user interruption.
+  4. If the refresh token is also expired or invalid, it clears credentials and 
+     redirects the user to `/login`.
+
+
+================================================================================
+SECTION 11: ARTIFICIAL INTELLIGENCE (AI) FEATURES & PROVIDER INTEGRATION
+================================================================================
+
+Q11.1: What AI capabilities are implemented in CRM Lite?
+A11.1:
+  1. Multimodal Speech-to-Text: Ingests browser microphone recordings or audio 
+     files (.mp3, .wav, .m4a, .webm) and transcribes speech with speaker diarization.
+  2. Deal Intelligence Call Summary: Extracts customer requirements, objections, 
+     buying intent, next steps, and follow-up dates into structured JSON.
+  3. AI Copilot Drawer: Role-scoped conversational assistant that answers questions 
+     about pipeline health, overdue tasks, and lead summaries using live CRM data.
+  4. Safe Action Confirmation: Detects user write intent and requires interactive 
+     human confirmation before applying mutations (e.g., stage updates).
+  5. Lead Dossier Synthesis: Synthesizes historical notes and touchpoints into an 
+     executive briefing with prescriptive stage-specific action advice.
+
+Q11.2: Which AI model is used and how is it integrated?
+A11.2:
+Google Gemini (`gemini-2.5-flash`) via the official `google-genai` SDK. It is 
+integrated behind an abstract provider pattern (`BaseAIProvider`) in 
+`backend/ai/services/ai_provider.py`.
+
+Q11.3: What happens if the Gemini API key is missing or the external API is down?
+A11.3:
+The system features a deterministic offline fallback (`_generate_direct_crm_response`).
+It catches AI provider exceptions and computes 100% factual answers directly from 
+Django ORM querysets, ensuring the copilot remains responsive and reliable.
+
+
+================================================================================
+SECTION 12: DATA INTEGRITY, CONSTRAINTS & MODEL VALIDATORS
+================================================================================
+
+Q12.1: How is phone number deduplication handled?
+A12.1:
+During lead creation or editing, the serializer validates that the phone number 
+does not already exist among active prospects (`status not in ['WON', 'LOST']`).
+This prevents two sales executives from chasing the same client independently.
+
+Q12.2: Can expected deal value be negative?
+A12.2:
+No. The `expected_value` field enforces `MinValueValidator(0.00)`. Any attempt to 
+enter a negative dollar amount is rejected at both the serializer and model levels.
+
+Q12.3: How does the database protect against orphaned records on user deletion?
+A12.3:
+Foreign keys from `Lead` and `FollowUp` to `User` use `on_delete=models.SET_NULL`.
+If an employee leaves the company and their user account is deleted, their deals 
+and interaction history are not deleted; they simply become unassigned.
+
+
+================================================================================
+SECTION 13: AUTOMATED TESTING & DEPLOYMENT READINESS
+================================================================================
+
+Q13.1: What automated tests are implemented in the project?
+A13.1:
+Django test suites cover:
+  - `accounts/tests.py`: JWT login, credential validation, token refresh.
+  - `leads/tests.py`: Lead CRUD, phone deduplication, negative value rejection, 
+    role isolation (Executives blocked from other leads), atomic customer conversion.
+  - `followups/tests.py`: Overdue detection, past date rejection, completion outcomes.
+  - `ai/tests.py`: Provider mocking, audio transcription, call summary JSON parsing, 
+    safe write action confirmation, and offline direct response fallbacks.
+
+Run command:
+  `python backend/manage.py test accounts leads followups ai`
+
+Q13.2: How is the application prepared for production deployment?
+A13.2:
+  - Backend: Configured for PostgreSQL, WSGI/ASGI deployment with Gunicorn/Uvicorn, 
+    whitenoise/Nginx static asset serving, and environment-based secrets.
+  - Frontend: Optimized production bundle generated via `npm run build` using 
+    Vite's Rollup bundler with tree-shaking and asset minification.
+  - Security: CORS configured via `django-cors-headers`, JWT expiration limits, 
+    strict RBAC permission classes on all endpoints.
+
+================================================================================
+END OF PROJECT QUESTIONS & ANSWERS
+================================================================================
