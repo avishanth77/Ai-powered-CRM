@@ -8,6 +8,8 @@ class LeadFilter(django_filters.FilterSet):
     priority = django_filters.ChoiceFilter(choices=Lead.Priority.choices)
     icp_status = django_filters.ChoiceFilter(choices=Lead.ICPStatus.choices)
     pld_status = django_filters.ChoiceFilter(choices=Lead.PLDStatus.choices)
+    buying_intent = django_filters.ChoiceFilter(choices=Lead.BuyingIntent.choices)
+    lead_type = django_filters.ChoiceFilter(choices=Lead.LeadType.choices)
     source = django_filters.ModelChoiceFilter(queryset=LeadSource.objects.all())
     assigned_to = django_filters.NumberFilter(field_name='assigned_to__id')
     created_after = django_filters.DateTimeFilter(field_name='created_at', lookup_expr='gte')
@@ -26,6 +28,8 @@ class LeadFilter(django_filters.FilterSet):
             'priority',
             'icp_status',
             'pld_status',
+            'buying_intent',
+            'lead_type',
             'source',
             'assigned_to',
             'created_after',
@@ -51,7 +55,13 @@ class LeadFilter(django_filters.FilterSet):
             return queryset
         return queryset.filter(
             Q(name__icontains=value) |
+            Q(first_name__icontains=value) |
+            Q(last_name__icontains=value) |
             Q(phone__icontains=value) |
+            Q(mobile_phone__icontains=value) |
             Q(email__icontains=value) |
-            Q(company_name__icontains=value)
+            Q(company_name__icontains=value) |
+            Q(job_title__icontains=value) |
+            Q(city__icontains=value) |
+            Q(industry__icontains=value)
         )

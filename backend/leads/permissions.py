@@ -65,3 +65,47 @@ class LeadStagePermission(BasePermission):
             return True
         return request.user.role == 'ADMIN' or request.user.is_superuser
 
+
+
+class StageTaskRulePermission(BasePermission):
+    """
+    Stage Task Automation Rule Permissions:
+    - Read (GET, HEAD, OPTIONS): Any authenticated user
+    - Write/Modify/Delete/Toggle: Admin and Manager (Executives cannot create/edit/delete rules)
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.method in SAFE_METHODS:
+            return True
+        return request.user.role in ['ADMIN', 'MANAGER'] or request.user.is_superuser
+
+    def has_object_permission(self, request, view, obj):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.method in SAFE_METHODS:
+            return True
+        return request.user.role in ['ADMIN', 'MANAGER'] or request.user.is_superuser
+
+
+class CustomPropertyPermission(BasePermission):
+    """
+    Permissions for managing custom property definitions:
+    - Read (GET, HEAD, OPTIONS): Any authenticated user
+    - Write/Modify/Delete: Admin and Manager
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.method in SAFE_METHODS:
+            return True
+        return request.user.role in ['ADMIN', 'MANAGER'] or request.user.is_superuser
+
+    def has_object_permission(self, request, view, obj):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.method in SAFE_METHODS:
+            return True
+        return request.user.role in ['ADMIN', 'MANAGER'] or request.user.is_superuser
+
+
