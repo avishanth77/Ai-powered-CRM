@@ -7,7 +7,8 @@ import { useToast } from '../context/ToastContext';
 import { extractErrorMessage, normalizeServerErrors, isValidEmail, isValidPhone } from '../utils/validation';
 import { FieldError } from '../components/FieldError';
 import { LEAD_PRIORITY } from '../utils/constants';
-import { ArrowLeft, Save, UserPlus } from 'lucide-react';
+import ProductSelector from '../components/ProductSelector';
+import { ArrowLeft, Save, UserPlus, Package, User, Building2, Target, DollarSign } from 'lucide-react';
 
 export const LeadCreate = () => {
   const navigate = useNavigate();
@@ -16,16 +17,43 @@ export const LeadCreate = () => {
 
   const [formData, setFormData] = useState({
     name: '',
+    first_name: '',
+    last_name: '',
     phone: '',
+    mobile_phone: '',
     email: '',
+    job_title: '',
+    department: '',
+    linkedin_url: '',
+    buying_role: '',
     company_name: '',
+    website: '',
+    industry: '',
+    company_size: '',
+    annual_revenue: '',
+    country: '',
+    state: '',
+    city: '',
+    address: '',
+    lead_score: '0',
+    buying_intent: 'MEDIUM',
+    estimated_budget: '',
+    purchasing_timeline: '',
+    decision_maker: '',
+    customer_requirements: '',
+    competitor_info: '',
+    qualification_notes: '',
+    lead_type: 'INBOUND',
+    expected_close_date: '',
     source: '',
     stage: '',
     priority: LEAD_PRIORITY.MEDIUM,
     assigned_to: user?.id || '',
     expected_value: '0.00',
-    address: '',
+    product_ids: [],
     lost_reason: '',
+    win_probability_override: '',
+    win_probability_reason: '',
   });
 
   const [stages, setStages] = useState([]);
@@ -36,7 +64,6 @@ export const LeadCreate = () => {
   const [formError, setFormError] = useState(null);
 
   useEffect(() => {
-    // Load dynamic lead stages
     leadApi
       .getStages()
       .then((res) => {
@@ -49,13 +76,11 @@ export const LeadCreate = () => {
       })
       .catch(() => {});
 
-    // Load sources
     leadApi
       .getSources()
       .then((res) => setSources(res.results || (Array.isArray(res) ? res : [])))
       .catch(() => {});
 
-    // Load users if manager/admin
     if (canAssignLeads) {
       userApi
         .getUsers()
@@ -66,7 +91,18 @@ export const LeadCreate = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      const updated = { ...prev, [name]: value };
+      if (name === 'first_name' || name === 'last_name') {
+        const first = name === 'first_name' ? value : prev.first_name;
+        const last = name === 'last_name' ? value : prev.last_name;
+        if (first || last) {
+          updated.name = `${first} ${last}`.trim();
+        }
+      }
+      return updated;
+    });
+
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: null }));
     }
@@ -77,26 +113,23 @@ export const LeadCreate = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.name.trim()) newErrors.name = 'Contact / Lead name is required.';
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone number is required.';
-    } else if (!isValidPhone(formData.phone)) {
+    if (formData.phone && !isValidPhone(formData.phone)) {
       newErrors.phone = 'Please enter a valid phone number (minimum 7 digits).';
     }
-
     if (formData.email && !isValidEmail(formData.email)) {
       newErrors.email = 'Please enter a valid email address.';
     }
-
     const expectedNum = parseFloat(formData.expected_value);
     if (Number.isNaN(expectedNum)) {
       newErrors.expected_value = 'Please enter a valid deal value.';
     } else if (expectedNum < 0) {
       newErrors.expected_value = 'Expected value cannot be negative.';
     }
-
+    if (!formData.stage) {
+      newErrors.stage = 'Please select a pipeline stage.';
+    }
     if (isLostStage && !formData.lost_reason.trim()) {
-      newErrors.lost_reason = 'A reason is required when marking a lead as Lost.';
+      newErrors.lost_reason = 'Lost reason is mandatory when marking a lead as Lost.';
     }
 
     setErrors(newErrors);
@@ -113,17 +146,44 @@ export const LeadCreate = () => {
     setLoading(true);
     try {
       const payload = {
-        name: formData.name.trim(),
+        name: formData.name.trim() || `${formData.first_name} ${formData.last_name}`.trim() || 'Prospect Lead',
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
         phone: formData.phone.trim(),
+        mobile_phone: formData.mobile_phone.trim(),
         email: formData.email.trim() || null,
+        job_title: formData.job_title.trim(),
+        department: formData.department.trim(),
+        linkedin_url: formData.linkedin_url.trim() || null,
+        buying_role: formData.buying_role || '',
         company_name: formData.company_name.trim() || null,
+        website: formData.website.trim() || null,
+        industry: formData.industry.trim(),
+        company_size: formData.company_size || '',
+        annual_revenue: formData.annual_revenue ? parseFloat(formData.annual_revenue) : null,
+        country: formData.country.trim(),
+        state: formData.state.trim(),
+        city: formData.city.trim(),
+        address: formData.address.trim() || null,
+        lead_score: parseInt(formData.lead_score) || 0,
+        buying_intent: formData.buying_intent || 'MEDIUM',
+        estimated_budget: formData.estimated_budget ? parseFloat(formData.estimated_budget) : null,
+        customer_requirements: formData.customer_requirements.trim(),
+        purchasing_timeline: formData.purchasing_timeline || '',
+        decision_maker: formData.decision_maker.trim(),
+        competitor_info: formData.competitor_info.trim(),
+        qualification_notes: formData.qualification_notes.trim(),
+        lead_type: formData.lead_type || 'INBOUND',
+        expected_close_date: formData.expected_close_date || null,
         source: formData.source ? parseInt(formData.source) : null,
         stage: formData.stage ? parseInt(formData.stage) : null,
         priority: formData.priority,
         assigned_to: formData.assigned_to ? parseInt(formData.assigned_to) : null,
         expected_value: parseFloat(formData.expected_value) || 0,
-        address: formData.address.trim() || null,
+        product_ids: formData.product_ids || [],
         lost_reason: isLostStage ? formData.lost_reason.trim() : null,
+        win_probability_override: formData.win_probability_override !== '' && formData.win_probability_override !== null && formData.win_probability_override !== undefined ? parseInt(formData.win_probability_override) : null,
+        win_probability_reason: (formData.win_probability_reason || '').trim(),
       };
 
       const res = await leadApi.createLead(payload);
@@ -153,11 +213,11 @@ export const LeadCreate = () => {
             <UserPlus size={26} />
             <span>Create New Lead</span>
           </h1>
-          <p className="page-subtitle">Add a new prospecting client to your pipeline</p>
+          <p className="page-subtitle">Add a comprehensive prospect profile to your CRM pipeline</p>
         </div>
       </div>
 
-      <div className="card" style={{ maxWidth: '840px' }}>
+      <div className="card" style={{ maxWidth: '880px' }}>
         <form onSubmit={handleSubmit} className="form-layout">
           {formError && (
             <div className="toast-item toast-error" role="alert" style={{ marginBottom: '0.5rem' }}>
@@ -168,37 +228,37 @@ export const LeadCreate = () => {
               </div>
             </div>
           )}
+
+          {/* Section 1: Contact Information */}
+          <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
+            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <User size={16} color="var(--primary)" />
+              <span>Contact Information</span>
+            </h3>
+          </div>
+
           <div className="form-grid-2">
             <div className="form-group">
-              <label className="form-label form-label-required" htmlFor="lead-name">
-                Full Name / Contact Person
-              </label>
+              <label className="form-label" htmlFor="first-name">First Name</label>
               <input
-                id="lead-name"
-                name="name"
+                id="first-name"
+                name="first_name"
                 type="text"
                 className="form-control"
-                placeholder="e.g. John Doe"
-                value={formData.name}
+                placeholder="e.g. John"
+                value={formData.first_name}
                 onChange={handleChange}
-                required
-                aria-invalid={Boolean(errors.name)}
-                aria-describedby={errors.name ? 'lead-name-error' : undefined}
               />
-              <FieldError id="lead-name-error" message={errors.name} />
             </div>
-
             <div className="form-group">
-              <label className="form-label" htmlFor="lead-company">
-                Company Name
-              </label>
+              <label className="form-label" htmlFor="last-name">Last Name</label>
               <input
-                id="lead-company"
-                name="company_name"
+                id="last-name"
+                name="last_name"
                 type="text"
                 className="form-control"
-                placeholder="e.g. Acme Corp (optional)"
-                value={formData.company_name}
+                placeholder="e.g. Doe"
+                value={formData.last_name}
                 onChange={handleChange}
               />
             </div>
@@ -206,9 +266,22 @@ export const LeadCreate = () => {
 
           <div className="form-grid-2">
             <div className="form-group">
-              <label className="form-label form-label-required" htmlFor="lead-phone">
-                Phone Number
-              </label>
+              <label className="form-label" htmlFor="lead-email">Email Address</label>
+              <input
+                id="lead-email"
+                name="email"
+                type="email"
+                className="form-control"
+                placeholder="e.g. john.doe@company.com"
+                value={formData.email}
+                onChange={handleChange}
+                aria-invalid={Boolean(errors.email)}
+              />
+              <FieldError id="lead-email-error" message={errors.email} />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="lead-phone">Work Phone</label>
               <input
                 id="lead-phone"
                 name="phone"
@@ -217,33 +290,381 @@ export const LeadCreate = () => {
                 placeholder="e.g. +91 9876543210"
                 value={formData.phone}
                 onChange={handleChange}
-                required
                 aria-invalid={Boolean(errors.phone)}
-                aria-describedby={errors.phone ? 'lead-phone-error' : undefined}
               />
               <FieldError id="lead-phone-error" message={errors.phone} />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="lead-email">
-                Email Address
-              </label>
-              <input
-                id="lead-email"
-                name="email"
-                type="email"
-                className="form-control"
-                placeholder="e.g. john@acme.com"
-                value={formData.email}
-                onChange={handleChange}
-                aria-invalid={Boolean(errors.email)}
-                aria-describedby={errors.email ? 'lead-email-error' : undefined}
-              />
-              <FieldError id="lead-email-error" message={errors.email} />
             </div>
           </div>
 
           <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="mobile-phone">Mobile Phone</label>
+              <input
+                id="mobile-phone"
+                name="mobile_phone"
+                type="tel"
+                className="form-control"
+                placeholder="e.g. +91 9123456789"
+                value={formData.mobile_phone}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="job-title">Job Title</label>
+              <input
+                id="job-title"
+                name="job_title"
+                type="text"
+                className="form-control"
+                placeholder="e.g. VP of Procurement"
+                value={formData.job_title}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="department">Department</label>
+              <input
+                id="department"
+                name="department"
+                type="text"
+                className="form-control"
+                placeholder="e.g. Operations, IT, Executive"
+                value={formData.department}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="buying-role">Buying Role</label>
+              <select
+                id="buying-role"
+                name="buying_role"
+                className="form-control"
+                value={formData.buying_role}
+                onChange={handleChange}
+              >
+                <option value="">Select Buying Role</option>
+                <option value="DECISION_MAKER">Decision Maker</option>
+                <option value="INFLUENCER">Influencer</option>
+                <option value="BUDGET_HOLDER">Budget Holder</option>
+                <option value="CHAMPION">Champion</option>
+                <option value="END_USER">End User</option>
+                <option value="GATEKEEPER">Gatekeeper</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="linkedin-url">LinkedIn Profile URL</label>
+            <input
+              id="linkedin-url"
+              name="linkedin_url"
+              type="url"
+              className="form-control"
+              placeholder="https://linkedin.com/in/username"
+              value={formData.linkedin_url}
+              onChange={handleChange}
+            />
+          </div>
+
+          {/* Section 2: Company Information */}
+          <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', margin: '1.25rem 0 0.75rem 0' }}>
+            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <Building2 size={16} color="#38bdf8" />
+              <span>Company Information</span>
+            </h3>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="lead-company">Company Name</label>
+              <input
+                id="lead-company"
+                name="company_name"
+                type="text"
+                className="form-control"
+                placeholder="e.g. Acme Corporation"
+                value={formData.company_name}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="website">Website</label>
+              <input
+                id="website"
+                name="website"
+                type="url"
+                className="form-control"
+                placeholder="https://company.example.com"
+                value={formData.website}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="industry">Industry</label>
+              <input
+                id="industry"
+                name="industry"
+                type="text"
+                className="form-control"
+                placeholder="e.g. SaaS, Manufacturing, Financial"
+                value={formData.industry}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="company-size">Company Size</label>
+              <select
+                id="company-size"
+                name="company_size"
+                className="form-control"
+                value={formData.company_size}
+                onChange={handleChange}
+              >
+                <option value="">Select Size</option>
+                <option value="1-10">1-10 employees</option>
+                <option value="11-50">11-50 employees</option>
+                <option value="51-200">51-200 employees</option>
+                <option value="201-500">201-500 employees</option>
+                <option value="501-1000">501-1000 employees</option>
+                <option value="1000+">1000+ employees</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="annual-revenue">Annual Revenue (₹)</label>
+              <input
+                id="annual-revenue"
+                name="annual_revenue"
+                type="number"
+                step="0.01"
+                className="form-control"
+                placeholder="e.g. 5000000"
+                value={formData.annual_revenue}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="city">City</label>
+              <input
+                id="city"
+                name="city"
+                type="text"
+                className="form-control"
+                placeholder="e.g. Bengaluru"
+                value={formData.city}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="state">State / Region</label>
+              <input
+                id="state"
+                name="state"
+                type="text"
+                className="form-control"
+                placeholder="e.g. Karnataka"
+                value={formData.state}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="country">Country</label>
+              <input
+                id="country"
+                name="country"
+                type="text"
+                className="form-control"
+                placeholder="e.g. India"
+                value={formData.country}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="lead-address">Physical Address</label>
+            <textarea
+              id="lead-address"
+              name="address"
+              className="form-control"
+              rows={2}
+              placeholder="Building, Street, Suite..."
+              value={formData.address}
+              onChange={handleChange}
+            />
+          </div>
+
+          {/* Section 3: Lead Qualification */}
+          <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', margin: '1.25rem 0 0.75rem 0' }}>
+            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <Target size={16} color="#f59e0b" />
+              <span>Lead Qualification</span>
+            </h3>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="lead-score">Lead Score (0-100)</label>
+              <input
+                id="lead-score"
+                name="lead_score"
+                type="number"
+                min="0"
+                max="100"
+                className="form-control"
+                value={formData.lead_score}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="buying-intent">Buying Intent</label>
+              <select
+                id="buying-intent"
+                name="buying_intent"
+                className="form-control"
+                value={formData.buying_intent}
+                onChange={handleChange}
+              >
+                <option value="HIGH">High Intent</option>
+                <option value="MEDIUM">Medium Intent</option>
+                <option value="LOW">Low Intent</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="estimated-budget">Estimated Budget (₹)</label>
+              <input
+                id="estimated-budget"
+                name="estimated_budget"
+                type="number"
+                step="0.01"
+                className="form-control"
+                placeholder="e.g. 250000"
+                value={formData.estimated_budget}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="purchasing-timeline">Purchasing Timeline</label>
+              <select
+                id="purchasing-timeline"
+                name="purchasing_timeline"
+                className="form-control"
+                value={formData.purchasing_timeline}
+                onChange={handleChange}
+              >
+                <option value="">Select Timeline</option>
+                <option value="IMMEDIATE">Immediate (&lt; 1 month)</option>
+                <option value="1_3_MONTHS">1 - 3 months</option>
+                <option value="3_6_MONTHS">3 - 6 months</option>
+                <option value="6_12_MONTHS">6 - 12 months</option>
+                <option value="NO_TIMELINE">No immediate plan</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="decision-maker">Key Decision Maker Name / Title</label>
+            <input
+              id="decision-maker"
+              name="decision_maker"
+              type="text"
+              className="form-control"
+              placeholder="e.g. Jane Smith, VP of Finance"
+              value={formData.decision_maker}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="customer-requirements">Customer Requirements / Scope</label>
+            <textarea
+              id="customer-requirements"
+              name="customer_requirements"
+              className="form-control"
+              rows={3}
+              placeholder="Key specifications, workflows, and problems they need solved..."
+              value={formData.customer_requirements}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="competitor-info">Competitor Information</label>
+            <textarea
+              id="competitor-info"
+              name="competitor_info"
+              className="form-control"
+              rows={2}
+              placeholder="Competitors currently evaluated or incumbency..."
+              value={formData.competitor_info}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="qualification-notes">Qualification Notes</label>
+            <textarea
+              id="qualification-notes"
+              name="qualification_notes"
+              className="form-control"
+              rows={2}
+              placeholder="Key takeaways from initial screening..."
+              value={formData.qualification_notes}
+              onChange={handleChange}
+            />
+          </div>
+
+          {/* Section 4: Pipeline & Sales Information */}
+          <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', margin: '1.25rem 0 0.75rem 0' }}>
+            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <DollarSign size={16} color="#10b981" />
+              <span>Pipeline & Sales Information</span>
+            </h3>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="lead-type">Lead Type</label>
+              <select
+                id="lead-type"
+                name="lead_type"
+                className="form-control"
+                value={formData.lead_type}
+                onChange={handleChange}
+              >
+                <option value="INBOUND">Inbound</option>
+                <option value="OUTBOUND">Outbound</option>
+                <option value="REFERRAL">Referral</option>
+                <option value="PARTNER">Partner</option>
+                <option value="EVENT">Event / Trade Show</option>
+                <option value="EXISTING_CUSTOMER">Existing Customer</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+
             <div className="form-group">
               <label className="form-label" htmlFor="lead-source">Lead Source</label>
               <select
@@ -260,6 +681,28 @@ export const LeadCreate = () => {
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label form-label-required" htmlFor="lead-stage">Pipeline Stage</label>
+              <select
+                id="lead-stage"
+                name="stage"
+                className="form-control"
+                value={formData.stage}
+                onChange={handleChange}
+                required
+                aria-invalid={Boolean(errors.stage)}
+              >
+                {stages.map((st) => (
+                  <option key={st.id} value={st.id}>
+                    {st.name}
+                  </option>
+                ))}
+              </select>
+              <FieldError id="lead-stage-error" message={errors.stage} />
             </div>
 
             <div className="form-group">
@@ -281,26 +724,16 @@ export const LeadCreate = () => {
           </div>
 
           <div className="form-grid-2">
-            {/* Dynamic Stage Dropdown */}
             <div className="form-group">
-              <label className="form-label form-label-required" htmlFor="lead-stage">Lead Stage</label>
-              <select
-                id="lead-stage"
-                name="stage"
+              <label className="form-label" htmlFor="expected-close-date">Expected Closing Date</label>
+              <input
+                id="expected-close-date"
+                name="expected_close_date"
+                type="date"
                 className="form-control"
-                value={formData.stage}
+                value={formData.expected_close_date}
                 onChange={handleChange}
-                required
-                aria-invalid={Boolean(errors.stage)}
-                aria-describedby={errors.stage ? 'lead-stage-error' : undefined}
-              >
-                {stages.map((st) => (
-                  <option key={st.id} value={st.id}>
-                    {st.name}
-                  </option>
-                ))}
-              </select>
-              <FieldError id="lead-stage-error" message={errors.stage} />
+              />
             </div>
 
             <div className="form-group">
@@ -315,15 +748,30 @@ export const LeadCreate = () => {
                 value={formData.expected_value}
                 onChange={handleChange}
                 aria-invalid={Boolean(errors.expected_value)}
-                aria-describedby={errors.expected_value ? 'lead-value-error' : undefined}
               />
               <FieldError id="lead-value-error" message={errors.expected_value} />
             </div>
           </div>
 
+          {/* Multi-Product Selection */}
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+              <Package size={15} color="var(--primary)" /> Products & Line Items
+            </label>
+            <ProductSelector
+              selectedProductIds={formData.product_ids || []}
+              onChange={(ids) => setFormData((prev) => ({ ...prev, product_ids: ids }))}
+              onTotalValueChange={(val) => {
+                if (val > 0) {
+                  setFormData((prev) => ({ ...prev, expected_value: val.toFixed(2) }));
+                }
+              }}
+            />
+          </div>
+
           {canAssignLeads && (
             <div className="form-group">
-              <label className="form-label" htmlFor="lead-assigned">Assigned Executive / Representative</label>
+              <label className="form-label" htmlFor="lead-assigned">Assigned Representative</label>
               <select
                 id="lead-assigned"
                 name="assigned_to"
@@ -343,19 +791,6 @@ export const LeadCreate = () => {
             </div>
           )}
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="lead-address">Physical Address / Location</label>
-            <textarea
-              id="lead-address"
-              name="address"
-              className="form-control"
-              rows={2}
-              placeholder="Building, Street, City, State..."
-              value={formData.address}
-              onChange={handleChange}
-            />
-          </div>
-
           {isLostStage && (
             <div className="form-group">
               <label className="form-label form-label-required" htmlFor="lead-lost-reason">
@@ -366,12 +801,11 @@ export const LeadCreate = () => {
                 name="lost_reason"
                 className="form-control"
                 rows={2}
-                placeholder="Reason why this lead was lost..."
+                placeholder="Reason why this deal was lost..."
                 value={formData.lost_reason}
                 onChange={handleChange}
                 required
                 aria-invalid={Boolean(errors.lost_reason)}
-                aria-describedby={errors.lost_reason ? 'lead-lost-reason-error' : undefined}
               />
               <FieldError id="lead-lost-reason-error" message={errors.lost_reason} />
             </div>
@@ -391,3 +825,5 @@ export const LeadCreate = () => {
     </div>
   );
 };
+
+export default LeadCreate;

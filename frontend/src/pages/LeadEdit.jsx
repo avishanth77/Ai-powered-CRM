@@ -8,8 +8,10 @@ import { extractErrorMessage, normalizeServerErrors, isValidEmail, isValidPhone 
 import { FieldError } from '../components/FieldError';
 import { LEAD_PRIORITY } from '../utils/constants';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import ProductSelector from '../components/ProductSelector';
 import { ConfirmModal } from '../components/ConfirmModal';
-import { ArrowLeft, Save, Edit3 } from 'lucide-react';
+import { PldAssessmentTest } from '../components/PldAssessmentTest';
+import { ArrowLeft, Save, Edit3, Package, User, Building2, Target, DollarSign } from 'lucide-react';
 
 export const LeadEdit = () => {
   const { id } = useParams();
@@ -19,16 +21,43 @@ export const LeadEdit = () => {
 
   const [formData, setFormData] = useState({
     name: '',
+    first_name: '',
+    last_name: '',
     phone: '',
+    mobile_phone: '',
     email: '',
+    job_title: '',
+    department: '',
+    linkedin_url: '',
+    buying_role: '',
     company_name: '',
+    website: '',
+    industry: '',
+    company_size: '',
+    annual_revenue: '',
+    country: '',
+    state: '',
+    city: '',
+    address: '',
+    lead_score: '0',
+    buying_intent: 'MEDIUM',
+    estimated_budget: '',
+    purchasing_timeline: '',
+    decision_maker: '',
+    customer_requirements: '',
+    competitor_info: '',
+    qualification_notes: '',
+    lead_type: 'INBOUND',
+    expected_close_date: '',
     source: '',
     stage: '',
     priority: '',
     assigned_to: '',
     expected_value: '0.00',
-    address: '',
+    product_ids: [],
     lost_reason: '',
+    win_probability_override: '',
+    win_probability_reason: '',
   });
 
   const [stages, setStages] = useState([]);
@@ -41,6 +70,7 @@ export const LeadEdit = () => {
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState(null);
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [pldModalData, setPldModalData] = useState(null);
 
   const loadData = async () => {
     setInitialLoading(true);
@@ -53,7 +83,6 @@ export const LeadEdit = () => {
       ]);
 
       let loadedStages = stagesRes.results || (Array.isArray(stagesRes) ? stagesRes : []);
-      // If current lead's stage is inactive and not in loadedStages, add it so it displays
       if (leadRes.stage_details && !loadedStages.some((s) => s.id === leadRes.stage_details.id)) {
         loadedStages = [...loadedStages, { ...leadRes.stage_details, name: `${leadRes.stage_details.name} (Inactive)` }];
       }
@@ -61,16 +90,43 @@ export const LeadEdit = () => {
 
       const loaded = {
         name: leadRes.name || '',
+        first_name: leadRes.first_name || '',
+        last_name: leadRes.last_name || '',
         phone: leadRes.phone || '',
+        mobile_phone: leadRes.mobile_phone || '',
         email: leadRes.email || '',
+        job_title: leadRes.job_title || '',
+        department: leadRes.department || '',
+        linkedin_url: leadRes.linkedin_url || '',
+        buying_role: leadRes.buying_role || '',
         company_name: leadRes.company_name || '',
+        website: leadRes.website || '',
+        industry: leadRes.industry || '',
+        company_size: leadRes.company_size || '',
+        annual_revenue: leadRes.annual_revenue || '',
+        country: leadRes.country || '',
+        state: leadRes.state || '',
+        city: leadRes.city || '',
+        address: leadRes.address || '',
+        lead_score: leadRes.lead_score !== undefined ? String(leadRes.lead_score) : '0',
+        buying_intent: leadRes.buying_intent || 'MEDIUM',
+        estimated_budget: leadRes.estimated_budget || '',
+        purchasing_timeline: leadRes.purchasing_timeline || '',
+        decision_maker: leadRes.decision_maker || '',
+        customer_requirements: leadRes.customer_requirements || '',
+        competitor_info: leadRes.competitor_info || '',
+        qualification_notes: leadRes.qualification_notes || '',
+        lead_type: leadRes.lead_type || 'INBOUND',
+        expected_close_date: leadRes.expected_close_date || '',
         source: leadRes.source || '',
         stage: leadRes.stage || leadRes.stage_details?.id || '',
         priority: leadRes.priority || '',
         assigned_to: leadRes.assigned_to || '',
         expected_value: leadRes.expected_value || '0.00',
-        address: leadRes.address || '',
         lost_reason: leadRes.lost_reason || '',
+        win_probability_override: leadRes.win_probability_override !== null && leadRes.win_probability_override !== undefined ? leadRes.win_probability_override : '',
+        win_probability_reason: leadRes.win_probability_reason || '',
+        product_ids: leadRes.product_ids || leadRes.products?.map((p) => p.id) || [],
       };
       setFormData(loaded);
       setInitialData(loaded);
@@ -96,7 +152,18 @@ export const LeadEdit = () => {
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      const updated = { ...prev, [name]: value };
+      if (name === 'first_name' || name === 'last_name') {
+        const first = name === 'first_name' ? value : prev.first_name;
+        const last = name === 'last_name' ? value : prev.last_name;
+        if (first || last) {
+          updated.name = `${first} ${last}`.trim();
+        }
+      }
+      return updated;
+    });
+
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: null }));
     }
@@ -107,26 +174,20 @@ export const LeadEdit = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    if (!formData.name.trim()) newErrors.name = 'Contact / Lead name is required.';
-    if (!formData.phone.trim()) {
-      newErrors.phone = 'Phone number is required.';
-    } else if (!isValidPhone(formData.phone)) {
+    if (formData.phone && !isValidPhone(formData.phone)) {
       newErrors.phone = 'Please enter a valid phone number (minimum 7 digits).';
     }
-
     if (formData.email && !isValidEmail(formData.email)) {
       newErrors.email = 'Please enter a valid email address.';
     }
-
     const expectedNum = parseFloat(formData.expected_value);
     if (Number.isNaN(expectedNum)) {
       newErrors.expected_value = 'Please enter a valid deal value.';
     } else if (expectedNum < 0) {
       newErrors.expected_value = 'Expected value cannot be negative.';
     }
-
     if (isLostStage && !formData.lost_reason?.trim()) {
-      newErrors.lost_reason = 'A reason is required when marking a lead as Lost.';
+      newErrors.lost_reason = 'Lost reason is mandatory when marking a lead as Lost.';
     }
 
     setErrors(newErrors);
@@ -143,11 +204,44 @@ export const LeadEdit = () => {
     setSaving(true);
     try {
       const payload = {
-        ...formData,
+        name: formData.name.trim() || `${formData.first_name} ${formData.last_name}`.trim() || 'Prospect Lead',
+        first_name: formData.first_name.trim(),
+        last_name: formData.last_name.trim(),
+        phone: formData.phone.trim(),
+        mobile_phone: formData.mobile_phone.trim(),
+        email: formData.email.trim() || null,
+        job_title: formData.job_title.trim(),
+        department: formData.department.trim(),
+        linkedin_url: formData.linkedin_url.trim() || null,
+        buying_role: formData.buying_role || '',
+        company_name: formData.company_name.trim() || null,
+        website: formData.website.trim() || null,
+        industry: formData.industry.trim(),
+        company_size: formData.company_size || '',
+        annual_revenue: formData.annual_revenue ? parseFloat(formData.annual_revenue) : null,
+        country: formData.country.trim(),
+        state: formData.state.trim(),
+        city: formData.city.trim(),
+        address: formData.address.trim() || null,
+        lead_score: parseInt(formData.lead_score) || 0,
+        buying_intent: formData.buying_intent || 'MEDIUM',
+        estimated_budget: formData.estimated_budget ? parseFloat(formData.estimated_budget) : null,
+        customer_requirements: formData.customer_requirements.trim(),
+        purchasing_timeline: formData.purchasing_timeline || '',
+        decision_maker: formData.decision_maker.trim(),
+        competitor_info: formData.competitor_info.trim(),
+        qualification_notes: formData.qualification_notes.trim(),
+        lead_type: formData.lead_type || 'INBOUND',
+        expected_close_date: formData.expected_close_date || null,
         stage: formData.stage ? parseInt(formData.stage) : null,
         source: formData.source ? parseInt(formData.source) : null,
+        priority: formData.priority,
         assigned_to: formData.assigned_to ? parseInt(formData.assigned_to) : null,
         expected_value: parseFloat(formData.expected_value) || 0,
+        product_ids: formData.product_ids || [],
+        lost_reason: isLostStage ? formData.lost_reason.trim() : null,
+        win_probability_override: formData.win_probability_override !== '' && formData.win_probability_override !== null && formData.win_probability_override !== undefined ? parseInt(formData.win_probability_override) : null,
+        win_probability_reason: (formData.win_probability_reason || '').trim(),
       };
 
       await leadApi.updateLead(id, payload);
@@ -167,53 +261,25 @@ export const LeadEdit = () => {
   };
 
   if (initialLoading) {
-    return <LoadingSpinner text="Loading lead information..." />;
+    return <LoadingSpinner text="Loading lead details..." />;
   }
-
-  if (loadError) {
-    return (
-      <div className="card" style={{ textAlign: 'center', padding: '3rem', maxWidth: '840px' }}>
-        <h3>Unable to load lead</h3>
-        <p className="text-muted" style={{ margin: '0.5rem 0 1.5rem' }}>{loadError}</p>
-        <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center', flexWrap: 'wrap' }}>
-          <button type="button" className="btn btn-primary" onClick={loadData}>
-            Retry
-          </button>
-          <Link to="/leads" className="btn btn-secondary">
-            Back to Leads
-          </Link>
-        </div>
-      </div>
-    );
-  }
-
-  const isDirty = initialData && JSON.stringify(formData) !== JSON.stringify(initialData);
-
-  const handleCancel = (e) => {
-    e.preventDefault();
-    if (isDirty) {
-      setConfirmCancelOpen(true);
-    } else {
-      navigate(`/leads/${id}`);
-    }
-  };
 
   return (
     <div className="lead-form-page">
       <div className="page-header">
         <div>
-          <Link to={`/leads/${id}`} onClick={handleCancel} className="contact-item mb-2" style={{ marginBottom: '0.5rem' }}>
-            <ArrowLeft size={16} /> Back to Lead Profile
+          <Link to={`/leads/${id}`} className="contact-item mb-2" style={{ marginBottom: '0.5rem' }}>
+            <ArrowLeft size={16} /> Back to Lead Details
           </Link>
           <h1 className="page-title">
             <Edit3 size={26} />
             <span>Edit Lead: {formData.name}</span>
           </h1>
-          <p className="page-subtitle">Update contact details, assignment, or pipeline status</p>
+          <p className="page-subtitle">Update lead information and CRM properties</p>
         </div>
       </div>
 
-      <div className="card" style={{ maxWidth: '840px' }}>
+      <div className="card" style={{ maxWidth: '880px' }}>
         <form onSubmit={handleSubmit} className="form-layout">
           {formError && (
             <div className="toast-item toast-error" role="alert" style={{ marginBottom: '0.5rem' }}>
@@ -224,29 +290,155 @@ export const LeadEdit = () => {
               </div>
             </div>
           )}
+
+          {/* Section 1: Contact Information */}
+          <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
+            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <User size={16} color="var(--primary)" />
+              <span>Contact Information</span>
+            </h3>
+          </div>
+
           <div className="form-grid-2">
             <div className="form-group">
-              <label className="form-label form-label-required" htmlFor="edit-name">
-                Full Name
-              </label>
+              <label className="form-label" htmlFor="first-name">First Name</label>
               <input
-                id="edit-name"
-                name="name"
+                id="first-name"
+                name="first_name"
                 type="text"
                 className="form-control"
-                value={formData.name}
+                value={formData.first_name}
                 onChange={handleChange}
-                required
-                aria-invalid={Boolean(errors.name)}
-                aria-describedby={errors.name ? 'edit-name-error' : undefined}
               />
-              <FieldError id="edit-name-error" message={errors.name} />
+            </div>
+            <div className="form-group">
+              <label className="form-label" htmlFor="last-name">Last Name</label>
+              <input
+                id="last-name"
+                name="last_name"
+                type="text"
+                className="form-control"
+                value={formData.last_name}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="lead-email">Email Address</label>
+              <input
+                id="lead-email"
+                name="email"
+                type="email"
+                className="form-control"
+                value={formData.email}
+                onChange={handleChange}
+                aria-invalid={Boolean(errors.email)}
+              />
+              <FieldError id="lead-email-error" message={errors.email} />
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="edit-company">Company Name</label>
+              <label className="form-label" htmlFor="lead-phone">Work Phone</label>
               <input
-                id="edit-company"
+                id="lead-phone"
+                name="phone"
+                type="tel"
+                className="form-control"
+                value={formData.phone}
+                onChange={handleChange}
+                aria-invalid={Boolean(errors.phone)}
+              />
+              <FieldError id="lead-phone-error" message={errors.phone} />
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="mobile-phone">Mobile Phone</label>
+              <input
+                id="mobile-phone"
+                name="mobile_phone"
+                type="tel"
+                className="form-control"
+                value={formData.mobile_phone}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="job-title">Job Title</label>
+              <input
+                id="job-title"
+                name="job_title"
+                type="text"
+                className="form-control"
+                value={formData.job_title}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="department">Department</label>
+              <input
+                id="department"
+                name="department"
+                type="text"
+                className="form-control"
+                value={formData.department}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="buying-role">Buying Role</label>
+              <select
+                id="buying-role"
+                name="buying_role"
+                className="form-control"
+                value={formData.buying_role}
+                onChange={handleChange}
+              >
+                <option value="">Select Buying Role</option>
+                <option value="DECISION_MAKER">Decision Maker</option>
+                <option value="INFLUENCER">Influencer</option>
+                <option value="BUDGET_HOLDER">Budget Holder</option>
+                <option value="CHAMPION">Champion</option>
+                <option value="END_USER">End User</option>
+                <option value="GATEKEEPER">Gatekeeper</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="linkedin-url">LinkedIn Profile URL</label>
+            <input
+              id="linkedin-url"
+              name="linkedin_url"
+              type="url"
+              className="form-control"
+              value={formData.linkedin_url}
+              onChange={handleChange}
+            />
+          </div>
+
+          {/* Section 2: Company Information */}
+          <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', margin: '1.25rem 0 0.75rem 0' }}>
+            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <Building2 size={16} color="#38bdf8" />
+              <span>Company Information</span>
+            </h3>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="lead-company">Company Name</label>
+              <input
+                id="lead-company"
                 name="company_name"
                 type="text"
                 className="form-control"
@@ -254,48 +446,270 @@ export const LeadEdit = () => {
                 onChange={handleChange}
               />
             </div>
-          </div>
-
-          <div className="form-grid-2">
-            <div className="form-group">
-              <label className="form-label form-label-required" htmlFor="edit-phone">
-                Phone Number
-              </label>
-              <input
-                id="edit-phone"
-                name="phone"
-                type="tel"
-                className="form-control"
-                value={formData.phone}
-                onChange={handleChange}
-                required
-                aria-invalid={Boolean(errors.phone)}
-                aria-describedby={errors.phone ? 'edit-phone-error' : undefined}
-              />
-              <FieldError id="edit-phone-error" message={errors.phone} />
-            </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="edit-email">Email Address</label>
+              <label className="form-label" htmlFor="website">Website</label>
               <input
-                id="edit-email"
-                name="email"
-                type="email"
+                id="website"
+                name="website"
+                type="url"
                 className="form-control"
-                value={formData.email}
+                value={formData.website}
                 onChange={handleChange}
-                aria-invalid={Boolean(errors.email)}
-                aria-describedby={errors.email ? 'edit-email-error' : undefined}
               />
-              <FieldError id="edit-email-error" message={errors.email} />
             </div>
           </div>
 
           <div className="form-grid-2">
             <div className="form-group">
-              <label className="form-label" htmlFor="edit-source">Lead Source</label>
+              <label className="form-label" htmlFor="industry">Industry</label>
+              <input
+                id="industry"
+                name="industry"
+                type="text"
+                className="form-control"
+                value={formData.industry}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="company-size">Company Size</label>
               <select
-                id="edit-source"
+                id="company-size"
+                name="company_size"
+                className="form-control"
+                value={formData.company_size}
+                onChange={handleChange}
+              >
+                <option value="">Select Size</option>
+                <option value="1-10">1-10 employees</option>
+                <option value="11-50">11-50 employees</option>
+                <option value="51-200">51-200 employees</option>
+                <option value="201-500">201-500 employees</option>
+                <option value="501-1000">501-1000 employees</option>
+                <option value="1000+">1000+ employees</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="annual-revenue">Annual Revenue (₹)</label>
+              <input
+                id="annual-revenue"
+                name="annual_revenue"
+                type="number"
+                step="0.01"
+                className="form-control"
+                value={formData.annual_revenue}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="city">City</label>
+              <input
+                id="city"
+                name="city"
+                type="text"
+                className="form-control"
+                value={formData.city}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="state">State / Region</label>
+              <input
+                id="state"
+                name="state"
+                type="text"
+                className="form-control"
+                value={formData.state}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="country">Country</label>
+              <input
+                id="country"
+                name="country"
+                type="text"
+                className="form-control"
+                value={formData.country}
+                onChange={handleChange}
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="lead-address">Physical Address</label>
+            <textarea
+              id="lead-address"
+              name="address"
+              className="form-control"
+              rows={2}
+              value={formData.address}
+              onChange={handleChange}
+            />
+          </div>
+
+          {/* Section 3: Lead Qualification */}
+          <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', margin: '1.25rem 0 0.75rem 0' }}>
+            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <Target size={16} color="#f59e0b" />
+              <span>Lead Qualification</span>
+            </h3>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="lead-score">Lead Score (0-100)</label>
+              <input
+                id="lead-score"
+                name="lead_score"
+                type="number"
+                min="0"
+                max="100"
+                className="form-control"
+                value={formData.lead_score}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="buying-intent">Buying Intent</label>
+              <select
+                id="buying-intent"
+                name="buying_intent"
+                className="form-control"
+                value={formData.buying_intent}
+                onChange={handleChange}
+              >
+                <option value="HIGH">High Intent</option>
+                <option value="MEDIUM">Medium Intent</option>
+                <option value="LOW">Low Intent</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="estimated-budget">Estimated Budget (₹)</label>
+              <input
+                id="estimated-budget"
+                name="estimated_budget"
+                type="number"
+                step="0.01"
+                className="form-control"
+                value={formData.estimated_budget}
+                onChange={handleChange}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="purchasing-timeline">Purchasing Timeline</label>
+              <select
+                id="purchasing-timeline"
+                name="purchasing_timeline"
+                className="form-control"
+                value={formData.purchasing_timeline}
+                onChange={handleChange}
+              >
+                <option value="">Select Timeline</option>
+                <option value="IMMEDIATE">Immediate (&lt; 1 month)</option>
+                <option value="1_3_MONTHS">1 - 3 months</option>
+                <option value="3_6_MONTHS">3 - 6 months</option>
+                <option value="6_12_MONTHS">6 - 12 months</option>
+                <option value="NO_TIMELINE">No immediate plan</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="decision-maker">Key Decision Maker Name / Title</label>
+            <input
+              id="decision-maker"
+              name="decision_maker"
+              type="text"
+              className="form-control"
+              value={formData.decision_maker}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="customer-requirements">Customer Requirements / Scope</label>
+            <textarea
+              id="customer-requirements"
+              name="customer_requirements"
+              className="form-control"
+              rows={3}
+              value={formData.customer_requirements}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="competitor-info">Competitor Information</label>
+            <textarea
+              id="competitor-info"
+              name="competitor_info"
+              className="form-control"
+              rows={2}
+              value={formData.competitor_info}
+              onChange={handleChange}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label" htmlFor="qualification-notes">Qualification Notes</label>
+            <textarea
+              id="qualification-notes"
+              name="qualification_notes"
+              className="form-control"
+              rows={2}
+              value={formData.qualification_notes}
+              onChange={handleChange}
+            />
+          </div>
+
+          {/* Section 4: Pipeline & Sales Information */}
+          <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', margin: '1.25rem 0 0.75rem 0' }}>
+            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+              <DollarSign size={16} color="#10b981" />
+              <span>Pipeline & Sales Information</span>
+            </h3>
+          </div>
+
+          <div className="form-grid-2">
+            <div className="form-group">
+              <label className="form-label" htmlFor="lead-type">Lead Type</label>
+              <select
+                id="lead-type"
+                name="lead_type"
+                className="form-control"
+                value={formData.lead_type}
+                onChange={handleChange}
+              >
+                <option value="INBOUND">Inbound</option>
+                <option value="OUTBOUND">Outbound</option>
+                <option value="REFERRAL">Referral</option>
+                <option value="PARTNER">Partner</option>
+                <option value="EVENT">Event / Trade Show</option>
+                <option value="EXISTING_CUSTOMER">Existing Customer</option>
+                <option value="OTHER">Other</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="lead-source">Lead Source</label>
+              <select
+                id="lead-source"
                 name="source"
                 className="form-control"
                 value={formData.source}
@@ -309,11 +723,13 @@ export const LeadEdit = () => {
                 ))}
               </select>
             </div>
+          </div>
 
+          <div className="form-grid-2">
             <div className="form-group">
-              <label className="form-label" htmlFor="edit-priority">Priority</label>
+              <label className="form-label" htmlFor="lead-priority">Priority</label>
               <select
-                id="edit-priority"
+                id="lead-priority"
                 name="priority"
                 className="form-control"
                 value={formData.priority}
@@ -326,123 +742,121 @@ export const LeadEdit = () => {
                 ))}
               </select>
             </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="expected-close-date">Expected Closing Date</label>
+              <input
+                id="expected-close-date"
+                name="expected_close_date"
+                type="date"
+                className="form-control"
+                value={formData.expected_close_date}
+                onChange={handleChange}
+              />
+            </div>
           </div>
 
-          <div className="form-grid-2">
-            <div className="form-group">
-              <label className="form-label form-label-required" htmlFor="edit-stage">Lead Stage</label>
-              <select
-                id="edit-stage"
-                name="stage"
-                className="form-control"
-                value={formData.stage}
-                onChange={handleChange}
-                required
-                aria-invalid={Boolean(errors.stage)}
-                aria-describedby={errors.stage ? 'edit-stage-error' : undefined}
-              >
-                {stages.map((st) => (
-                  <option key={st.id} value={st.id}>
-                    {st.name}
-                  </option>
-                ))}
-              </select>
-              <FieldError id="edit-stage-error" message={errors.stage} />
-            </div>
+          <div className="form-group">
+            <label className="form-label" htmlFor="lead-value">Expected Deal Value (₹)</label>
+            <input
+              id="lead-value"
+              name="expected_value"
+              type="number"
+              step="0.01"
+              min="0"
+              className="form-control"
+              value={formData.expected_value}
+              onChange={handleChange}
+              aria-invalid={Boolean(errors.expected_value)}
+            />
+            <FieldError id="lead-value-error" message={errors.expected_value} />
+          </div>
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="edit-value">Expected Deal Value (₹)</label>
-              <input
-                id="edit-value"
-                name="expected_value"
-                type="number"
-                step="0.01"
-                min="0"
-                className="form-control"
-                value={formData.expected_value}
-                onChange={handleChange}
-                aria-invalid={Boolean(errors.expected_value)}
-                aria-describedby={errors.expected_value ? 'edit-value-error' : undefined}
-              />
-              <FieldError id="edit-value-error" message={errors.expected_value} />
-            </div>
+          {/* Multi-Product Selection */}
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
+              <Package size={15} color="var(--primary)" /> Products & Line Items
+            </label>
+            <ProductSelector
+              selectedProductIds={formData.product_ids || []}
+              onChange={(ids) => setFormData((prev) => ({ ...prev, product_ids: ids }))}
+              onTotalValueChange={(val) => {
+                if (val > 0) {
+                  setFormData((prev) => ({ ...prev, expected_value: val.toFixed(2) }));
+                }
+              }}
+            />
           </div>
 
           {canAssignLeads && (
             <div className="form-group">
-              <label className="form-label" htmlFor="edit-assigned">Assigned Executive</label>
+              <label className="form-label" htmlFor="lead-assigned">Assigned Representative</label>
               <select
-                id="edit-assigned"
+                id="lead-assigned"
                 name="assigned_to"
                 className="form-control"
-                value={formData.assigned_to || ''}
+                value={formData.assigned_to}
                 onChange={handleChange}
               >
                 <option value="">Unassigned</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.full_name || u.email} ({u.role})
-                  </option>
-                ))}
+                {users
+                  .filter((u) => u.is_active && u.role === 'EXECUTIVE')
+                  .map((u) => (
+                    <option key={u.id} value={u.id}>
+                      {u.first_name || u.last_name ? `${u.first_name} ${u.last_name}` : u.email}
+                    </option>
+                  ))}
               </select>
             </div>
           )}
 
           {isLostStage && (
             <div className="form-group">
-              <label className="form-label form-label-required" htmlFor="edit-lost-reason">
-                Lost Reason
+              <label className="form-label form-label-required" htmlFor="lead-lost-reason">
+                Lost Reason (Mandatory when stage is Lost)
               </label>
               <textarea
-                id="edit-lost-reason"
+                id="lead-lost-reason"
                 name="lost_reason"
                 className="form-control"
-                value={formData.lost_reason || ''}
+                rows={2}
+                placeholder="Reason why this deal was lost..."
+                value={formData.lost_reason}
                 onChange={handleChange}
-                placeholder="Specify why the deal was lost..."
                 required
                 aria-invalid={Boolean(errors.lost_reason)}
-                aria-describedby={errors.lost_reason ? 'edit-lost-reason-error' : undefined}
               />
-              <FieldError id="edit-lost-reason-error" message={errors.lost_reason} />
+              <FieldError id="lead-lost-reason-error" message={errors.lost_reason} />
             </div>
           )}
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="edit-address">Address</label>
-            <textarea
-              id="edit-address"
-              name="address"
-              className="form-control"
-              value={formData.address || ''}
-              onChange={handleChange}
-              placeholder="Street, city, state..."
-              rows={2}
-            />
-          </div>
-
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-            <button type="button" className="btn btn-secondary" onClick={handleCancel}>
+          <div className="form-actions" style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
+            <Link to={`/leads/${id}`} className="btn btn-secondary">
               Cancel
-            </button>
+            </Link>
             <button type="submit" className="btn btn-primary" disabled={saving}>
-              <Save size={18} />
-              <span>{saving ? 'Updating...' : 'Save Changes'}</span>
+              <Save size={16} />
+              <span>{saving ? 'Saving...' : 'Save Changes'}</span>
             </button>
           </div>
         </form>
       </div>
 
-      <ConfirmModal
-        isOpen={confirmCancelOpen}
-        title="Discard unsaved changes?"
-        message="You have unsaved edits that will be lost if you leave this page."
-        confirmText="Discard Changes"
-        cancelText="Keep Editing"
-        isDestructive={true}
-        onConfirm={() => navigate(`/leads/${id}`)}
-        onCancel={() => setConfirmCancelOpen(false)}
-      />
+      {pldModalData && (
+        <ConfirmModal
+          isOpen={Boolean(pldModalData)}
+          title="PLD Qualification Required"
+          message={`Stage "${pldModalData.stageName}" requires a qualified PLD assessment before advancing.`}
+          confirmText="Start Assessment"
+          onConfirm={() => {
+            navigate(`/leads/${id}?tab=pld`);
+            setPldModalData(null);
+          }}
+          onCancel={() => setPldModalData(null)}
+        />
+      )}
     </div>
   );
 };
+
+export default LeadEdit;

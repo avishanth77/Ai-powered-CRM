@@ -5,7 +5,6 @@ import { followupApi } from '../api/followupApi';
 import { userApi } from '../api/userApi';
 import { aiApi } from '../api/aiApi';
 import { icpApi } from '../api/icpApi';
-import { pldApi } from '../api/pldApi';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { formatCurrency, formatDateTime, formatDate, formatRelativeTime, toLocalDateTimeInput } from '../utils/formatters';
@@ -27,12 +26,18 @@ import { InternalCommentsSection } from '../components/InternalCommentsSection';
 import { IcpQualificationHistory } from '../components/IcpQualificationHistory';
 import { IcpQualificationLauncher } from '../components/IcpQualificationTest';
 import { IcpStatusBadge } from '../components/IcpStatusBadge';
-import { PldAssessmentHistory } from '../components/PldAssessmentHistory';
-import { PldAssessmentLauncher, PldAssessmentTest } from '../components/PldAssessmentTest';
-import { PldGateChecklist } from '../components/PldGateChecklist';
-import { PldNextAction } from '../components/PldNextAction';
-import { PldStatusBadge } from '../components/PldStatusBadge';
+import LeadStageTasksTab from '../components/LeadStageTasksTab';
+import StageTaskCheckpointModal from '../components/StageTaskCheckpointModal';
+import StageTransitionModal from '../components/StageTransitionModal';
+import ProductSelector from '../components/ProductSelector';
+import { HubSpotLeadHeader } from '../components/hubspot/HubSpotLeadHeader';
+import { HubSpotOverviewTab } from '../components/hubspot/HubSpotOverviewTab';
+import { HubSpotActivitiesTab } from '../components/hubspot/HubSpotActivitiesTab';
+import { HubSpotNotesCollabTab } from '../components/hubspot/HubSpotNotesCollabTab';
+import { HubSpotHistoryTab } from '../components/hubspot/HubSpotHistoryTab';
+import { CustomPropertiesModal } from '../components/hubspot/CustomPropertiesModal';
 import '../styles/comments.css';
+import '../styles/hubspot_lead.css';
 
 import {
   ArrowLeft,
@@ -60,6 +65,11 @@ import {
   Target,
   ShieldAlert,
   Gauge,
+  TrendingUp,
+  Loader2,
+  CheckSquare,
+  Package,
+  X,
 } from 'lucide-react';
 
 export const LeadDetails = () => {
@@ -71,7 +81,10 @@ export const LeadDetails = () => {
 
   const [lead, setLead] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'notes'); // notes | followups | handovers | timeline | comments | icp
+  const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'overview');
+  const [customPropsModalOpen, setCustomPropsModalOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Data for tabs & dropdowns
   const [stages, setStages] = useState([]);
@@ -86,15 +99,7 @@ export const LeadDetails = () => {
   const [icpRefreshToken, setIcpRefreshToken] = useState(0);
 
   // PLD state
-  const [pldState, setPldState] = useState({ gates: [], pld_score: 0, pld_status: 'NOT_ASSESSED', assessment_count: 0 });
-  const [pldRefreshToken, setPldRefreshToken] = useState(0);
-  const [pldModalOpen, setPldModalOpen] = useState(false);
-  const [pldModalStageId, setPldModalStageId] = useState(null);
 
-  const openPldAssessment = useCallback((stageId = null) => {
-    setPldModalStageId(stageId);
-    setPldModalOpen(true);
-  }, []);
 
   // Modals state
   const [convertModalOpen, setConvertModalOpen] = useState(false);
@@ -128,6 +133,9 @@ export const LeadDetails = () => {
 
   const [lostModalOpen, setLostModalOpen] = useState(false);
   const [pendingLostStageId, setPendingLostStageId] = useState(null);
+  const [checkpointModalData, setCheckpointModalData] = useState(null);
+  const [transitionModalData, setTransitionModalData] = useState(null);
+  const [transitionSubmitting, setTransitionSubmitting] = useState(false);
   const [lostSubmitting, setLostSubmitting] = useState(false);
 
   // AI Summary State
@@ -147,6 +155,16 @@ export const LeadDetails = () => {
 
   // Logged Call Summary Details Modal
   const [callModalOpen, setCallModalOpen] = useState(false);
+  const [isEditWinProbOpen, setIsEditWinProbOpen] = useState(false);
+  const [isEditProductsOpen, setIsEditProductsOpen] = useState(false);
+  const [editProductIds, setEditProductIds] = useState([]);
+  const [isSubmittingProducts, setIsSubmittingProducts] = useState(false);
+  const [editWinProbVal, setEditWinProbVal] = useState(10);
+  const [editWinProbReason, setEditWinProbReason] = useState('');
+  const [isSubmittingWinProb, setIsSubmittingWinProb] = useState(false);
+  const winProbDialogRef = useDialogA11y(isEditWinProbOpen, () => {
+    if (!isSubmittingWinProb) setIsEditWinProbOpen(false);
+  });
   const [activeCallSummary, setActiveCallSummary] = useState(null);
   const [loadingCallDetails, setLoadingCallDetails] = useState(false);
   const callDialogRef = useDialogA11y(callModalOpen, () => setCallModalOpen(false));
@@ -278,20 +296,6 @@ export const LeadDetails = () => {
     } catch {}
   }, [id]);
 
-  const fetchPldState = useCallback(async () => {
-    try {
-      const res = await pldApi.getLeadPld(id);
-      const data = res?.data;
-      if (data) {
-        setPldState({
-          gates: data.gates || [],
-          pld_score: data.pld_score,
-          pld_status: data.pld_status,
-          assessment_count: data.assessment_count || 0,
-        });
-      }
-    } catch {}
-  }, [id]);
 
   useEffect(() => {
     fetchLeadDetails();
@@ -301,64 +305,166 @@ export const LeadDetails = () => {
     fetchFollowups();
     fetchHandovers();
     fetchIcpHistory();
-    fetchPldState();
 
     if (canAssignLeads || canHandoverLeads) {
       userApi.getUsers().then((res) => setUsersList(asList(res.results ?? res))).catch(() => {});
     }
-  }, [fetchLeadDetails, fetchStages, fetchNotes, fetchTimeline, fetchFollowups, fetchHandovers, fetchIcpHistory, fetchPldState, canAssignLeads, canHandoverLeads]);
+  }, [fetchLeadDetails, fetchStages, fetchNotes, fetchTimeline, fetchFollowups, fetchHandovers, fetchIcpHistory, canAssignLeads, canHandoverLeads]);
 
-  const handleIcpCompleted = useCallback(() => {
+  const handleIcpCompleted = useCallback((qualificationData) => {
     setIcpRefreshToken((prev) => prev + 1);
     fetchIcpHistory();
     fetchLeadDetails();
-  }, [fetchIcpHistory, fetchLeadDetails]);
+    if (qualificationData?.stage_advanced) {
+      showToast(
+        `ICP Qualified! Lead auto-advanced to ${qualificationData.new_stage || 'next stage'}.`,
+        'success'
+      );
+    }
+  }, [fetchIcpHistory, fetchLeadDetails, showToast]);
 
-  const handlePldCompleted = useCallback(() => {
-    setPldRefreshToken((prev) => prev + 1);
-    fetchPldState();
-    fetchLeadDetails();
-    fetchTimeline();
-  }, [fetchPldState, fetchLeadDetails, fetchTimeline]);
 
-  // Handle Quick Stage Change
-  const handleStageChange = async (newStageId) => {
+    // Step 1: Open Stage Progression Checkpoint FIRST on stage change
+  const handleStageChange = (newStageId) => {
     const targetStageObj = stages.find((s) => s.id === parseInt(newStageId));
     if (!targetStageObj) {
       showToast('Could not update stage — the stage list is unavailable.', 'error');
       return;
     }
+    const currentStageObj = stages.find((s) => s.id === (lead?.stage?.id || lead?.stage));
     const isLost = targetStageObj.slug === 'lost' || targetStageObj.name.toLowerCase() === 'lost';
 
     if (isLost) {
-      setPendingLostStageId(parseInt(newStageId));
-      setLostModalOpen(true);
+      // Direct lost reason modal
+      setTransitionModalData({
+        lead,
+        sourceStage: currentStageObj?.name || lead?.stage_details?.name || lead?.status || 'Current Stage',
+        targetStage: targetStageObj,
+      });
       return;
     }
 
+    // Step 1: Stage Progression Checkpoint Modal FIRST!
+    setCheckpointModalData({
+      lead,
+      sourceStage: currentStageObj?.name || lead?.stage_details?.name || lead?.status || 'Current Stage',
+      targetStage: targetStageObj,
+    });
+  };
+
+  const handleProceedFromCheckpoint = ({ lead: l, targetStage, sourceStage }) => {
+    setCheckpointModalData(null);
+    setTransitionModalData({
+      lead: l || lead,
+      sourceStage: sourceStage || checkpointModalData?.sourceStage,
+      targetStage,
+    });
+  };
+
+  const handleConfirmTransition = async ({ targetStage, winProbability, winProbabilityReason, lostReason }) => {
+    setTransitionSubmitting(true);
     try {
-      await leadApi.updateLead(id, { stage: parseInt(newStageId) });
-      showToast(`Stage changed to ${targetStageObj.name}`, 'success');
+      const payload = {
+        stage: targetStage.id,
+        win_probability_override: winProbability,
+        win_probability_reason: winProbabilityReason,
+      };
+      if (lostReason) {
+        payload.lost_reason = lostReason;
+      }
+
+      const updateRes = await leadApi.updateLead(id, payload);
+      const autoCount = updateRes?.automated_tasks?.length || 0;
+      showToast(
+        `Stage changed to ${targetStage.name}${autoCount > 0 ? ` (${autoCount} automated task${autoCount > 1 ? 's' : ''} assigned)` : ''}`,
+        'success'
+      );
+      setTransitionModalData(null);
       fetchLeadDetails();
       fetchTimeline();
-      fetchPldState();
+      fetchFollowups();
     } catch (err) {
       const errData = err.response?.data;
-      const missingList = errData?.missing || errData?.missing_codes || [];
-      const hasPldMissing =
-        missingList.includes('pld_status') ||
-        missingList.includes('pld_assessment') ||
-        Boolean(errData?.missing_details?.some((m) => m.code === 'pld_status' || m.code === 'pld_assessment'));
+      const missingList =
+        errData?.missing ||
+        errData?.errors?.missing ||
+        errData?.missing_codes ||
+        errData?.errors?.missing_codes ||
+        [];
+      const errorMsg = String(errData?.message || errData?.errors?.stage || '');
+      const hasStageTasksMissing =
+        missingList.includes('mandatory_tasks') ||
+        Boolean(errData?.missing_tasks?.length) ||
+        errorMsg.toLowerCase().includes('mandatory task') ||
+        errorMsg.toLowerCase().includes('manager approval') ||
+        Boolean(errData?.manager_approval_required);
 
-      if (hasPldMissing) {
-        showToast(
-          `Stage "${targetStageObj.name}" requires qualifying its PLD assessment first. Please complete the assessment below.`,
-          'warning'
-        );
-        openPldAssessment(targetStageObj.id);
+      if (hasStageTasksMissing) {
+        setTransitionModalData(null);
+        setCheckpointModalData({
+          lead,
+          targetStage: {
+            ...targetStage,
+            win_probability: winProbability,
+            win_probability_reason: winProbabilityReason,
+          },
+          missingTasks: errData?.missing_tasks || [],
+          errorMessage: errorMsg,
+        });
       } else {
         showToast(extractErrorMessage(err, 'Stage update failed'), 'error');
       }
+    } finally {
+      setTransitionSubmitting(false);
+    }
+  };
+
+  const handleOpenEditWinProb = () => {
+    setEditWinProbVal(lead?.win_probability_override ?? lead?.win_probability ?? 10);
+    setEditWinProbReason(lead?.win_probability_reason || '');
+    setIsEditWinProbOpen(true);
+  };
+
+  const handleSaveWinProb = async (e) => {
+    if (e) e.preventDefault();
+    setIsSubmittingWinProb(true);
+    try {
+      const prob = parseInt(editWinProbVal, 10) || 0;
+      await leadApi.updateLead(id, {
+        win_probability_override: prob,
+        win_probability_reason: (editWinProbReason || '').trim(),
+      });
+      showToast(`Win probability set to ${prob}% (constant across all stages)`, 'success');
+      setIsEditWinProbOpen(false);
+      fetchLeadDetails();
+      fetchTimeline();
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Failed to update win probability'), 'error');
+    } finally {
+      setIsSubmittingWinProb(false);
+    }
+  };
+
+  const handleOpenEditProducts = () => {
+    setEditProductIds(lead?.product_ids || lead?.products?.map((p) => p.id) || []);
+    setIsEditProductsOpen(true);
+  };
+
+  const handleSaveProducts = async (e) => {
+    if (e) e.preventDefault();
+    setIsSubmittingProducts(true);
+    try {
+      await leadApi.updateLead(id, {
+        product_ids: editProductIds,
+      });
+      showToast('Lead products updated successfully!', 'success');
+      setIsEditProductsOpen(false);
+      fetchLeadDetails();
+      fetchTimeline();
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Failed to update products'), 'error');
+    } finally {
+      setIsSubmittingProducts(false);
     }
   };
 
@@ -547,6 +653,20 @@ export const LeadDetails = () => {
     }
   };
 
+  const handleDeleteLead = async () => {
+    setDeleting(true);
+    try {
+      await leadApi.deleteLead(id);
+      showToast('Lead deleted successfully', 'success');
+      navigate('/leads');
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Failed to delete lead'), 'error');
+    } finally {
+      setDeleting(false);
+      setDeleteConfirmOpen(false);
+    }
+  };
+
   if (loading || !lead) {
     return <LoadingSpinner text="Loading lead profile..." />;
   }
@@ -569,677 +689,227 @@ export const LeadDetails = () => {
 
   return (
     <div className="lead-detail-page">
-      {/* Back and Page Header */}
-      <div className="page-header">
-        <div>
-          <Link to="/leads" className="contact-item mb-2" style={{ marginBottom: '0.5rem' }}>
-            <ArrowLeft size={16} /> Back to Leads
-          </Link>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-            <h1 className="page-title">{lead.name}</h1>
-            <StatusBadge status={lead.stage_details || lead.status} />
-            <PriorityBadge priority={lead.priority} />
-            <IcpStatusBadge status={lead.icp_status} />
-          </div>
-          <p className="page-subtitle">
-            {lead.company_name ? `${lead.company_name} • ` : ''}Created on {formatDate(lead.created_at)}
-          </p>
-        </div>
+      {/* HubSpot Top Lead Profile Header */}
+      <HubSpotLeadHeader
+        lead={lead}
+        stages={stages}
+        onStageSelect={(stg) => handleStageChange(stg.id)}
+        onEditLead={() => navigate(`/leads/${id}/edit`)}
+        onLogCall={() => {
+          setNoteData({ note_type: 'CALL', note_text: '' });
+          setNewNoteModalOpen(true);
+        }}
+        onLogEmail={() => {
+          setNoteData({ note_type: 'EMAIL', note_text: '' });
+          setNewNoteModalOpen(true);
+        }}
+        onLogMeeting={() => {
+          setNoteData({ note_type: 'MEETING', note_text: '' });
+          setNewNoteModalOpen(true);
+        }}
+        onAddNote={() => {
+          setNoteData({ note_type: 'GENERAL', note_text: '' });
+          setNewNoteModalOpen(true);
+        }}
+        onNewTask={() => setActiveTab('stage-tasks')}
+        onScheduleFollowup={() => setScheduleModalOpen(true)}
+        onConvert={() => setConvertModalOpen(true)}
+        onHandover={() => setHandoverModalOpen(true)}
+        onAssign={() => setAssignModalOpen(true)}
+        onMarkLost={() => {
+          const lostStg = stages.find((s) => s.slug === 'lost' || s.name.toLowerCase() === 'lost');
+          if (lostStg) {
+            handleStageChange(lostStg.id);
+          } else {
+            setLostModalOpen(true);
+          }
+        }}
+        onDelete={() => setDeleteConfirmOpen(true)}
+        onOpenWinProb={handleOpenEditWinProb}
+        canAssignLeads={canAssignLeads}
+        canConvertLeads={canConvertLeads}
+        canHandoverLeads={canHandoverLeads}
+        isAdminOrManager={user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.is_superuser}
+      />
 
-        <div className="page-actions">
-          {/* Convert to Customer Button (Qualified Leads Only) */}
-          {canConvertLeads && isQualified && (
-            <button
-              type="button"
-              className="btn btn-success"
-              onClick={() => setConvertModalOpen(true)}
+      {/* HubSpot Navigation Tabs */}
+      <div className="hs-tabs" role="tablist" style={{ marginTop: '1.25rem' }}>
+        <button
+          type="button"
+          className={`hs-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
+          onClick={() => setActiveTab('overview')}
+        >
+          <span>Overview</span>
+        </button>
+
+        <button
+          type="button"
+          className={`hs-tab-btn ${activeTab === 'activities' ? 'active' : ''}`}
+          onClick={() => setActiveTab('activities')}
+        >
+          <span>Activities</span>
+          <span className="hs-tab-pill">{notes.length + followups.length + timeline.length}</span>
+        </button>
+
+        <button
+          type="button"
+          className={`hs-tab-btn ${activeTab === 'stage-tasks' ? 'active' : ''}`}
+          onClick={() => setActiveTab('stage-tasks')}
+        >
+          <span>Tasks & Pipeline Gates</span>
+          {lead?.stage_task_summary && (
+            <span
+              className="hs-tab-pill"
+              style={{
+                backgroundColor: lead.stage_task_summary.mandatory_pending > 0 ? 'rgba(234, 179, 8, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                color: lead.stage_task_summary.mandatory_pending > 0 ? 'var(--warning)' : 'var(--success)',
+              }}
             >
-              <UserCheck size={18} />
-              <span>Convert to Customer</span>
-            </button>
+              {lead.stage_task_summary.completed}/{lead.stage_task_summary.total}
+            </span>
           )}
+        </button>
 
-          {isWon && lead.customer_id && (
-            <Link to={`/customers/${lead.customer_id}`} className="btn btn-secondary">
-              <CheckCircle2 size={16} color="var(--success)" />
-              <span>View Customer Record</span>
-            </Link>
-          )}
+        <button
+          type="button"
+          className={`hs-tab-btn ${activeTab === 'notes' ? 'active' : ''}`}
+          onClick={() => setActiveTab('notes')}
+        >
+          <span>Notes & Team Collab</span>
+          <span className="hs-tab-pill">{notes.length}</span>
+        </button>
 
-          {canAssignLeads && (
-            <button
-              type="button"
-              className="btn btn-secondary"
-              onClick={() => setAssignModalOpen(true)}
-            >
-              <Share2 size={16} />
-              <span>Assign Lead</span>
-            </button>
-          )}
+        <button
+          type="button"
+          className={`hs-tab-btn ${activeTab === 'history' ? 'active' : ''}`}
+          onClick={() => setActiveTab('history')}
+        >
+          <span>Audit History</span>
+          <span className="hs-tab-pill">{timeline.length}</span>
+        </button>
 
+        <button
+          type="button"
+          className={`hs-tab-btn ${activeTab === 'icp' ? 'active' : ''}`}
+          onClick={() => setActiveTab('icp')}
+        >
+          <span>ICP Fit</span>
+          {icpCount > 0 && <span className="hs-tab-pill">{icpCount}</span>}
+        </button>
+
+        {(user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.is_superuser) && (
           <button
             type="button"
-            className="btn btn-secondary"
-            onClick={handleOpenAiSummary}
-            title="Generate AI Lead Analysis"
-            disabled={loadingAi}
+            className="btn btn-secondary btn-sm"
+            style={{ marginLeft: 'auto', fontSize: '0.75rem', padding: '0.35rem 0.65rem' }}
+            onClick={() => setCustomPropsModalOpen(true)}
+            title="Configure dynamic custom properties"
           >
-            <Sparkles size={16} color="#c084fc" />
-            <span>{loadingAi ? 'Analyzing…' : 'AI Synthesis'}</span>
+            <Shield size={13} color="var(--primary)" />
+            <span>Customize Fields</span>
           </button>
-
-          <Link
-            to={`/ai/call-summary?lead=${id}`}
-            className="btn btn-secondary"
-            title="Record or Upload AI Voice Call Summary"
-          >
-            <Mic size={16} color="var(--primary)" />
-            <span>AI Call Summary</span>
-          </Link>
-
-          <Link to={`/leads/${id}/edit`} className="btn btn-secondary">
-            <Edit size={16} />
-            <span>Edit Profile</span>
-          </Link>
-
-          <button
-            type="button"
-            className="btn btn-primary"
-            onClick={() => setScheduleModalOpen(true)}
-          >
-            <CalendarPlus size={16} />
-            <span>Schedule Follow-up</span>
-          </button>
-        </div>
+        )}
       </div>
 
-      {/* Main Grid: Sidebar Profile + Tabbed Content */}
-      <div className="lead-detail-layout">
-        {/* Left Column: Lead Information Card */}
-        <div className="lead-profile-sidebar">
-          <div className="card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem' }}>
-              <h3 style={{ fontSize: '1rem' }}>Contact Information</h3>
-              {/* Quick Stage Selector */}
-              <select
-                className="pipeline-move-select"
-                value={lead.stage || lead.stage_details?.id || ''}
-                onChange={(e) => handleStageChange(e.target.value)}
-                aria-label="Change Lead Stage"
-                disabled={stages.length === 0}
-              >
-                {lead.stage_details && !stages.some((s) => s.id === lead.stage_details.id) && (
-                  <option value={lead.stage_details.id}>{lead.stage_details.name}</option>
-                )}
-                {stages.map((st) => (
-                  <option key={st.id} value={st.id}>
-                    {st.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+      {/* Main Tab Panels */}
+      <div style={{ marginTop: '1rem', marginBottom: '2rem' }}>
+        {activeTab === 'overview' && (
+          <HubSpotOverviewTab
+            lead={lead}
+            onViewTasksTab={() => setActiveTab('stage-tasks')}
+            onViewActivitiesTab={() => setActiveTab('activities')}
+            onScheduleFollowup={() => setScheduleModalOpen(true)}
+            onOpenAiSummary={handleOpenAiSummary}
+          />
+        )}
 
-            <div className="lead-info-list">
-              {/* Current Assignment Block */}
-              <div
-                className="lead-info-item"
-                style={{
-                  background: 'rgba(99, 102, 241, 0.08)',
-                  padding: '0.875rem 1rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: '1px solid rgba(99, 102, 241, 0.25)',
-                  marginBottom: '0.75rem',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
-                  <div>
-                    <span className="lead-info-label" style={{ color: 'var(--primary)', fontWeight: 600 }}>
-                      Current Assignment
-                    </span>
-                    <div style={{ fontWeight: 600, fontSize: '0.9375rem', color: 'var(--text-main)', marginTop: '0.25rem' }}>
-                      {lead.assigned_to_details?.full_name || lead.assigned_to_details?.email || 'Unassigned'}
-                    </div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '0.125rem' }}>
-                      Role: {lead.assigned_to_details?.role === 'EXECUTIVE' ? 'Sales Executive' : (lead.assigned_to_details?.role || 'Sales Executive')}
-                    </div>
-                  </div>
-                  {canHandoverLeads && (
-                    <button
-                      type="button"
-                      className="btn btn-primary btn-sm"
-                      style={{ padding: '0.35rem 0.625rem', fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem', flexShrink: 0 }}
-                      onClick={() => setHandoverModalOpen(true)}
-                    >
-                      <Share2 size={13} />
-                      <span>Handover Lead</span>
-                    </button>
-                  )}
-                </div>
+        {activeTab === 'activities' && (
+          <HubSpotActivitiesTab
+            lead={lead}
+            notes={notes}
+            followups={followups}
+            timeline={timeline}
+            onLogCall={() => {
+              setNoteData({ note_type: 'CALL', note_text: '' });
+              setNewNoteModalOpen(true);
+            }}
+            onLogEmail={() => {
+              setNoteData({ note_type: 'EMAIL', note_text: '' });
+              setNewNoteModalOpen(true);
+            }}
+            onLogMeeting={() => {
+              setNoteData({ note_type: 'MEETING', note_text: '' });
+              setNewNoteModalOpen(true);
+            }}
+            onAddNote={() => {
+              setNoteData({ note_type: 'GENERAL', note_text: '' });
+              setNewNoteModalOpen(true);
+            }}
+            onCompleteFollowup={(f) => {
+              setSelectedFollowup(f);
+              setCompletionOutcome(f.outcome || '');
+              setCompleteModalOpen(true);
+            }}
+          />
+        )}
+
+        {activeTab === 'stage-tasks' && (
+          <LeadStageTasksTab
+            lead={lead}
+            stages={stages}
+            users={usersList}
+            onLeadUpdated={() => {
+              fetchLeadDetails();
+              fetchTimeline();
+            }}
+            onAdvanceStageClick={(targetStage) => {
+              if (targetStage) {
+                handleStageChange(targetStage.id);
+              }
+            }}
+          />
+        )}
+
+        {activeTab === 'notes' && (
+          <HubSpotNotesCollabTab
+            lead={lead}
+            notes={notes}
+            onAddNote={() => {
+              setNoteData({ note_type: 'GENERAL', note_text: '' });
+              setNewNoteModalOpen(true);
+            }}
+          />
+        )}
+
+        {activeTab === 'history' && (
+          <HubSpotHistoryTab
+            timeline={timeline}
+            handovers={handovers}
+          />
+        )}
+
+        {activeTab === 'icp' && (
+          <div className="hs-card" style={{ padding: '1.25rem' }}>
+            <div className="icp-lead-panel-header" style={{ marginBottom: '1.5rem' }}>
+              <div className="icp-lead-status">
+                <span className="icp-lead-status-label">ICP Status</span>
+                <IcpStatusBadge status={lead.icp_status} />
               </div>
-              <PldNextAction
-                lead={lead}
-                stages={stages}
-                pldState={pldState}
-                icpCount={icpCount}
-                onSelectTab={setActiveTab}
-                onMoveStage={handleStageChange}
-                onRunStageAssessment={(stageId) => openPldAssessment(stageId)}
-                onConvert={canConvertLeads && isQualified ? () => setConvertModalOpen(true) : undefined}
+              <IcpQualificationLauncher
+                leadId={lead.id}
+                leadName={lead.name}
+                companyName={lead.company_name}
+                onCompleted={(data) => handleIcpCompleted(data)}
+                buttonLabel={icpCount > 0 ? 'Retake ICP Qualification' : 'Start ICP Qualification'}
               />
-                <div className="lead-info-item">
-                <span className="lead-info-label">Phone</span>
-                <span className="lead-info-value contact-item">
-                  <Phone size={14} className="text-dim" />
-                  {lead.phone ? <a href={`tel:${lead.phone}`}>{lead.phone}</a> : '—'}
-                </span>
-              </div>
-
-              <div className="lead-info-item">
-                <span className="lead-info-label">Email</span>
-                <span className="lead-info-value contact-item">
-                  <Mail size={14} className="text-dim" />
-                  {lead.email ? <a href={`mailto:${lead.email}`}>{lead.email}</a> : '—'}
-                </span>
-              </div>
-
-              <div className="lead-info-item">
-                <span className="lead-info-label">Company</span>
-                <span className="lead-info-value contact-item">
-                  <Building2 size={14} className="text-dim" />
-                  {lead.company_name || 'Individual'}
-                </span>
-              </div>
-
-              <div className="lead-info-item">
-                <span className="lead-info-label">Expected Deal Value</span>
-                <span className="lead-info-value" style={{ fontFamily: 'Outfit', fontSize: '1.25rem', color: 'var(--warning)' }}>
-                  {formatCurrency(lead.expected_value)}
-                </span>
-              </div>
-
-              <div className="lead-info-item">
-                <span className="lead-info-label">Lead Source</span>
-                <span className="lead-info-value">{lead.source_details?.name || 'N/A'}</span>
-              </div>
-
-              {lead.address && (
-                <div className="lead-info-item">
-                  <span className="lead-info-label">Address</span>
-                  <span className="lead-info-value contact-item">
-                    <MapPin size={14} className="text-dim" />
-                    {lead.address}
-                  </span>
-                </div>
-              )}
-
-              {lead.lost_reason && (
-                <div className="lead-info-item" style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '0.75rem', borderRadius: 'var(--radius-md)', border: '1px solid rgba(239, 68, 68, 0.2)' }}>
-                  <span className="lead-info-label" style={{ color: 'var(--danger)' }}>Lost Reason</span>
-                  <span className="lost-reason-text">{lead.lost_reason}</span>
-                </div>
-              )}
             </div>
+
+            <h3 style={{ fontSize: '1.125rem', margin: '0 0 0.75rem 0' }}>
+              ICP Qualification History
+            </h3>
+            <IcpQualificationHistory leadId={lead.id} refreshToken={icpRefreshToken} />
           </div>
-        </div>
-
-        {/* Right Column: Tabbed Communication Notes, Follow-ups, and Activity Timeline */}
-        <div className="lead-detail-main">
-          <div className="tabs-navigation" role="tablist" aria-label="Lead detail views">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'notes'}
-              className={`tab-btn ${activeTab === 'notes' ? 'tab-btn-active' : ''}`}
-              onClick={() => setActiveTab('notes')}
-            >
-              <MessageSquarePlus size={16} />
-              <span>Communication Notes</span>
-              <span className="tab-badge">{notes.length}</span>
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'followups'}
-              className={`tab-btn ${activeTab === 'followups' ? 'tab-btn-active' : ''}`}
-              onClick={() => setActiveTab('followups')}
-            >
-              <Clock size={16} />
-              <span>Follow-ups</span>
-              <span className="tab-badge">{followups.length}</span>
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'handovers'}
-              className={`tab-btn ${activeTab === 'handovers' ? 'tab-btn-active' : ''}`}
-              onClick={() => setActiveTab('handovers')}
-            >
-              <Share2 size={16} />
-              <span>Handover History</span>
-              <span className="tab-badge">{handovers.length}</span>
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'timeline'}
-              className={`tab-btn ${activeTab === 'timeline' ? 'tab-btn-active' : ''}`}
-              onClick={() => setActiveTab('timeline')}
-            >
-              <Activity size={16} />
-              <span>Activity Audit Trail</span>
-              <span className="tab-badge">{timeline.length}</span>
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'comments'}
-              className={`tab-btn ${activeTab === 'comments' ? 'tab-btn-active' : ''}`}
-              onClick={() => setActiveTab('comments')}
-            >
-              <MessageSquare size={16} />
-              <span>Internal Discussion</span>
-              <span className="tab-badge" style={{ background: 'rgba(124, 58, 237, 0.15)', color: 'var(--accent-purple)' }}>
-                Team
-              </span>
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'icp'}
-              className={`tab-btn ${activeTab === 'icp' ? 'tab-btn-active' : ''}`}
-              onClick={() => setActiveTab('icp')}
-            >
-              <Target size={16} />
-              <span>ICP Qualification</span>
-              {icpCount > 0 && <span className="tab-badge">{icpCount}</span>}
-            </button>
-
-            <button
-              type="button"
-              role="tab"
-              aria-selected={activeTab === 'pld'}
-              className={`tab-btn ${activeTab === 'pld' ? 'tab-btn-active' : ''}`}
-              onClick={() => setActiveTab('pld')}
-            >
-              <Gauge size={16} />
-              <span>PLD</span>
-              {pldState.assessment_count > 0 && (
-                <span className="tab-badge">{pldState.assessment_count}</span>
-              )}
-            </button>
-          </div>
-
-          {/* TAB: ICP QUALIFICATION */}
-          {activeTab === 'icp' && lead && (
-            <div>
-              <div className="icp-lead-panel-header">
-                <div className="icp-lead-status">
-                  <span className="icp-lead-status-label">ICP Status</span>
-                  <IcpStatusBadge status={lead.icp_status} />
-                </div>
-                <IcpQualificationLauncher
-                  leadId={lead.id}
-                  leadName={lead.name}
-                  companyName={lead.company_name}
-                  onCompleted={handleIcpCompleted}
-                  buttonLabel={icpCount > 0 ? 'Retake ICP Qualification' : 'Start ICP Qualification'}
-                />
-              </div>
-
-              <h3 style={{ fontSize: '1.125rem', margin: '0 0 0.75rem 0' }}>
-                ICP Qualification History
-              </h3>
-              <IcpQualificationHistory leadId={lead.id} refreshToken={icpRefreshToken} />
-            </div>
-          )}
-
-          {/* TAB: PLD ASSESSMENT */}
-          {activeTab === 'pld' && lead && (
-            <div>
-              <div className="icp-lead-panel-header">
-                <div className="icp-lead-status">
-                  <span className="icp-lead-status-label">PLD Status</span>
-                  <PldStatusBadge status={pldState.pld_status} />
-                  <span className="pld-score-chip">
-                    {pldState.pld_score} pts
-                  </span>
-                </div>
-                <PldAssessmentLauncher
-                  leadId={lead.id}
-                  leadName={lead.name}
-                  companyName={lead.company_name}
-                  stages={stages}
-                  onCompleted={handlePldCompleted}
-                  onMoveStage={handleStageChange}
-                  buttonLabel={
-                    pldState.assessment_count > 0 ? 'Run PLD Assessment Again' : 'Run PLD Assessment'
-                  }
-                />
-              </div>
-
-              <div className="pld-lead-panel-grid">
-                <section className="pld-panel-section">
-                  <h3 className="pld-panel-heading">Stage Requirements</h3>
-                  <PldGateChecklist
-                    gates={pldState.gates}
-                    onRunStageAssessment={(stageId) => openPldAssessment(stageId)}
-                  />
-                </section>
-
-                <section className="pld-panel-section pld-panel-section-wide">
-                  <h3 className="pld-panel-heading">Assessment History</h3>
-                  <PldAssessmentHistory
-                    leadId={lead.id}
-                    refreshToken={pldRefreshToken}
-                  />
-                </section>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 1: Communication Notes */}
-          {activeTab === 'notes' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '1.125rem' }}>Notes & Interactions</h3>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setNewNoteModalOpen(true)}
-                >
-                  <MessageSquarePlus size={15} />
-                  <span>+ Add Communication Note</span>
-                </button>
-              </div>
-
-              {notes.length === 0 ? (
-                <div className="card text-center" style={{ padding: '3rem 1.5rem', textAlign: 'center' }}>
-                  <p className="text-muted">No communication notes recorded yet.</p>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm mt-3"
-                    style={{ margin: '1rem auto 0' }}
-                    onClick={() => setNewNoteModalOpen(true)}
-                  >
-                    Add First Note
-                  </button>
-                </div>
-              ) : (
-                <div className="notes-feed">
-                  {notes.map((note) => (
-                    <div key={note.id} className="note-card">
-                      <div className="note-card-header">
-                        <div className="note-author-info">
-                          <span className="note-type-pill">{note.note_type}</span>
-                          <strong className="text-main font-sm">{note.user_name || note.user_email}</strong>
-                        </div>
-                        <span className="text-dim font-sm">{formatDateTime(note.created_at)}</span>
-                      </div>
-                      <div className="note-body-text">{note.note_text}</div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 2: Follow-ups */}
-          {activeTab === 'followups' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '1.125rem' }}>Scheduled Follow-ups</h3>
-                <button
-                  type="button"
-                  className="btn btn-primary btn-sm"
-                  onClick={() => setScheduleModalOpen(true)}
-                >
-                  <CalendarPlus size={15} />
-                  <span>+ Schedule Follow-up</span>
-                </button>
-              </div>
-
-              {followups.length === 0 ? (
-                <div className="card text-center" style={{ padding: '3rem 1.5rem', textAlign: 'center' }}>
-                  <p className="text-muted">No follow-ups scheduled for this lead.</p>
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm mt-3"
-                    style={{ margin: '1rem auto 0' }}
-                    onClick={() => setScheduleModalOpen(true)}
-                  >
-                    Schedule Now
-                  </button>
-                </div>
-              ) : (
-                <div className="notes-feed">
-                  {followups.map((fu) => {
-                    const isOverdue = fu.is_overdue || (fu.status === 'PENDING' && new Date(fu.follow_up_at) < new Date());
-                    return (
-                      <div key={fu.id} className="note-card">
-                        <div className="note-card-header">
-                          <div className="note-author-info">
-                            <span className="text-main font-semibold">{fu.purpose}</span>
-                            <span
-                              className="status-badge"
-                              style={{
-                                color: isOverdue ? 'var(--danger)' : fu.status === 'COMPLETED' ? 'var(--success)' : '#38bdf8',
-                                backgroundColor: isOverdue ? 'rgba(239, 68, 68, 0.12)' : 'rgba(56, 189, 248, 0.12)',
-                              }}
-                            >
-                              {isOverdue ? 'OVERDUE' : fu.status}
-                            </span>
-                          </div>
-                          <span className="text-dim font-sm">
-                            {formatDateTime(fu.follow_up_at)}
-                          </span>
-                        </div>
-
-                        {fu.outcome && (
-                          <div className="timeline-notes" style={{ marginTop: '0.5rem' }}>
-                            <strong>Outcome:</strong> {fu.outcome}
-                          </div>
-                        )}
-
-                        {fu.status !== 'COMPLETED' ? (
-                          <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                            <button
-                              type="button"
-                              className="btn btn-success btn-sm"
-                              onClick={() => {
-                                setSelectedFollowup(fu);
-                                setCompletionOutcome(fu.outcome || '');
-                                setCompleteModalOpen(true);
-                              }}
-                              title="Complete task & log outcome"
-                            >
-                              <CheckCircle2 size={14} />
-                              <span>Complete & Log Outcome</span>
-                            </button>
-                          </div>
-                        ) : (
-                          <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                            <button
-                              type="button"
-                              className="btn btn-secondary btn-sm"
-                              onClick={() => {
-                                setSelectedFollowup(fu);
-                                setCompletionOutcome(fu.outcome || '');
-                                setCompleteModalOpen(true);
-                              }}
-                              title="View or update logged outcome"
-                            >
-                              <FileText size={14} />
-                              <span>View / Edit Outcome</span>
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 3: Activity Timeline */}
-          {activeTab === 'timeline' && (
-            <div>
-              <h3 style={{ fontSize: '1.125rem', marginBottom: '1rem' }}>Activity History</h3>
-              {timeline.length === 0 ? (
-                <p className="text-muted">No logged activity for this lead.</p>
-              ) : (
-                <div className="timeline-container">
-                  {timeline.map((act) => {
-                    const isCall = act.action === 'CALL_LOGGED';
-                    return (
-                      <div key={act.id} className="timeline-item">
-                        <div
-                          className="timeline-dot"
-                          style={isCall ? { background: 'var(--primary)', borderColor: 'var(--primary)' } : undefined}
-                        />
-                        <div
-                          className="timeline-card"
-                          style={isCall ? { borderLeft: '3px solid var(--primary)' } : undefined}
-                        >
-                          <div className="timeline-header">
-                            <span
-                              className="timeline-action"
-                              style={isCall ? { display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--primary)' } : undefined}
-                            >
-                              {isCall ? (
-                                <>
-                                  <Mic size={14} />
-                                  <span>🎙 Call • {act.new_value?.call_type || 'Outbound'} Call</span>
-                                </>
-                              ) : (
-                                act.action_display || act.action
-                              )}
-                            </span>
-                            <span className="timeline-time">{formatRelativeTime(act.created_at)}</span>
-                          </div>
-
-                          <div className="timeline-actor">
-                            By: {act.performer_name || 'System / Automated'}
-                            {isCall && act.new_value?.duration_seconds !== undefined
-                              ? ` • Duration: ${Math.floor(act.new_value.duration_seconds / 60)}:${String(act.new_value.duration_seconds % 60).padStart(2, '0')}`
-                              : ''}{' '}
-                            ({formatDateTime(act.created_at)})
-                          </div>
-
-                          {isCall && act.new_value?.ai_summary ? (
-                            <div style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
-                              <div style={{ fontWeight: 600, color: 'var(--text-dim)', fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                                AI Summary:
-                              </div>
-                              <div style={{ color: 'var(--text-main)', lineHeight: 1.5 }}>
-                                {act.new_value.ai_summary}
-                              </div>
-                            </div>
-                          ) : act.notes ? (
-                            <div className="timeline-notes">{act.notes}</div>
-                          ) : null}
-
-                          {isCall && act.new_value?.next_action && (
-                            <div style={{ marginTop: '0.5rem', fontSize: '0.875rem' }}>
-                              <div style={{ fontWeight: 600, color: 'var(--text-dim)', fontSize: '0.75rem', textTransform: 'uppercase', marginBottom: '0.25rem' }}>
-                                Next Action:
-                              </div>
-                              <div style={{ color: 'var(--primary)', fontWeight: 600 }}>
-                                {act.new_value.next_action}
-                              </div>
-                            </div>
-                          )}
-
-                          {isCall && (
-                            <div style={{ marginTop: '0.75rem' }}>
-                              <button
-                                type="button"
-                                className="btn btn-secondary btn-sm"
-                                onClick={() => handleViewCallSummary(act.new_value?.call_id, act)}
-                              >
-                                <FileText size={13} />
-                                <span>View Summary</span>
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 4: Handover History */}
-          {activeTab === 'handovers' && (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h3 style={{ fontSize: '1.125rem' }}>Ownership Handover History</h3>
-                {canHandoverLeads && (
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={() => setHandoverModalOpen(true)}
-                  >
-                    <Share2 size={14} />
-                    <span>+ Handover Lead</span>
-                  </button>
-                )}
-              </div>
-
-              {handovers.length === 0 ? (
-                <div className="card text-center" style={{ padding: '3rem 1.5rem', textAlign: 'center' }}>
-                  <p className="text-muted">No ownership handovers recorded for this lead.</p>
-                  {canHandoverLeads && (
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm mt-3"
-                      style={{ margin: '1rem auto 0' }}
-                      onClick={() => setHandoverModalOpen(true)}
-                    >
-                      Initiate Handover
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="timeline-container">
-                  {handovers.map((item) => (
-                    <div key={item.id} className="timeline-item">
-                      <div className="timeline-dot" style={{ background: 'var(--primary)', borderColor: 'var(--primary)' }} />
-                      <div className="timeline-card">
-                        <div className="timeline-header">
-                          <span className="timeline-action" style={{ color: 'var(--primary)' }}>
-                            {item.previous_assignee_name || 'Unassigned'} → {item.new_assignee_name}
-                          </span>
-                          <span className="timeline-time">{formatRelativeTime(item.created_at)}</span>
-                        </div>
-                        <div className="timeline-actor">
-                          Handed over by: <strong>{item.handed_over_by_name || 'Admin / Manager'}</strong> ({formatDateTime(item.created_at)})
-                        </div>
-                        <div className="timeline-notes" style={{ marginTop: '0.5rem', background: 'rgba(255,255,255,0.03)', padding: '0.5rem 0.75rem', borderRadius: 'var(--radius-sm)' }}>
-                          <strong>Reason:</strong> {item.reason}
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* TAB 5: Internal Team Discussion & Mentions */}
-          {activeTab === 'comments' && (
-            <div>
-              <InternalCommentsSection leadId={lead.id} />
-            </div>
-          )}
-        </div>
+        )}
       </div>
 
       {/* Convert to Customer Modal */}
@@ -1856,20 +1526,406 @@ export const LeadDetails = () => {
         </div>
       )}
 
-      {/* Target Stage PLD Assessment Modal */}
-      {lead && (
-        <PldAssessmentTest
-          isOpen={pldModalOpen}
-          leadId={lead.id}
-          leadName={lead.name}
-          companyName={lead.company_name}
-          initialStageId={pldModalStageId}
-          stages={stages}
-          onClose={() => setPldModalOpen(false)}
-          onCompleted={handlePldCompleted}
-          onMoveStage={handleStageChange}
+
+      {/* Quick Edit Win Probability Modal */}
+      {isEditWinProbOpen && (
+        <div
+          className="modal-backdrop"
+          onClick={!isSubmittingWinProb ? () => setIsEditWinProbOpen(false) : undefined}
+          role="dialog"
+          aria-modal="true"
+          style={{ zIndex: 1100 }}
+        >
+          <div
+            className="modal-container"
+            ref={winProbDialogRef}
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '480px', width: '100%' }}
+          >
+            <div className="modal-header">
+              <div className="modal-title-row">
+                <div
+                  className="modal-icon-badge"
+                  style={{
+                    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                    color: 'var(--primary)',
+                    padding: '0.4rem',
+                    borderRadius: 'var(--radius-md)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <TrendingUp size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 700 }}>
+                    Set Win Probability (%)
+                  </h3>
+                  <p className="text-dim font-xs" style={{ margin: '2px 0 0 0' }}>
+                    {lead?.name} • Stage: {lead?.stage_details?.name || 'Current'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setIsEditWinProbOpen(false)}
+                disabled={isSubmittingWinProb}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveWinProb} style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div>
+                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                  Win Probability Percentage
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginTop: '0.35rem' }}>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    step="5"
+                    value={editWinProbVal}
+                    onChange={(e) => {
+                      let num = parseInt(e.target.value, 10);
+                      if (isNaN(num)) num = 0;
+                      if (num < 0) num = 0;
+                      if (num > 100) num = 100;
+                      setEditWinProbVal(num);
+                    }}
+                    style={{
+                      flex: 1,
+                      accentColor: editWinProbVal === 100 ? 'var(--success)' : 'var(--primary)',
+                      cursor: 'pointer',
+                    }}
+                  />
+                  <div style={{ position: 'relative', width: '80px', flexShrink: 0 }}>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      className="form-control"
+                      value={editWinProbVal}
+                      onChange={(e) => {
+                        let num = parseInt(e.target.value, 10);
+                        if (isNaN(num)) num = 0;
+                        if (num < 0) num = 0;
+                        if (num > 100) num = 100;
+                        setEditWinProbVal(num);
+                      }}
+                      style={{
+                        paddingRight: '1.4rem',
+                        fontWeight: 700,
+                        textAlign: 'center',
+                        fontSize: '0.9rem',
+                        color: editWinProbVal === 100 ? 'var(--success)' : undefined,
+                      }}
+                    />
+                    <span
+                      style={{
+                        position: 'absolute',
+                        right: '0.5rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: 'var(--text-dim)',
+                        fontSize: '0.8rem',
+                        pointerEvents: 'none',
+                      }}
+                    >
+                      %
+                    </span>
+                  </div>
+                </div>
+
+                {/* Quick Presets */}
+                <div style={{ display: 'flex', gap: '0.35rem', flexWrap: 'wrap', marginTop: '0.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: editWinProbVal === 100 ? '1px solid var(--success)' : '1px solid var(--border-subtle)',
+                      background: editWinProbVal === 100 ? 'rgba(34, 197, 94, 0.15)' : 'transparent',
+                      color: editWinProbVal === 100 ? 'var(--success)' : 'var(--text-main)',
+                      fontWeight: editWinProbVal === 100 ? 700 : 500,
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setEditWinProbVal(100)}
+                  >
+                    🎯 100% (Guaranteed)
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: editWinProbVal === 75 ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+                      background: editWinProbVal === 75 ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                      color: editWinProbVal === 75 ? 'var(--primary)' : 'var(--text-main)',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setEditWinProbVal(75)}
+                  >
+                    75%
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: editWinProbVal === 50 ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+                      background: editWinProbVal === 50 ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                      color: editWinProbVal === 50 ? 'var(--primary)' : 'var(--text-main)',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setEditWinProbVal(50)}
+                  >
+                    50%
+                  </button>
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    style={{
+                      fontSize: '0.72rem',
+                      padding: '0.2rem 0.55rem',
+                      borderRadius: 'var(--radius-sm)',
+                      border: editWinProbVal === 25 ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+                      background: editWinProbVal === 25 ? 'rgba(99, 102, 241, 0.15)' : 'transparent',
+                      color: editWinProbVal === 25 ? 'var(--primary)' : 'var(--text-main)',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setEditWinProbVal(25)}
+                  >
+                    25%
+                  </button>
+                  {lead?.stage_details?.win_probability !== undefined && (
+                    <button
+                      type="button"
+                      className="btn-ghost"
+                      style={{
+                        fontSize: '0.72rem',
+                        padding: '0.2rem 0.55rem',
+                        borderRadius: 'var(--radius-sm)',
+                        border: '1px solid var(--border-subtle)',
+                        color: 'var(--text-dim)',
+                        cursor: 'pointer',
+                      }}
+                      onClick={() => setEditWinProbVal(lead.stage_details.win_probability)}
+                    >
+                      Stage Default ({lead.stage_details.win_probability}%)
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="form-label" style={{ fontWeight: 600, fontSize: '0.85rem' }}>
+                  Reason / Rationale
+                </label>
+                <textarea
+                  rows={2}
+                  className="form-control"
+                  placeholder="e.g. Budget fully approved, decision makers committed 100%..."
+                  value={editWinProbReason}
+                  onChange={(e) => setEditWinProbReason(e.target.value)}
+                  style={{ marginTop: '0.35rem' }}
+                />
+              </div>
+
+              <div
+                style={{
+                  backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                  border: '1px solid rgba(99, 102, 241, 0.2)',
+                  borderRadius: 'var(--radius-md)',
+                  padding: '0.65rem 0.85rem',
+                  fontSize: '0.8rem',
+                  color: 'var(--text-main)',
+                }}
+              >
+                🔒 <strong>Constant across all stages:</strong> Once saved, this deal will retain {editWinProbVal}% Win Probability across all pipeline transitions until updated.
+              </div>
+
+              <div className="modal-actions" style={{ justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setIsEditWinProbOpen(false)}
+                  disabled={isSubmittingWinProb}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isSubmittingWinProb}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  {isSubmittingWinProb ? <Loader2 size={16} className="spinner" /> : <Check size={16} />}
+                  Save Win Probability
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Manage Products Modal */}
+      {isEditProductsOpen && (
+        <div
+          className="modal-backdrop"
+          onClick={!isSubmittingProducts ? () => setIsEditProductsOpen(false) : undefined}
+          role="dialog"
+          aria-modal="true"
+          style={{ zIndex: 1100 }}
+        >
+          <div
+            className="modal-container"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '580px', width: '100%' }}
+          >
+            <div className="modal-header">
+              <div className="modal-title-row">
+                <div
+                  className="modal-icon-badge"
+                  style={{
+                    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+                    color: 'var(--primary)',
+                    padding: '0.4rem',
+                    borderRadius: 'var(--radius-md)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <Package size={20} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 700 }}>
+                    Manage Products for Deal
+                  </h3>
+                  <p className="text-dim font-xs" style={{ margin: '2px 0 0 0' }}>
+                    {lead?.name} {lead?.company_name ? `• ${lead.company_name}` : ''}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setIsEditProductsOpen(false)}
+                disabled={isSubmittingProducts}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProducts} style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <ProductSelector
+                selectedProductIds={editProductIds}
+                onChange={setEditProductIds}
+              />
+
+              <div className="modal-actions" style={{ justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  onClick={() => setIsEditProductsOpen(false)}
+                  disabled={isSubmittingProducts}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={isSubmittingProducts}
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+                >
+                  {isSubmittingProducts ? <Loader2 size={16} className="spinner" /> : <Package size={16} />}
+                  Save Products
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Step 1: Stage Progression Checkpoint Modal (FIRST) */}
+      {checkpointModalData && (
+        <StageTaskCheckpointModal
+          isOpen={Boolean(checkpointModalData)}
+          onClose={() => setCheckpointModalData(null)}
+          lead={checkpointModalData.lead}
+          targetStage={checkpointModalData.targetStage}
+          sourceStage={checkpointModalData.sourceStage}
+          missingTasks={checkpointModalData.missingTasks}
+          errorMessage={checkpointModalData.errorMessage}
+          isManagerOrAdmin={user?.role === 'ADMIN' || user?.role === 'MANAGER'}
+          onProceedToWinProbability={handleProceedFromCheckpoint}
+          onAdvanceSuccess={() => {
+            showToast(`Lead advanced to ${checkpointModalData.targetStage?.name || 'next stage'} successfully!`, 'success');
+            setCheckpointModalData(null);
+            fetchLeadDetails();
+            fetchTimeline();
+          }}
         />
       )}
+
+      {/* Step 2: Stage Transition & Win Probability Modal (SECOND) */}
+      {transitionModalData && (
+        <StageTransitionModal
+          isOpen={Boolean(transitionModalData)}
+          lead={transitionModalData.lead}
+          sourceStage={transitionModalData.sourceStage}
+          targetStage={transitionModalData.targetStage}
+          loading={transitionSubmitting}
+          onConfirm={handleConfirmTransition}
+          onCancel={() => setTransitionModalData(null)}
+          onBack={() => {
+            const isLost =
+              transitionModalData.targetStage?.slug === 'lost' ||
+              transitionModalData.targetStage?.name?.toLowerCase() === 'lost';
+            if (isLost) {
+              setTransitionModalData(null);
+              return;
+            }
+            const prev = transitionModalData;
+            setTransitionModalData(null);
+            setCheckpointModalData({
+              lead: prev.lead,
+              targetStage: prev.targetStage,
+              sourceStage: prev.sourceStage,
+            });
+          }}
+        />
+      )}
+
+      {/* Delete Lead Confirm Modal */}
+      <ConfirmModal
+        isOpen={deleteConfirmOpen}
+        title="Delete Lead"
+        message={`Are you sure you want to permanently delete lead "${lead?.name}"? All associated notes, activities, and tasks will be removed.`}
+        confirmText="Delete Lead"
+        loading={deleting}
+        onConfirm={handleDeleteLead}
+        onCancel={() => setDeleteConfirmOpen(false)}
+      />
+
+      {/* Dynamic Custom Properties Modal */}
+      <CustomPropertiesModal
+        isOpen={customPropsModalOpen}
+        onClose={() => setCustomPropsModalOpen(false)}
+        onPropertiesChanged={() => fetchLeadDetails()}
+      />
     </div>
   );
 };
