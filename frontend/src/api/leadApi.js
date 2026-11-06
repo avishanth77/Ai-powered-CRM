@@ -276,4 +276,45 @@ export const leadApi = {
     const response = await api.post(`/api/leads/${leadId}/custom-properties/`, { properties });
     return response.data;
   },
+
+  // Auto-Assignment & Routing Rules
+  getAssignmentConfig: async () => {
+    const response = await api.get('/api/leads/assignment-config/');
+    return response.data;
+  },
+
+  updateAssignmentConfig: async (configData) => {
+    const response = await api.patch('/api/leads/assignment-config/', configData);
+    return response.data;
+  },
+
+  getAssignmentRules: async (params = {}) => {
+    const response = await api.get('/api/leads/assignment-rules/', { params });
+    return response.data;
+  },
+
+  createAssignmentRule: async (ruleData) => {
+    const response = await api.post('/api/leads/assignment-rules/', ruleData);
+    return response.data;
+  },
+
+  updateAssignmentRule: async (id, ruleData) => {
+    const response = await api.patch(`/api/leads/assignment-rules/${id}/`, ruleData);
+    return response.data;
+  },
+
+  deleteAssignmentRule: async (id) => {
+    const response = await api.delete(`/api/leads/assignment-rules/${id}/`);
+    return response.data;
+  },
+
+  reorderAssignmentRules: async (orderList) => {
+    const response = await api.post('/api/leads/assignment-rules/reorder/', { order: orderList });
+    return response.data;
+  },
+
+  autoAssignLead: async (leadId) => {
+    const response = await api.post(`/api/leads/${leadId}/auto-assign/`);
+    return response.data;
+  },
 };

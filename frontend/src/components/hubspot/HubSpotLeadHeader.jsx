@@ -20,6 +20,7 @@ import {
   AlertTriangle,
   User,
   Sparkles,
+  RotateCcw,
 } from 'lucide-react';
 import { PriorityBadge } from '../PriorityBadge';
 import { StatusBadge } from '../StatusBadge';
@@ -39,6 +40,7 @@ export const HubSpotLeadHeader = ({
   onConvert,
   onHandover,
   onAssign,
+  onAutoAssign,
   onMarkLost,
   onDelete,
   onOpenWinProb,
@@ -202,6 +204,22 @@ export const HubSpotLeadHeader = ({
                     >
                       <UserCheck size={14} />
                       <span>Assign Lead</span>
+                    </button>
+                  )}
+
+                  {canAssignLeads && onAutoAssign && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ justifyContent: 'flex-start', border: 'none', background: 'transparent' }}
+                      onClick={() => {
+                        setMoreMenuOpen(false);
+                        onAutoAssign();
+                      }}
+                      title="Automatically assign to salesman via assignment rules"
+                    >
+                      <RotateCcw size={14} />
+                      <span>Auto-Assign Salesman</span>
                     </button>
                   )}
 

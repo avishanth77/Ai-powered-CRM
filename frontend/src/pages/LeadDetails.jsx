@@ -672,6 +672,17 @@ export const LeadDetails = () => {
     return <LoadingSpinner text="Loading lead profile..." />;
   }
 
+  const handleAutoAssignLead = async () => {
+    try {
+      const res = await leadApi.autoAssignLead(id);
+      showToast(res.message || 'Lead auto-assigned successfully!', 'success');
+      fetchLeadDetails();
+      fetchTimeline();
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Failed to auto-assign lead'), 'error');
+    }
+  };
+
   const isQualified =
     lead.stage_details?.slug === 'qualified' ||
     lead.stage?.slug === 'qualified' ||
@@ -717,6 +728,7 @@ export const LeadDetails = () => {
         onConvert={() => setConvertModalOpen(true)}
         onHandover={() => setHandoverModalOpen(true)}
         onAssign={() => setAssignModalOpen(true)}
+        onAutoAssign={handleAutoAssignLead}
         onMarkLost={() => {
           const lostStg = stages.find((s) => s.slug === 'lost' || s.name.toLowerCase() === 'lost');
           if (lostStg) {

@@ -798,7 +798,7 @@ export const LeadEdit = () => {
                 value={formData.assigned_to}
                 onChange={handleChange}
               >
-                <option value="">Unassigned</option>
+                <option value="">Unassigned (Auto-Assign if unassigned)</option>
                 {users
                   .filter((u) => u.is_active && u.role === 'EXECUTIVE')
                   .map((u) => (

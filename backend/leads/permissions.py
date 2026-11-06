@@ -109,3 +109,20 @@ class CustomPropertyPermission(BasePermission):
         return request.user.role in ['ADMIN', 'MANAGER'] or request.user.is_superuser
 
 
+class LeadAssignmentPermission(BasePermission):
+    """
+    Permissions for configuring lead assignment:
+    - Only Admin and Manager can view and configure lead assignment settings and rules.
+    """
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return request.user.role in ['ADMIN', 'MANAGER'] or request.user.is_superuser
+
+    def has_object_permission(self, request, view, obj):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        return request.user.role in ['ADMIN', 'MANAGER'] or request.user.is_superuser
+
+
+

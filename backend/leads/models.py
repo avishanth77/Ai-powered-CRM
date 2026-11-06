@@ -925,3 +925,165 @@ class CustomPropertyValue(models.Model):
     def __str__(self):
         return f"{self.property_def.label} for Lead #{self.lead_id}"
 
+
+class LeadAssignmentConfig(models.Model):
+    """
+    Global auto-assignment configuration allowing Managers/Admins to customize
+    how incoming leads are automatically distributed among salesmen.
+    """
+    class Strategy(models.TextChoices):
+        ROUND_ROBIN = 'ROUND_ROBIN', 'Round Robin (Even Distribution)'
+        LEAST_LOADED = 'LEAST_LOADED', 'Least Loaded (Workload Balanced)'
+        SPECIFIC_USER = 'SPECIFIC_USER', 'Specific Salesperson'
+
+    is_enabled = models.BooleanField(
+        default=True,
+        help_text='Enable or disable automatic lead assignment.'
+    )
+    strategy = models.CharField(
+        max_length=30,
+        choices=Strategy.choices,
+        default=Strategy.ROUND_ROBIN,
+        help_text='Distribution strategy across active salesmen.'
+    )
+    specific_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='default_assigned_configs',
+        help_text='Default salesperson when strategy is SPECIFIC_USER.'
+    )
+    fallback_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='fallback_assigned_configs',
+        help_text='Fallback salesperson if no pool users are available.'
+    )
+    salesmen_pool = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name='assignment_pools',
+        help_text='Pool of salespeople eligible for round-robin / least-loaded distribution.'
+    )
+    last_assigned_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+',
+        help_text='Last user selected in round-robin sequence.'
+    )
+    notify_salesman = models.BooleanField(
+        default=True,
+        help_text='Send in-app notification to salesman upon assignment.'
+    )
+    auto_assign_web_to_lead = models.BooleanField(
+        default=True,
+        help_text='Auto-assign leads arriving through Web-to-Lead forms.'
+    )
+    auto_assign_csv_import = models.BooleanField(
+        default=True,
+        help_text='Auto-assign leads imported via CSV when no owner is specified.'
+    )
+    auto_assign_manual_create = models.BooleanField(
+        default=True,
+        help_text='Auto-assign manually created leads when owner is left blank.'
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = 'Lead Assignment Configuration'
+        verbose_name_plural = 'Lead Assignment Configurations'
+
+    @classmethod
+    def get_solo(cls):
+        obj = cls.objects.first()
+        if not obj:
+            obj = cls.objects.create()
+        return obj
+
+    def __str__(self):
+        return f"Lead Assignment Config ({self.strategy}, Enabled={self.is_enabled})"
+
+
+class LeadAssignmentRule(models.Model):
+    """
+    Custom conditional routing rules that assign leads to specific salesmen
+    or custom pools based on lead attributes (Source, Product, Country, etc.).
+    """
+    name = models.CharField(max_length=150, help_text='Descriptive rule name, e.g. "Website Inquiries to Digital Team"')
+    is_active = models.BooleanField(default=True)
+    order = models.PositiveIntegerField(default=1, help_text='Evaluation order (lower evaluates first)')
+    
+    # Matching Criteria
+    source = models.ForeignKey(
+        'leads.LeadSource',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assignment_rules',
+        help_text='Match leads with this Source (empty matches any).'
+    )
+    lead_type = models.CharField(
+        max_length=30,
+        blank=True,
+        default='',
+        help_text='Match leads with this Lead Type (e.g. INBOUND, OUTBOUND; empty matches any).'
+    )
+    country = models.CharField(
+        max_length=100,
+        blank=True,
+        default='',
+        help_text='Match leads from this country (case-insensitive substring; empty matches any).'
+    )
+    product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assignment_rules',
+        help_text='Match leads requesting this product (empty matches any).'
+    )
+
+    # Assignment Action
+    strategy = models.CharField(
+        max_length=30,
+        choices=LeadAssignmentConfig.Strategy.choices,
+        default=LeadAssignmentConfig.Strategy.ROUND_ROBIN
+    )
+    specific_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='specific_lead_rules'
+    )
+    salesmen_pool = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        blank=True,
+        related_name='rule_assignment_pools'
+    )
+    last_assigned_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='+'
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['order', 'id']
+        verbose_name = 'Lead Assignment Rule'
+        verbose_name_plural = 'Lead Assignment Rules'
+
+    def __str__(self):
+        return f"Rule #{self.order}: {self.name} ({self.strategy})"
+
+

@@ -1,4 +1,5 @@
 from rest_framework import viewsets, status, permissions
+from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import parsers
@@ -22,6 +23,8 @@ from .models import (
     LeadStageTask,
     CustomPropertyDefinition,
     CustomPropertyValue,
+    LeadAssignmentConfig,
+    LeadAssignmentRule,
 )
 from .serializers import (
     LeadSourceSerializer,
@@ -38,6 +41,8 @@ from .serializers import (
     LeadStageTaskSerializer,
     CustomPropertyDefinitionSerializer,
     CustomPropertyValueSerializer,
+    LeadAssignmentConfigSerializer,
+    LeadAssignmentRuleSerializer,
 )
 from .permissions import (
     LeadPermission,
@@ -45,6 +50,7 @@ from .permissions import (
     LeadStagePermission,
     StageTaskRulePermission,
     CustomPropertyPermission,
+    LeadAssignmentPermission,
 )
 from .filters import LeadFilter
 from activity.services import log_activity
@@ -335,6 +341,56 @@ class CustomPropertyDefinitionViewSet(viewsets.ModelViewSet):
                     CustomPropertyDefinition.objects.filter(id=prop_id).update(display_order=disp_order)
 
         return Response({'success': True, 'message': 'Custom properties reordered successfully.'})
+
+
+class LeadAssignmentConfigView(APIView):
+    """
+    API endpoint for retrieving and configuring global Lead Auto-Assignment settings.
+    Restricted to Admins and Managers.
+    """
+    permission_classes = [LeadAssignmentPermission]
+
+    def get(self, request):
+        config = LeadAssignmentConfig.get_solo()
+        serializer = LeadAssignmentConfigSerializer(config)
+        return Response(serializer.data)
+
+    def patch(self, request):
+        config = LeadAssignmentConfig.get_solo()
+        serializer = LeadAssignmentConfigSerializer(config, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    def put(self, request):
+        return self.patch(request)
+
+
+class LeadAssignmentRuleViewSet(viewsets.ModelViewSet):
+    """
+    CRUD ViewSet for custom conditional lead assignment routing rules.
+    Allows Admins and Managers to route leads based on Source, Product, Country, etc.
+    """
+    queryset = LeadAssignmentRule.objects.all().order_by('order', 'id')
+    serializer_class = LeadAssignmentRuleSerializer
+    permission_classes = [LeadAssignmentPermission]
+
+    @action(detail=False, methods=['post'], url_path='reorder')
+    def reorder(self, request):
+        order_list = request.data.get('order', [])
+        if not isinstance(order_list, list):
+            return Response({'error': 'Expected an array under "order".'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            for item in order_list:
+                rule_id = item.get('id')
+                disp_order = item.get('order')
+                if rule_id and disp_order is not None:
+                    LeadAssignmentRule.objects.filter(id=rule_id).update(order=disp_order)
+
+        return Response({'success': True, 'message': 'Assignment rules reordered successfully.'})
+
 
 
 def ensure_customer_for_won_lead(lead, user=None):
@@ -836,6 +892,33 @@ class LeadViewSet(viewsets.ModelViewSet):
         return Response({
             'success': True,
             'message': f'Lead assigned to {new_user.get_full_name() or new_user.email}.',
+            'data': LeadDetailSerializer(lead).data
+        })
+
+    @action(detail=True, methods=['post'], url_path='auto-assign')
+    def auto_assign(self, request, pk=None):
+        """
+        Manually trigger the auto-assignment engine on a lead (Manager/Admin only).
+        """
+        user = request.user
+        if user.role == 'EXECUTIVE' and not user.is_superuser:
+            return Response({
+                'success': False,
+                'message': 'Only Managers and Admins can trigger lead auto-assignment.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        lead = self.get_object()
+        from leads.services.assignment import assign_lead_to_salesman
+        assigned_user = assign_lead_to_salesman(lead, channel='manual', actor=user, force=True, commit=True)
+        if not assigned_user:
+            return Response({
+                'success': False,
+                'message': 'No eligible salesman could be found based on current auto-assignment rules/pools.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        return Response({
+            'success': True,
+            'message': f'Lead auto-assigned to {assigned_user.get_full_name() or assigned_user.email}.',
             'data': LeadDetailSerializer(lead).data
         })
 

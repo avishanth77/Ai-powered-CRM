@@ -6,6 +6,8 @@ from .views import (
     StageTaskRuleViewSet,
     LeadStageTaskViewSet,
     CustomPropertyDefinitionViewSet,
+    LeadAssignmentConfigView,
+    LeadAssignmentRuleViewSet,
 )
 from .views_comments import LeadCommentsView, InternalCommentDetailView
 from .views_public import PublicContactLeadView
@@ -15,9 +17,13 @@ router.register(r'sources', LeadSourceViewSet, basename='lead-source')
 router.register(r'stage-task-rules', StageTaskRuleViewSet, basename='lead-stage-task-rules')
 router.register(r'stage-tasks', LeadStageTaskViewSet, basename='lead-stage-tasks')
 router.register(r'custom-properties', CustomPropertyDefinitionViewSet, basename='custom-property')
+router.register(r'assignment-rules', LeadAssignmentRuleViewSet, basename='assignment-rules')
 router.register(r'', LeadViewSet, basename='lead')
 
 urlpatterns = [
+    # Global Lead Assignment Configuration (Admin/Manager)
+    path('assignment-config/', LeadAssignmentConfigView.as_view(), name='lead-assignment-config'),
+
     # Public Web-to-Lead endpoint for external website contact forms
     path('web-to-lead/', PublicContactLeadView.as_view(), name='web-to-lead'),
     path('public/contact/', PublicContactLeadView.as_view(), name='public-contact-lead'),

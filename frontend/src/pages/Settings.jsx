@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { leadApi } from '../api/leadApi';
 import { authApi } from '../api/authApi';
 import { useAuth } from '../context/AuthContext';
@@ -7,7 +8,11 @@ import { extractErrorMessage } from '../utils/validation';
 import { useDialogA11y } from '../hooks/useDialogA11y';
 import { ROLE_LABELS } from '../utils/constants';
 import { IcpQuestionsManager } from '../components/IcpQuestionsManager';
-import { PldSettingsManager } from '../components/PldSettingsManager';
+import { StageTasksManager } from '../components/StageTasksManager';
+import WinProbabilityFunnel from '../components/WinProbabilityFunnel';
+import { WebToLeadManager } from '../components/WebToLeadManager';
+import ProductsManager from '../components/ProductsManager';
+import { LeadAssignmentManager } from '../components/LeadAssignmentManager';
 import {
   Settings as SettingsIcon,
   Plus,
@@ -28,20 +33,38 @@ import {
   ListChecks,
   Gauge,
   X,
+  Sparkles,
+  Globe,
+  Package,
+  UserCheck,
 } from 'lucide-react';
 
 export const Settings = () => {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
+
   const {
     user,
+    isAdmin,
+    isManager,
     updateUserProfile,
     canManageSources,
     canManageStages,
     canManageIcp,
     canManagePld,
+    canManageTaskRules,
   } = useAuth();
   const { showToast } = useToast();
 
-  const [activeTab, setActiveTab] = useState(canManageStages ? 'stages' : 'profile');
+  const [activeTab, setActiveTab] = useState(
+    tabParam || (canManageStages ? 'stages' : 'profile')
+  );
+
+  useEffect(() => {
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [tabParam]);
 
   // Profile Form
   const [profileData, setProfileData] = useState({
@@ -79,6 +102,9 @@ export const Settings = () => {
     color: '#6366F1',
     display_order: 1,
     is_active: true,
+    require_manager_approval: false,
+    win_probability: 50,
+    win_probability_reason: '',
   });
   const [submittingStage, setSubmittingStage] = useState(false);
   const [stageFormErrors, setStageFormErrors] = useState({});
@@ -208,6 +234,9 @@ export const Settings = () => {
       color: '#6366F1',
       display_order: nextOrder,
       is_active: true,
+      require_manager_approval: false,
+      win_probability: 50,
+      win_probability_reason: '',
     });
     setStageFormErrors({});
     setCreateStageModalOpen(true);
@@ -253,6 +282,9 @@ export const Settings = () => {
         color: stageFormData.color.trim(),
         display_order: parseInt(stageFormData.display_order) || 1,
         is_active: Boolean(stageFormData.is_active),
+        require_manager_approval: Boolean(stageFormData.require_manager_approval),
+        win_probability: parseInt(stageFormData.win_probability) || 0,
+        win_probability_reason: (stageFormData.win_probability_reason || '').trim(),
       });
       showToast(`Stage "${stageFormData.name.trim()}" created successfully!`, 'success');
       setCreateStageModalOpen(false);
@@ -274,6 +306,9 @@ export const Settings = () => {
       display_order: stage.display_order,
       is_active: stage.is_active,
       is_system: stage.is_system,
+      require_manager_approval: Boolean(stage.require_manager_approval),
+      win_probability: stage.win_probability ?? 10,
+      win_probability_reason: stage.win_probability_reason || '',
     });
     setStageFormErrors({});
     setEditStageModalOpen(true);
@@ -293,6 +328,9 @@ export const Settings = () => {
         color: stageToEdit.color.trim(),
         display_order: parseInt(stageToEdit.display_order) || 1,
         is_active: Boolean(stageToEdit.is_active),
+        require_manager_approval: Boolean(stageToEdit.require_manager_approval),
+        win_probability: parseInt(stageToEdit.win_probability) || 0,
+        win_probability_reason: (stageToEdit.win_probability_reason || '').trim(),
       });
       showToast(`Stage "${stageToEdit.name.trim()}" updated successfully!`, 'success');
       setEditStageModalOpen(false);
@@ -368,7 +406,7 @@ export const Settings = () => {
             <span>Settings & Configuration</span>
           </h1>
           <p className="page-subtitle">
-            Configure CRM lead stages, ICP qualification questions, PLD problems, sales channels, and your personal profile
+            Configure CRM lead stages, ICP qualification questions, stage tasks & progression rules, sales channels, and your personal profile
           </p>
         </div>
       </div>
@@ -427,16 +465,66 @@ export const Settings = () => {
           </button>
         )}
 
-        {canManagePld && (
+
+
+        {(canManageTaskRules || canManagePld) && (
           <button
             type="button"
             role="tab"
-            aria-selected={activeTab === 'pld'}
-            className={`tab-btn ${activeTab === 'pld' ? 'tab-btn-active' : ''}`}
-            onClick={() => setActiveTab('pld')}
+            aria-selected={activeTab === 'tasks' || activeTab === 'pld'}
+            className={`tab-btn ${activeTab === 'tasks' || activeTab === 'pld' ? 'tab-btn-active' : ''}`}
+            onClick={() => setActiveTab('tasks')}
           >
-            <Gauge size={16} />
-            <span>PLD Engine</span>
+            <Sparkles size={16} />
+            <span>Stage Tasks & Progression Rules</span>
+          </button>
+        )}
+
+        {(canManageSources || canManageStages) && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'web-to-lead'}
+            className={`tab-btn ${activeTab === 'web-to-lead' ? 'tab-btn-active' : ''}`}
+            onClick={() => {
+              setActiveTab('web-to-lead');
+              setSearchParams({ tab: 'web-to-lead' });
+            }}
+          >
+            <Globe size={16} />
+            <span>Web-to-Lead API</span>
+          </button>
+        )}
+
+        {(isAdmin || isManager) && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'products'}
+            className={`tab-btn ${activeTab === 'products' ? 'tab-btn-active' : ''}`}
+            onClick={() => {
+              setActiveTab('products');
+              setSearchParams({ tab: 'products' });
+            }}
+          >
+            <Package size={16} />
+            <span>Products Catalog</span>
+          </button>
+        )}
+
+        {(isAdmin || isManager) && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'assignment'}
+            className={`tab-btn ${activeTab === 'assignment' ? 'tab-btn-active' : ''}`}
+            onClick={() => {
+              setActiveTab('assignment');
+              setSearchParams({ tab: 'assignment' });
+            }}
+          >
+            <UserCheck size={16} />
+            <span>Lead Auto-Assignment</span>
           </button>
         )}
       </div>
@@ -473,8 +561,11 @@ export const Settings = () => {
                   <th>Stage Name</th>
                   <th>Description</th>
                   <th>Color</th>
+                  <th>Win Prob (%)</th>
+                  <th>Probability Reason</th>
                   <th>Active</th>
                   <th>Leads Count</th>
+                  <th>Auto Tasks</th>
                   <th>System</th>
                   <th className="table-action-col">Actions</th>
                 </tr>
@@ -482,7 +573,7 @@ export const Settings = () => {
               <tbody>
                 {loadingStages ? (
                   <tr>
-                    <td colSpan={8} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-dim)' }}>
+                    <td colSpan={11} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-dim)' }}>
                       Loading lead stages...
                     </td>
                   </tr>
@@ -521,6 +612,20 @@ export const Settings = () => {
                       </span>
                     </td>
                     <td>
+                      <span className="funnel-prob-chip" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
+                        🎯 {st.win_probability ?? 10}%
+                      </span>
+                    </td>
+                    <td>
+                      <span
+                        className="text-dim font-sm"
+                        style={{ maxWidth: '240px', display: 'inline-block', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                        title={st.win_probability_reason}
+                      >
+                        {st.win_probability_reason || '—'}
+                      </span>
+                    </td>
+                    <td>
                       <span className={`status-badge ${st.is_active ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem' }}>
                         {st.is_active ? 'Yes' : 'No'}
                       </span>
@@ -529,6 +634,18 @@ export const Settings = () => {
                       <span className="tab-badge" style={{ fontWeight: 600 }}>
                         {st.leads_count || 0} leads
                       </span>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                        onClick={() => setActiveTab('tasks')}
+                        title="Configure Automated Tasks for this stage"
+                      >
+                        <Sparkles size={12} color="var(--primary)" />
+                        {st.task_rules_count || 0} tasks
+                      </button>
                     </td>
                     <td>
                       {st.is_system ? (
@@ -607,6 +724,13 @@ export const Settings = () => {
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div style={{ marginTop: '2rem' }}>
+            <WinProbabilityFunnel
+              key={stages.map((s) => `${s.id}-${s.win_probability}-${s.win_probability_reason}-${s.leads_count}`).join(',')}
+              onStageClick={handleOpenEditStage}
+            />
           </div>
         </div>
       )}
@@ -788,9 +912,20 @@ export const Settings = () => {
       {/* TAB 3: LEAD SOURCES */}
       {activeTab === 'sources' && canManageSources && (
         <div className="card">
-          <h3 style={{ fontSize: '1.125rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '1.25rem' }}>
-            Lead Sources & Channels
-          </h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+            <h3 style={{ fontSize: '1.125rem', margin: 0 }}>
+              Lead Sources & Channels
+            </h3>
+            <button
+              type="button"
+              className="btn btn-sm btn-secondary"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', fontSize: '0.8rem' }}
+              onClick={() => setActiveTab('web-to-lead')}
+            >
+              <Globe size={14} color="var(--primary)" />
+              Website Webhook Integration & API
+            </button>
+          </div>
 
           <form onSubmit={handleCreateSource} className="form-layout mb-4" style={{ marginBottom: '1.5rem' }}>
             <div className="form-group">
@@ -955,6 +1090,40 @@ export const Settings = () => {
                   </div>
                 </div>
 
+                <div className="form-grid-2" style={{ margin: '0.75rem 0' }}>
+                  <div className="form-group">
+                    <label className="form-label form-label-required" htmlFor="stage-win-prob">
+                      Win Probability (%)
+                    </label>
+                    <input
+                      id="stage-win-prob"
+                      type="number"
+                      min={0}
+                      max={100}
+                      className="form-control"
+                      value={stageFormData.win_probability ?? 10}
+                      onChange={(e) => setStageFormData({ ...stageFormData, win_probability: e.target.value })}
+                      placeholder="e.g. 50"
+                      required
+                    />
+                    <span className="text-dim font-xs">Estimated deal conversion chance (0-100%) for leads in this stage.</span>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="stage-win-reason">
+                      Probability Reason / Milestone Rationale
+                    </label>
+                    <textarea
+                      id="stage-win-reason"
+                      rows={2}
+                      className="form-control"
+                      value={stageFormData.win_probability_reason ?? ''}
+                      onChange={(e) => setStageFormData({ ...stageFormData, win_probability_reason: e.target.value })}
+                      placeholder="e.g. Product demonstration completed; decision makers engaged."
+                    />
+                  </div>
+                </div>
+
                 <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem' }}>
                   <input
                     id="stage-active"
@@ -1093,6 +1262,39 @@ export const Settings = () => {
                   </div>
                 </div>
 
+                <div className="form-grid-2" style={{ margin: '0.75rem 0' }}>
+                  <div className="form-group">
+                    <label className="form-label form-label-required" htmlFor="edit-stage-win-prob">
+                      Win Probability (%)
+                    </label>
+                    <input
+                      id="edit-stage-win-prob"
+                      type="number"
+                      min={0}
+                      max={100}
+                      className="form-control"
+                      value={stageToEdit.win_probability ?? 10}
+                      onChange={(e) => setStageToEdit({ ...stageToEdit, win_probability: e.target.value })}
+                      required
+                    />
+                    <span className="text-dim font-xs">Estimated deal conversion chance (0-100%) for leads in this stage.</span>
+                  </div>
+
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="edit-stage-win-reason">
+                      Probability Reason / Milestone Rationale
+                    </label>
+                    <textarea
+                      id="edit-stage-win-reason"
+                      rows={2}
+                      className="form-control"
+                      value={stageToEdit.win_probability_reason ?? ''}
+                      onChange={(e) => setStageToEdit({ ...stageToEdit, win_probability_reason: e.target.value })}
+                      placeholder="e.g. Contract in legal & pricing review."
+                    />
+                  </div>
+                </div>
+
                 <div className="form-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.75rem', marginTop: '0.5rem' }}>
                   <input
                     id="edit-stage-active"
@@ -1218,8 +1420,23 @@ export const Settings = () => {
       {/* TAB: ICP QUALIFICATION QUESTIONS (Admin / Manager) */}
       {activeTab === 'icp' && canManageIcp && <IcpQuestionsManager />}
 
-      {/* TAB: PLD ENGINE (Admin / Manager) */}
-      {activeTab === 'pld' && canManagePld && <PldSettingsManager />}
+      {/* TAB: STAGE TASKS & PROGRESSION RULES (Admin / Manager) */}
+      {(activeTab === 'tasks' || activeTab === 'pld') && (canManageTaskRules || canManagePld) && (
+        <StageTasksManager onStageUpdated={fetchStages} />
+      )}
+
+      {/* TAB: WEB-TO-LEAD / WEBSITE CONTACT INTEGRATION */}
+      {activeTab === 'web-to-lead' && (canManageSources || canManageStages) && (
+        <WebToLeadManager />
+      )}
+
+      {activeTab === 'products' && (isAdmin || isManager) && (
+        <ProductsManager />
+      )}
+
+      {activeTab === 'assignment' && (isAdmin || isManager) && (
+        <LeadAssignmentManager />
+      )}
     </div>
   );
 };

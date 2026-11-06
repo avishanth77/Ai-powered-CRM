@@ -779,7 +779,7 @@ export const LeadCreate = () => {
                 value={formData.assigned_to}
                 onChange={handleChange}
               >
-                <option value="">Unassigned</option>
+                <option value="">✨ Auto-Assign via Salesman Rules</option>
                 {users
                   .filter((u) => u.is_active && u.role === 'EXECUTIVE')
                   .map((u) => (

@@ -14,6 +14,8 @@ from .models import (
     LeadStageTask,
     CustomPropertyDefinition,
     CustomPropertyValue,
+    LeadAssignmentConfig,
+    LeadAssignmentRule,
 )
 from accounts.serializers import UserSerializer
 
@@ -685,6 +687,12 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
                 validated_data['assigned_to'] = request.user
         lead = super().create(validated_data)
 
+        # Auto-assign incoming lead if no salesman was explicitly assigned
+        if not lead.assigned_to:
+            from leads.services.assignment import assign_lead_to_salesman
+            actor = request.user if request and request.user.is_authenticated else None
+            assign_lead_to_salesman(lead, channel='manual', actor=actor, commit=True)
+
         if custom_props:
             _save_custom_properties(lead, custom_props)
 
@@ -897,3 +905,81 @@ class LeadStageTaskSerializer(serializers.ModelSerializer):
             'lead_name', 'stage_name', 'assigned_to_details', 'completed_by_details',
             'approved_by_details', 'dependency_title'
         ]
+
+
+class LeadAssignmentConfigSerializer(serializers.ModelSerializer):
+    specific_user_details = UserSimpleSerializer(source='specific_user', read_only=True)
+    fallback_user_details = UserSimpleSerializer(source='fallback_user', read_only=True)
+    last_assigned_user_details = UserSimpleSerializer(source='last_assigned_user', read_only=True)
+    salesmen_pool_details = UserSimpleSerializer(source='salesmen_pool', many=True, read_only=True)
+    salesmen_pool_ids = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(is_active=True),
+        many=True,
+        write_only=True,
+        required=False,
+        source='salesmen_pool'
+    )
+
+    class Meta:
+        model = LeadAssignmentConfig
+        fields = [
+            'id',
+            'is_enabled',
+            'strategy',
+            'specific_user',
+            'specific_user_details',
+            'fallback_user',
+            'fallback_user_details',
+            'salesmen_pool',
+            'salesmen_pool_details',
+            'salesmen_pool_ids',
+            'last_assigned_user',
+            'last_assigned_user_details',
+            'notify_salesman',
+            'auto_assign_web_to_lead',
+            'auto_assign_csv_import',
+            'auto_assign_manual_create',
+            'updated_at',
+            'created_at',
+        ]
+        read_only_fields = ['id', 'updated_at', 'created_at']
+
+
+class LeadAssignmentRuleSerializer(serializers.ModelSerializer):
+    source_details = LeadSourceSerializer(source='source', read_only=True)
+    specific_user_details = UserSimpleSerializer(source='specific_user', read_only=True)
+    last_assigned_user_details = UserSimpleSerializer(source='last_assigned_user', read_only=True)
+    salesmen_pool_details = UserSimpleSerializer(source='salesmen_pool', many=True, read_only=True)
+    salesmen_pool_ids = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(is_active=True),
+        many=True,
+        write_only=True,
+        required=False,
+        source='salesmen_pool'
+    )
+
+    class Meta:
+        model = LeadAssignmentRule
+        fields = [
+            'id',
+            'name',
+            'is_active',
+            'order',
+            'source',
+            'source_details',
+            'lead_type',
+            'country',
+            'product',
+            'strategy',
+            'specific_user',
+            'specific_user_details',
+            'salesmen_pool',
+            'salesmen_pool_details',
+            'salesmen_pool_ids',
+            'last_assigned_user',
+            'last_assigned_user_details',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at']
+
