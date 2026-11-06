@@ -63,6 +63,7 @@ import {
   Copy,
   Check,
   Target,
+  Shield,
   ShieldAlert,
   Gauge,
   TrendingUp,

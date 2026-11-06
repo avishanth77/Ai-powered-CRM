@@ -60,7 +60,8 @@ export const HubSpotLeadHeader = ({
     .join('')
     .toUpperCase();
 
-  const currentStageIndex = stages.findIndex((s) => s.id === lead.stage);
+  const leadStageId = lead.stage?.id || lead.stage;
+  const currentStageIndex = stages.findIndex((s) => s.id === leadStageId);
 
   return (
     <div className="hs-header">
@@ -343,7 +344,7 @@ export const HubSpotLeadHeader = ({
       {stages.length > 0 && (
         <div className="hs-stage-stepper" role="tablist" aria-label="Pipeline stages">
           {stages.map((stage, idx) => {
-            const isActive = stage.id === lead.stage;
+            const isActive = stage.id === leadStageId;
             const isPassed = currentStageIndex > -1 && idx < currentStageIndex;
 
             return (
