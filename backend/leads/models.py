@@ -918,6 +918,10 @@ class CustomPropertyValue(models.Model):
         verbose_name = 'Custom Property Value'
         verbose_name_plural = 'Custom Property Values'
 
+    @property
+    def value(self):
+        return self.value_json if self.value_json is not None else self.value_text
+
     def __str__(self):
         return f"{self.property_def.label} for Lead #{self.lead_id}"
 
