@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>CRM AI Copilot • Mobile Assistant</title>
+  <title>CRM Mobile OS • AI Copilot Smartphone Simulator</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <style>
     :root {
       --primary: #3b82f6;
       --primary-dark: #2563eb;
-      --primary-glow: rgba(59, 130, 246, 0.25);
+      --primary-glow: rgba(59, 130, 246, 0.35);
       --bg-chassis: #1e2532;
       --chassis-border: #2d3748;
       --phone-bg: #0b0f17;
@@ -42,7 +42,7 @@
       height: 100%;
       height: 100dvh;
       max-height: 100vh;
-      overflow: hidden; /* Locked to one screen - zero page scrollbar */
+      overflow: hidden;
       margin: 0;
       padding: 0;
     }
@@ -82,8 +82,8 @@
     }
 
     .brand-logo-icon {
-      width: 24px;
-      height: 24px;
+      width: 22px;
+      height: 22px;
       background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
       border-radius: 6px;
       display: flex;
@@ -93,29 +93,29 @@
     }
 
     .brand-logo-icon svg {
-      width: 14px;
-      height: 14px;
+      width: 13px;
+      height: 13px;
       fill: #ffffff;
     }
 
     .top-actions {
       display: flex;
       align-items: center;
-      gap: 0.5rem;
+      gap: 0.4rem;
     }
 
     .toolbar-btn {
       background: rgba(255, 255, 255, 0.06);
       border: 1px solid rgba(255, 255, 255, 0.1);
       color: var(--text-dim);
-      padding: 0.35rem 0.65rem;
+      padding: 0.3rem 0.6rem;
       border-radius: 20px;
       cursor: pointer;
-      font-size: 0.75rem;
+      font-size: 0.725rem;
       font-family: inherit;
       display: flex;
       align-items: center;
-      gap: 0.35rem;
+      gap: 0.3rem;
       transition: all 0.2s ease;
     }
 
@@ -136,7 +136,7 @@
       box-shadow: 0 0 6px var(--warning);
     }
 
-    /* SMARTPHONE MOCKUP FRAME - Dynamically scales to fit 100% on one screen */
+    /* SMARTPHONE MOCKUP FRAME */
     .phone-wrapper {
       position: relative;
       height: min(780px, calc(100dvh - 3.25rem));
@@ -159,7 +159,7 @@
       min-height: 0;
     }
 
-    /* Realistic hardware buttons on chassis edges */
+    /* Hardware buttons on chassis edges */
     .phone-wrapper::before {
       content: '';
       position: absolute;
@@ -172,15 +172,20 @@
       box-shadow: 0 45px 0 #333d4e; /* Volume buttons */
     }
 
-    .phone-wrapper::after {
-      content: '';
+    .power-btn-hardware {
       position: absolute;
       top: 22%;
       right: -3px;
-      width: 3px;
+      width: 4px;
       height: 9%;
       background: #333d4e;
-      border-radius: 0 3px 3px 0; /* Power button */
+      border-radius: 0 3px 3px 0;
+      cursor: pointer;
+      z-index: 10;
+      transition: background 0.15s ease;
+    }
+    .power-btn-hardware:hover {
+      background: var(--primary);
     }
 
     /* Inner Screen Glass */
@@ -197,7 +202,7 @@
       min-height: 0;
     }
 
-    /* Mobile Status Bar with Dynamic Island */
+    /* Mobile Status Bar (Always Visible at Top) */
     .phone-status-bar {
       height: 38px;
       padding: 0 1rem;
@@ -207,9 +212,10 @@
       font-size: 0.725rem;
       font-weight: 600;
       color: var(--text-main);
-      z-index: 20;
+      z-index: 50;
       flex-shrink: 0;
       position: relative;
+      background: transparent;
     }
 
     .phone-time {
@@ -217,21 +223,31 @@
       letter-spacing: -0.02em;
     }
 
-    /* Dynamic Island pill */
+    /* Dynamic Island */
     .dynamic-island {
       position: absolute;
       left: 50%;
       top: 7px;
       transform: translateX(-50%);
-      width: 90px;
-      height: 23px;
+      width: 96px;
+      height: 24px;
       background: #000000;
       border-radius: 20px;
       display: flex;
       align-items: center;
-      justify-content: flex-end;
+      justify-content: space-between;
       padding: 0 8px;
       box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+      cursor: pointer;
+      transition: all 0.25s ease;
+    }
+
+    .island-icon {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--primary);
+      opacity: 0.8;
     }
 
     .camera-lens {
@@ -255,10 +271,441 @@
       fill: currentColor;
     }
 
+    /* =========================================================================
+       SCREEN VIEWS (LOCK SCREEN, HOME SCREEN, APP SCREEN)
+       ========================================================================= */
+    .screen-view {
+      position: absolute;
+      top: 38px;
+      left: 0;
+      right: 0;
+      bottom: 16px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.25s ease;
+      min-height: 0;
+    }
+
+    /* -------------------------------------------------------------------------
+       SCREEN 1: LOCK SCREEN
+       ------------------------------------------------------------------------- */
+    #lockScreen {
+      z-index: 40;
+      background: radial-gradient(circle at 50% 25%, #1e293b 0%, #090d16 100%);
+      padding: 1.25rem 1.15rem 1rem 1.15rem;
+      justify-content: space-between;
+      align-items: center;
+      transform: translateY(0);
+      opacity: 1;
+      cursor: pointer;
+    }
+
+    #lockScreen.unlocked {
+      transform: translateY(-100%);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .lock-top {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+      margin-top: 0.5rem;
+    }
+
+    .lock-padlock {
+      width: 18px;
+      height: 18px;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 0.25rem;
+    }
+
+    .lock-date {
+      font-size: 0.8125rem;
+      font-weight: 500;
+      color: rgba(255, 255, 255, 0.8);
+      letter-spacing: -0.01em;
+    }
+
+    .lock-clock {
+      font-size: 3.5rem;
+      font-weight: 800;
+      line-height: 1;
+      color: #ffffff;
+      letter-spacing: -0.04em;
+      text-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+    }
+
+    /* Lock Screen Notification Card */
+    .lock-notifications {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 0.6rem;
+      margin: auto 0;
+    }
+
+    .lock-notif-card {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius-md);
+      padding: 0.75rem 0.85rem;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      transition: transform 0.2s ease, background 0.2s ease;
+      cursor: pointer;
+    }
+
+    .lock-notif-card:hover {
+      background: rgba(255, 255, 255, 0.12);
+      transform: scale(1.02);
+    }
+
+    .notif-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.6875rem;
+      color: rgba(255, 255, 255, 0.7);
+    }
+
+    .notif-app-info {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-weight: 600;
+    }
+
+    .notif-app-icon {
+      width: 16px;
+      height: 16px;
+      background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .notif-app-icon svg {
+      width: 10px;
+      height: 10px;
+      fill: #ffffff;
+    }
+
+    .notif-title {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .notif-desc {
+      font-size: 0.75rem;
+      color: rgba(255, 255, 255, 0.85);
+      line-height: 1.35;
+    }
+
+    /* Lock Screen Bottom Actions */
+    .lock-bottom {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .lock-quick-actions {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      padding: 0 0.5rem;
+    }
+
+    .lock-round-btn {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .lock-round-btn:hover {
+      background: rgba(255, 255, 255, 0.25);
+    }
+    .lock-round-btn svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .unlock-swipe-prompt {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.25rem;
+      font-size: 0.725rem;
+      color: rgba(255, 255, 255, 0.75);
+      font-weight: 500;
+      letter-spacing: -0.01em;
+      animation: pulseChevron 2s infinite ease-in-out;
+    }
+
+    @keyframes pulseChevron {
+      0%, 100% { opacity: 0.6; transform: translateY(0); }
+      50% { opacity: 1; transform: translateY(-4px); }
+    }
+
+    /* -------------------------------------------------------------------------
+       SCREEN 2: HOME SCREEN
+       ------------------------------------------------------------------------- */
+    #homeScreen {
+      z-index: 10;
+      background: radial-gradient(circle at 30% 10%, #1e1b4b 0%, #0f172a 45%, #030712 100%);
+      padding: 0.75rem 0.85rem 0.5rem 0.85rem;
+      justify-content: space-between;
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    #homeScreen.app-open {
+      transform: scale(0.92);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    /* Home Screen Widgets */
+    .home-widgets {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.65rem;
+      margin-bottom: 1rem;
+    }
+
+    .widget-box {
+      background: rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius-md);
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      height: 90px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+      cursor: pointer;
+      transition: transform 0.2s ease;
+    }
+    .widget-box:hover {
+      transform: scale(1.02);
+    }
+
+    .widget-top {
+      font-size: 0.6875rem;
+      color: rgba(255, 255, 255, 0.6);
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .widget-val {
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.1;
+    }
+
+    .widget-desc {
+      font-size: 0.6875rem;
+      color: #93c5fd;
+      font-weight: 500;
+    }
+
+    /* App Icons Grid */
+    .app-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 1rem 0.5rem;
+      padding: 0.5rem 0.25rem;
+    }
+
+    .app-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+      cursor: pointer;
+      background: none;
+      border: none;
+      color: var(--text-main);
+      font-family: inherit;
+      transition: transform 0.15s ease;
+    }
+    .app-item:hover {
+      transform: scale(1.08);
+    }
+    .app-item:active {
+      transform: scale(0.94);
+    }
+
+    .app-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+      position: relative;
+    }
+
+    .app-icon.crm-ai {
+      background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%);
+      box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+
+    .app-icon.leads {
+      background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    }
+
+    .app-icon.calendar {
+      background: #ffffff;
+      color: #1e293b;
+      display: flex;
+      flex-direction: column;
+      font-size: 0.6rem;
+      font-weight: 700;
+    }
+    .app-icon.calendar span.day {
+      font-size: 1.35rem;
+      font-weight: 800;
+      color: #ef4444;
+      line-height: 1;
+    }
+
+    .app-icon.analytics {
+      background: linear-gradient(135deg, #ea580c 0%, #f59e0b 100%);
+    }
+
+    .app-icon.mail {
+      background: linear-gradient(135deg, #0284c7 0%, #38bdf8 100%);
+    }
+
+    .app-icon.notes {
+      background: linear-gradient(135deg, #ca8a04 0%, #fde047 100%);
+    }
+
+    .app-icon.reminders {
+      background: #ffffff;
+      color: #3b82f6;
+    }
+
+    .app-icon.settings {
+      background: linear-gradient(135deg, #475569 0%, #64748b 100%);
+    }
+
+    .app-badge {
+      position: absolute;
+      top: -3px;
+      right: -3px;
+      background: #ef4444;
+      color: #ffffff;
+      font-size: 0.625rem;
+      font-weight: 800;
+      padding: 0.1rem 0.35rem;
+      border-radius: 10px;
+      border: 1.5px solid #000;
+    }
+
+    .app-label {
+      font-size: 0.6875rem;
+      font-weight: 500;
+      color: #f1f5f9;
+      text-align: center;
+      letter-spacing: -0.01em;
+      text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
+    }
+
+    /* Bottom Dock Bar */
+    .home-dock {
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 26px;
+      padding: 0.6rem 0.85rem;
+      display: flex;
+      justify-content: space-around;
+      align-items: center;
+      box-shadow: 0 8px 30px rgba(0, 0, 0, 0.45);
+      margin-top: auto;
+    }
+
+    .dock-item {
+      cursor: pointer;
+      transition: transform 0.15s ease;
+    }
+    .dock-item:hover {
+      transform: scale(1.1);
+    }
+    .dock-item:active {
+      transform: scale(0.92);
+    }
+
+    .dock-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 13px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+      position: relative;
+    }
+
+    .dock-icon.phone-app {
+      background: linear-gradient(135deg, #16a34a 0%, #22c55e 100%);
+    }
+    .dock-icon.messages-app {
+      background: linear-gradient(135deg, #2563eb 0%, #3b82f6 100%);
+    }
+    .dock-icon.safari-app {
+      background: #ffffff;
+      color: #0284c7;
+    }
+
+    /* -------------------------------------------------------------------------
+       SCREEN 3: MOBILE CRM APP (ACTIVE APP VIEW)
+       ------------------------------------------------------------------------- */
+    #appScreen {
+      z-index: 20;
+      background: var(--phone-bg);
+      transform: scale(0.94) translateY(30px);
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    #appScreen.active {
+      transform: scale(1) translateY(0);
+      opacity: 1;
+      pointer-events: auto;
+    }
+
     /* In-App Header */
     .app-header {
-      padding: 0.45rem 0.85rem 0.55rem 0.85rem;
-      background: rgba(20, 26, 36, 0.85);
+      padding: 0.45rem 0.75rem 0.5rem 0.75rem;
+      background: rgba(20, 26, 36, 0.95);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       border-bottom: 1px solid var(--phone-border);
@@ -269,15 +716,40 @@
       z-index: 10;
     }
 
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .btn-back-home {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      cursor: pointer;
+      padding: 0.2rem;
+      display: flex;
+      align-items: center;
+      border-radius: 6px;
+    }
+    .btn-back-home:hover {
+      color: var(--text-main);
+      background: var(--phone-surface-2);
+    }
+    .btn-back-home svg {
+      width: 18px;
+      height: 18px;
+    }
+
     .header-info {
       display: flex;
       align-items: center;
-      gap: 0.55rem;
+      gap: 0.5rem;
     }
 
     .bot-avatar {
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
       display: flex;
@@ -289,34 +761,34 @@
     }
 
     .bot-avatar svg {
-      width: 17px;
-      height: 17px;
+      width: 16px;
+      height: 16px;
     }
 
     .online-indicator {
       position: absolute;
       bottom: -1px;
       right: -1px;
-      width: 9px;
-      height: 9px;
+      width: 8px;
+      height: 8px;
       background: var(--success);
       border: 2px solid var(--phone-bg);
       border-radius: 50%;
     }
 
     .bot-meta h2 {
-      font-size: 0.875rem;
+      font-size: 0.85rem;
       font-weight: 700;
       color: var(--text-main);
-      line-height: 1.2;
+      line-height: 1.1;
     }
 
     .bot-meta span {
-      font-size: 0.65rem;
+      font-size: 0.625rem;
       color: var(--text-dim);
       display: flex;
       align-items: center;
-      gap: 0.3rem;
+      gap: 0.25rem;
     }
 
     .header-btns {
@@ -329,8 +801,8 @@
       background: transparent;
       border: none;
       color: var(--text-dim);
-      width: 30px;
-      height: 30px;
+      width: 28px;
+      height: 28px;
       border-radius: 50%;
       display: flex;
       align-items: center;
@@ -349,15 +821,36 @@
       height: 15px;
     }
 
-    /* Messages Stream */
+    /* In-App Tab Views */
+    .app-tab-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .tab-pane {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    .tab-pane.active {
+      display: flex;
+    }
+
+    /* TAB 1: COPILOT CHAT MESSAGES */
     .chat-messages {
       flex: 1;
-      padding: 0.75rem 0.85rem;
+      padding: 0.65rem 0.75rem;
       overflow-y: auto;
       overflow-x: hidden;
       display: flex;
       flex-direction: column;
-      gap: 0.75rem;
+      gap: 0.65rem;
       scroll-behavior: smooth;
       min-height: 0;
     }
@@ -370,16 +863,15 @@
       border-radius: 4px;
     }
 
-    /* Message Rows */
     .message-row {
       display: flex;
       flex-direction: column;
-      max-width: 86%;
+      max-width: 88%;
       animation: msgAppear 0.25s cubic-bezier(0.16, 1, 0.3, 1);
     }
 
     @keyframes msgAppear {
-      from { opacity: 0; transform: translateY(8px); }
+      from { opacity: 0; transform: translateY(6px); }
       to { opacity: 1; transform: translateY(0); }
     }
 
@@ -394,10 +886,10 @@
     }
 
     .message-bubble {
-      padding: 0.7rem 0.875rem;
+      padding: 0.6rem 0.8rem;
       border-radius: var(--radius-md);
-      font-size: 0.8125rem;
-      line-height: 1.5;
+      font-size: 0.8rem;
+      line-height: 1.48;
       word-break: break-word;
       position: relative;
     }
@@ -418,15 +910,15 @@
     }
 
     .message-time {
-      font-size: 0.65rem;
+      font-size: 0.625rem;
       color: var(--text-muted);
-      margin-top: 0.25rem;
+      margin-top: 0.2rem;
       padding: 0 0.25rem;
     }
 
-    /* Markdown Formatted Typography Inside Assistant Bubbles */
+    /* Markdown Formatted Typography */
     .markdown-content p {
-      margin: 0 0 0.45rem 0;
+      margin: 0 0 0.4rem 0;
     }
     .markdown-content p:last-child {
       margin-bottom: 0;
@@ -445,21 +937,15 @@
 
     .markdown-content ul,
     .markdown-content ol {
-      margin: 0.35rem 0 0.5rem 0;
-      padding-left: 1.25rem;
+      margin: 0.3rem 0 0.45rem 0;
+      padding-left: 1.15rem;
     }
-
-    .markdown-content ul {
-      list-style-type: disc;
-    }
-
-    .markdown-content ol {
-      list-style-type: decimal;
-    }
+    .markdown-content ul { list-style-type: disc; }
+    .markdown-content ol { list-style-type: decimal; }
 
     .markdown-content li {
-      margin-bottom: 0.3rem;
-      line-height: 1.45;
+      margin-bottom: 0.25rem;
+      line-height: 1.42;
     }
     .markdown-content li:last-child {
       margin-bottom: 0;
@@ -467,18 +953,18 @@
 
     .markdown-content code.code-inline {
       font-family: var(--font-mono);
-      font-size: 0.775rem;
+      font-size: 0.75rem;
       background: rgba(0, 0, 0, 0.35);
       border: 1px solid var(--phone-border);
-      padding: 0.1rem 0.3rem;
+      padding: 0.1rem 0.25rem;
       border-radius: 4px;
       color: var(--primary);
     }
 
-    /* Action Confirmation Card (in mobile bubble) */
+    /* Action Confirmation Card */
     .action-card {
-      margin-top: 0.625rem;
-      padding: 0.625rem;
+      margin-top: 0.5rem;
+      padding: 0.55rem;
       background: var(--phone-surface-2);
       border: 1px solid rgba(59, 130, 246, 0.25);
       border-radius: var(--radius-sm);
@@ -488,78 +974,72 @@
       display: flex;
       align-items: center;
       gap: 0.35rem;
-      font-size: 0.75rem;
+      font-size: 0.725rem;
       font-weight: 600;
       color: var(--primary);
-      margin-bottom: 0.35rem;
+      margin-bottom: 0.3rem;
     }
-
     .action-header svg {
-      width: 14px;
-      height: 14px;
+      width: 13px;
+      height: 13px;
     }
 
     .action-desc {
-      font-size: 0.775rem;
+      font-size: 0.75rem;
       color: var(--text-main);
-      margin-bottom: 0.5rem;
+      margin-bottom: 0.45rem;
     }
 
     .action-buttons {
       display: flex;
-      gap: 0.4rem;
+      gap: 0.35rem;
     }
 
     .btn-action-confirm {
       background: var(--primary);
       color: #ffffff;
       border: none;
-      padding: 0.35rem 0.65rem;
+      padding: 0.3rem 0.6rem;
       border-radius: 6px;
-      font-size: 0.725rem;
+      font-size: 0.7rem;
       font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 0.25rem;
-      transition: background 0.15s ease;
     }
-    .btn-action-confirm:hover {
-      background: var(--primary-dark);
-    }
+    .btn-action-confirm:hover { background: var(--primary-dark); }
 
     .btn-action-cancel {
       background: rgba(255, 255, 255, 0.08);
       color: var(--text-dim);
       border: none;
-      padding: 0.35rem 0.65rem;
+      padding: 0.3rem 0.6rem;
       border-radius: 6px;
-      font-size: 0.725rem;
+      font-size: 0.7rem;
       cursor: pointer;
     }
 
-    /* Typing Dots Indicator */
+    /* Typing Dots */
     .typing-row {
       display: flex;
       align-items: center;
-      gap: 0.35rem;
-      padding: 0.5rem 0.75rem;
+      gap: 0.3rem;
+      padding: 0.45rem 0.7rem;
       background: var(--phone-surface);
       border: 1px solid var(--phone-border);
       border-radius: var(--radius-md);
       width: fit-content;
       margin-bottom: 0.25rem;
     }
-
     .typing-row span.typing-label {
-      font-size: 0.725rem;
+      font-size: 0.7rem;
       color: var(--text-dim);
-      margin-right: 0.35rem;
+      margin-right: 0.25rem;
     }
-
     .dot {
-      width: 5px;
-      height: 5px;
+      width: 4px;
+      height: 4px;
       border-radius: 50%;
       background: var(--primary);
       animation: bounce 1.4s infinite ease-in-out both;
@@ -574,33 +1054,30 @@
 
     /* Suggestions Horizontal Scrollable Chips */
     .suggestions-container {
-      padding: 0.25rem 0.75rem 0.4rem 0.75rem;
+      padding: 0.25rem 0.65rem 0.35rem 0.65rem;
       display: flex;
       gap: 0.35rem;
       overflow-x: auto;
       flex-shrink: 0;
       scrollbar-width: none;
     }
-    .suggestions-container::-webkit-scrollbar {
-      display: none;
-    }
+    .suggestions-container::-webkit-scrollbar { display: none; }
 
     .suggestion-chip {
       background: rgba(255, 255, 255, 0.05);
       border: 1px solid var(--phone-border);
       color: var(--text-dim);
-      padding: 0.3rem 0.6rem;
+      padding: 0.25rem 0.55rem;
       border-radius: 20px;
-      font-size: 0.7rem;
+      font-size: 0.6875rem;
       white-space: nowrap;
       cursor: pointer;
       display: flex;
       align-items: center;
-      gap: 0.3rem;
+      gap: 0.25rem;
       transition: all 0.2s ease;
       flex-shrink: 0;
     }
-
     .suggestion-chip:hover {
       background: rgba(59, 130, 246, 0.15);
       border-color: rgba(59, 130, 246, 0.35);
@@ -630,10 +1107,7 @@
       padding: 0.35rem 0.75rem;
       transition: border-color 0.2s ease;
     }
-
-    .input-wrapper:focus-within {
-      border-color: var(--primary);
-    }
+    .input-wrapper:focus-within { border-color: var(--primary); }
 
     .input-wrapper input {
       flex: 1;
@@ -641,17 +1115,14 @@
       border: none;
       outline: none;
       color: var(--text-main);
-      font-size: 0.8125rem;
+      font-size: 0.7875rem;
       font-family: inherit;
     }
-
-    .input-wrapper input::placeholder {
-      color: var(--text-muted);
-    }
+    .input-wrapper input::placeholder { color: var(--text-muted); }
 
     .send-btn {
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
       background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
       border: none;
@@ -660,33 +1131,203 @@
       align-items: center;
       justify-content: center;
       cursor: pointer;
-      transition: transform 0.15s ease, background 0.2s ease;
       flex-shrink: 0;
       box-shadow: 0 2px 8px var(--primary-glow);
     }
-
-    .send-btn:hover {
-      transform: scale(1.05);
-    }
-
-    .send-btn:active {
-      transform: scale(0.95);
-    }
-
     .send-btn svg {
-      width: 15px;
-      height: 15px;
+      width: 14px;
+      height: 14px;
       margin-left: 2px;
     }
 
-    /* iOS Home Swipe Indicator */
+    /* -------------------------------------------------------------------------
+       TAB 2: LEADS SCREEN (MOBILE LIST)
+       ------------------------------------------------------------------------- */
+    .leads-view {
+      flex: 1;
+      padding: 0.75rem 0.85rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .leads-header-title {
+      font-size: 0.8125rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 0.25rem;
+    }
+
+    .lead-mobile-card {
+      background: var(--phone-surface);
+      border: 1px solid var(--phone-border);
+      border-radius: var(--radius-md);
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+    }
+
+    .lead-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .lead-card-name {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .stage-pill {
+      font-size: 0.65rem;
+      font-weight: 600;
+      padding: 0.15rem 0.45rem;
+      border-radius: 12px;
+      background: rgba(59, 130, 246, 0.15);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .lead-card-detail {
+      font-size: 0.725rem;
+      color: var(--text-dim);
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+    }
+
+    .lead-actions-row {
+      display: flex;
+      gap: 0.4rem;
+      margin-top: 0.25rem;
+    }
+
+    .btn-lead-action {
+      flex: 1;
+      padding: 0.35rem 0.5rem;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.25rem;
+      border: none;
+      transition: all 0.15s ease;
+    }
+
+    .btn-lead-ai {
+      background: rgba(59, 130, 246, 0.15);
+      color: #93c5fd;
+      border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+    .btn-lead-ai:hover {
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    .btn-lead-call {
+      background: rgba(16, 185, 129, 0.15);
+      color: #6ee7b7;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    /* -------------------------------------------------------------------------
+       TAB 3: PIPELINE SCREEN
+       ------------------------------------------------------------------------- */
+    .pipeline-view {
+      flex: 1;
+      padding: 0.75rem 0.85rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .pipeline-summary-card {
+      background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(99, 102, 241, 0.15) 100%);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      border-radius: var(--radius-md);
+      padding: 0.75rem;
+      display: flex;
+      justify-content: space-around;
+      text-align: center;
+    }
+
+    .pipe-stat h4 {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: #ffffff;
+    }
+    .pipe-stat span {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+    }
+
+    .stage-row-item {
+      background: var(--phone-surface);
+      border: 1px solid var(--phone-border);
+      border-radius: var(--radius-sm);
+      padding: 0.6rem 0.75rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.75rem;
+    }
+
+    /* IN-APP BOTTOM TAB BAR */
+    .app-bottom-nav {
+      height: 44px;
+      background: rgba(20, 26, 36, 0.95);
+      border-top: 1px solid var(--phone-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-around;
+      flex-shrink: 0;
+      padding: 0 0.5rem;
+    }
+
+    .nav-tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.15rem;
+      cursor: pointer;
+      font-size: 0.625rem;
+      font-weight: 600;
+      font-family: inherit;
+      padding: 0.25rem 0.5rem;
+      transition: color 0.15s ease;
+    }
+    .nav-tab-btn svg {
+      width: 17px;
+      height: 17px;
+    }
+    .nav-tab-btn.active {
+      color: var(--primary);
+    }
+
+    /* iOS Home Swipe Bar (Global at Bottom of Phone) */
     .home-bar-area {
-      height: 14px;
+      height: 16px;
       display: flex;
       align-items: center;
       justify-content: center;
       background: var(--phone-bg);
       flex-shrink: 0;
+      z-index: 50;
+      cursor: pointer;
     }
 
     .home-indicator {
@@ -694,6 +1335,11 @@
       height: 4px;
       background: rgba(255, 255, 255, 0.25);
       border-radius: 10px;
+      transition: background 0.2s ease, width 0.2s ease;
+    }
+    .home-bar-area:hover .home-indicator {
+      background: rgba(255, 255, 255, 0.55);
+      width: 125px;
     }
 
     /* Settings / Auth Modal Sheet */
@@ -702,16 +1348,14 @@
       inset: 0;
       background: rgba(0, 0, 0, 0.7);
       backdrop-filter: blur(4px);
-      z-index: 50;
+      z-index: 60;
       display: none;
       align-items: flex-end;
       justify-content: center;
       border-radius: clamp(20px, 4.2vh, 38px);
     }
 
-    .modal-backdrop.open {
-      display: flex;
-    }
+    .modal-backdrop.open { display: flex; }
 
     .modal-sheet {
       width: 100%;
@@ -728,82 +1372,75 @@
     }
 
     .sheet-handle {
-      width: 40px;
+      width: 36px;
       height: 4px;
       background: var(--phone-border);
       border-radius: 10px;
-      margin: 0 auto 1rem auto;
+      margin: 0 auto 0.75rem auto;
     }
 
     .sheet-title {
-      font-size: 0.9375rem;
+      font-size: 0.875rem;
       font-weight: 700;
-      margin-bottom: 0.35rem;
+      margin-bottom: 0.25rem;
       color: var(--text-main);
     }
-
     .sheet-subtitle {
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       color: var(--text-dim);
-      margin-bottom: 1rem;
+      margin-bottom: 0.75rem;
     }
 
     .sheet-input-group {
       display: flex;
       flex-direction: column;
-      gap: 0.35rem;
-      margin-bottom: 0.75rem;
+      gap: 0.25rem;
+      margin-bottom: 0.65rem;
       text-align: left;
     }
-
     .sheet-input-group label {
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       font-weight: 600;
       color: var(--text-dim);
       text-transform: uppercase;
       letter-spacing: 0.03em;
     }
-
     .sheet-input-group input {
       background: var(--phone-surface-2);
       border: 1px solid var(--phone-border);
       border-radius: 8px;
-      padding: 0.5rem 0.75rem;
+      padding: 0.45rem 0.65rem;
       color: var(--text-main);
-      font-size: 0.8125rem;
+      font-size: 0.75rem;
       font-family: inherit;
       outline: none;
     }
-
-    .sheet-input-group input:focus {
-      border-color: var(--primary);
-    }
+    .sheet-input-group input:focus { border-color: var(--primary); }
 
     .sheet-btns {
       display: flex;
       flex-direction: column;
-      gap: 0.5rem;
-      margin-top: 1rem;
+      gap: 0.4rem;
+      margin-top: 0.75rem;
     }
 
     .btn-sheet-primary {
       background: var(--primary);
       color: #ffffff;
       border: none;
-      padding: 0.6rem;
-      border-radius: 10px;
+      padding: 0.55rem;
+      border-radius: 8px;
       font-weight: 600;
-      font-size: 0.8125rem;
+      font-size: 0.75rem;
       cursor: pointer;
     }
-
     .btn-sheet-secondary {
       background: transparent;
       color: var(--text-dim);
       border: 1px solid var(--phone-border);
-      padding: 0.6rem;
-      border-radius: 10px;
-      font-size: 0.8125rem;
+      padding: 0.55rem;
+      border-radius: 8px;
+      font-size: 0.75rem;
       cursor: pointer;
     }
 
@@ -817,9 +1454,7 @@
         height: 100dvh;
       }
 
-      .desktop-toolbar {
-        display: none;
-      }
+      .desktop-toolbar { display: none; }
 
       .phone-wrapper {
         width: 100vw;
@@ -834,21 +1469,17 @@
       }
 
       .phone-wrapper::before,
-      .phone-wrapper::after {
-        display: none;
-      }
+      .power-btn-hardware { display: none; }
 
       .phone-screen {
         border-radius: 0;
         height: 100%;
       }
 
-      .modal-backdrop {
-        border-radius: 0;
-      }
+      .modal-backdrop { border-radius: 0; }
     }
 
-    /* Toggle for Direct Fullscreen View on Desktop */
+    /* Frameless Mode for Full Desktop View */
     body.frameless-mode {
       padding: 0;
       background: var(--phone-bg);
@@ -867,9 +1498,7 @@
       width: auto;
       margin-bottom: 0;
     }
-    body.frameless-mode .brand-pill {
-      display: none;
-    }
+    body.frameless-mode .brand-pill { display: none; }
     body.frameless-mode .phone-wrapper {
       width: 100vw;
       height: 100vh;
@@ -882,16 +1511,12 @@
       aspect-ratio: auto;
     }
     body.frameless-mode .phone-wrapper::before,
-    body.frameless-mode .phone-wrapper::after {
-      display: none;
-    }
+    body.frameless-mode .power-btn-hardware { display: none; }
     body.frameless-mode .phone-screen {
       border-radius: 0;
       height: 100%;
     }
-    body.frameless-mode .modal-backdrop {
-      border-radius: 0;
-    }
+    body.frameless-mode .modal-backdrop { border-radius: 0; }
   </style>
 </head>
 <body>
@@ -902,10 +1527,18 @@
       <div class="brand-logo-icon">
         <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
       </div>
-      <span>CRM Copilot • Mobile</span>
+      <span>Mobile CRM Phone OS</span>
     </div>
 
     <div class="top-actions">
+      <button class="toolbar-btn" onclick="lockPhone()" title="Lock Phone">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0110 0v4"/>
+        </svg>
+        <span>Lock</span>
+      </button>
+
       <button class="toolbar-btn" id="connectionBadge" onclick="openAuthModal()" title="Click to configure API connection">
         <span class="status-dot" id="statusDot"></span>
         <span id="connectionLabel">Live API</span>
@@ -924,14 +1557,18 @@
 
   <!-- SMARTPHONE FRAME -->
   <div class="phone-wrapper" id="phoneWrapper">
+    <!-- Clickable Hardware Power Button -->
+    <div class="power-btn-hardware" onclick="togglePower()" title="Power / Lock Button"></div>
+
     <div class="phone-screen">
 
-      <!-- Realistic Mobile Status Bar -->
+      <!-- Realistic Mobile Status Bar (Always on Top) -->
       <div class="phone-status-bar">
-        <span class="phone-time" id="statusTime">9:41</span>
+        <span class="phone-time" id="statusTime">22:40</span>
 
         <!-- Dynamic Island pill -->
-        <div class="dynamic-island">
+        <div class="dynamic-island" id="dynamicIsland" onclick="handleIslandClick()">
+          <div class="island-icon"></div>
           <div class="camera-lens"></div>
         </div>
 
@@ -945,89 +1582,441 @@
         </div>
       </div>
 
-      <!-- In-App Header -->
-      <div class="app-header">
-        <div class="header-info">
-          <div class="bot-avatar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M12 8V4m0 4a4 4 0 100 8 4 4 0 000-8zm0 8v4m-8-6h4m8 0h4"/>
-            </svg>
-            <div class="online-indicator"></div>
-          </div>
-          <div class="bot-meta">
-            <h2>CRM AI Copilot</h2>
-            <span><span class="status-dot"></span> Online • Live Assistant</span>
-          </div>
-        </div>
-
-        <div class="header-btns">
-          <button class="icon-btn" onclick="clearChatHistory()" title="Clear Conversation">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <polyline points="3 6 5 6 21 6"/>
-              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-            </svg>
-          </button>
-          <button class="icon-btn" onclick="openAuthModal()" title="Authentication & Connection Settings">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <circle cx="12" cy="12" r="3"/>
-              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <!-- Messages Stream -->
-      <div class="chat-messages" id="chatMessages">
-        <!-- Messages will be dynamically rendered here -->
-      </div>
-
-      <!-- Thinking Indicator (Hidden by default) -->
-      <div id="typingIndicator" style="display: none; padding: 0 0.85rem;">
-        <div class="typing-row">
-          <span class="typing-label">Copilot is thinking</span>
-          <div class="dot"></div>
-          <div class="dot"></div>
-          <div class="dot"></div>
-        </div>
-      </div>
-
-      <!-- Suggestion Chips -->
-      <div class="suggestions-container" id="suggestionsContainer">
-        <button class="suggestion-chip" onclick="handleQuickSend('Show my overdue leads')">
-          ⚡ Overdue leads
-        </button>
-        <button class="suggestion-chip" onclick="handleQuickSend('Summarize my pipeline')">
-          📊 Pipeline summary
-        </button>
-        <button class="suggestion-chip" onclick="handleQuickSend('What should I do today?')">
-          🎯 Today's action plan
-        </button>
-        <button class="suggestion-chip" onclick="handleQuickSend('Show high-value leads')">
-          🏆 Top deals
-        </button>
-      </div>
-
-      <!-- Input Bar -->
-      <div class="chat-input-bar">
-        <div class="input-wrapper">
-          <input
-            type="text"
-            id="chatInput"
-            placeholder="Ask your CRM Copilot..."
-            autocomplete="off"
-            onkeydown="if(event.key === 'Enter') handleSend();"
-          />
-        </div>
-        <button class="send-btn" id="sendBtn" onclick="handleSend()" title="Send Message">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="22" y1="2" x2="11" y2="13"/>
-            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+      <!-- ===================================================================
+           SCREEN 1: LOCK SCREEN
+           =================================================================== -->
+      <div class="screen-view" id="lockScreen" onclick="unlockPhone()">
+        <div class="lock-top">
+          <svg class="lock-padlock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+            <path d="M7 11V7a5 5 0 0110 0v4"/>
           </svg>
-        </button>
+          <span class="lock-date" id="lockDate">Saturday, November 7</span>
+          <h1 class="lock-clock" id="lockClock">22:40</h1>
+        </div>
+
+        <!-- Lock Screen Notification Widget -->
+        <div class="lock-notifications">
+          <div class="lock-notif-card" onclick="event.stopPropagation(); openCrmApp('chat', 'what is the status of REYYA');">
+            <div class="notif-header">
+              <div class="notif-app-info">
+                <div class="notif-app-icon">
+                  <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+                </div>
+                <span>CRM LITE • PRIORITY</span>
+              </div>
+              <span>now</span>
+            </div>
+            <div class="notif-title">Follow-up Due: REYYA Achu</div>
+            <div class="notif-desc">Demo Scheduled stage follow-up call pending. Tap to open CRM Copilot.</div>
+          </div>
+        </div>
+
+        <div class="lock-bottom">
+          <div class="lock-quick-actions">
+            <div class="lock-round-btn" onclick="event.stopPropagation();" title="Flashlight">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M18 6l-3-3H9L6 6v2l2 2v10a2 2 0 002 2h4a2 2 0 002-2V10l2-2V6z"/>
+              </svg>
+            </div>
+            <div class="lock-round-btn" onclick="event.stopPropagation();" title="Camera">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
+                <circle cx="12" cy="13" r="4"/>
+              </svg>
+            </div>
+          </div>
+
+          <div class="unlock-swipe-prompt">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="18 15 12 9 6 15"/>
+            </svg>
+            <span>Tap anywhere to unlock</span>
+          </div>
+        </div>
       </div>
 
-      <!-- Bottom Home Indicator -->
-      <div class="home-bar-area">
+      <!-- ===================================================================
+           SCREEN 2: HOME SCREEN (APP GRID & WIDGETS)
+           =================================================================== -->
+      <div class="screen-view" id="homeScreen">
+        <!-- Home Screen Widgets -->
+        <div class="home-widgets">
+          <!-- Calendar/Weather Widget -->
+          <div class="widget-box" onclick="openCrmApp('leads')">
+            <div class="widget-top">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="5"/><path d="M12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+              </svg>
+              <span>CRM TODAY</span>
+            </div>
+            <div class="widget-val">1 Lead</div>
+            <div class="widget-desc">REYYA Achu (Demo)</div>
+          </div>
+
+          <!-- Quick Copilot Widget -->
+          <div class="widget-box" onclick="openCrmApp('chat')">
+            <div class="widget-top">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 8V4m0 4a4 4 0 100 8 4 4 0 000-8zm0 8v4m-8-6h4m8 0h4"/>
+              </svg>
+              <span>AI COPILOT</span>
+            </div>
+            <div class="widget-val" style="font-size:1.05rem;">Live Online</div>
+            <div class="widget-desc">Tap to start chat</div>
+          </div>
+        </div>
+
+        <!-- App Grid -->
+        <div class="app-grid">
+          <!-- App 1: CRM AI Copilot (Featured) -->
+          <button class="app-item" onclick="openCrmApp('chat')">
+            <div class="app-icon crm-ai">
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                <path d="M12 8V4m0 4a4 4 0 100 8 4 4 0 000-8zm0 8v4m-8-6h4m8 0h4"/>
+              </svg>
+              <span class="app-badge">1</span>
+            </div>
+            <span class="app-label">CRM AI</span>
+          </button>
+
+          <!-- App 2: Leads -->
+          <button class="app-item" onclick="openCrmApp('leads')">
+            <div class="app-icon leads">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 00-3-3.87m-4-12a4 4 0 010 7.75"/>
+              </svg>
+            </div>
+            <span class="app-label">Leads</span>
+          </button>
+
+          <!-- App 3: Calendar -->
+          <button class="app-item" onclick="openCrmApp('pipeline')">
+            <div class="app-icon calendar">
+              <span style="color:#64748b; font-size:0.55rem; text-transform:uppercase;">SAT</span>
+              <span class="day" id="calendarDay">7</span>
+            </div>
+            <span class="app-label">Calendar</span>
+          </button>
+
+          <!-- App 4: Pipeline / Analytics -->
+          <button class="app-item" onclick="openCrmApp('pipeline')">
+            <div class="app-icon analytics">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+              </svg>
+            </div>
+            <span class="app-label">Pipeline</span>
+          </button>
+
+          <!-- App 5: Mail -->
+          <button class="app-item" onclick="openCrmApp('chat', 'Show my recent messages')">
+            <div class="app-icon mail">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                <polyline points="22,6 12,13 2,6"/>
+              </svg>
+              <span class="app-badge">3</span>
+            </div>
+            <span class="app-label">Mail</span>
+          </button>
+
+          <!-- App 6: Notes -->
+          <button class="app-item" onclick="openCrmApp('chat', 'Show notes for REYYA Achu')">
+            <div class="app-icon notes">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+              </svg>
+            </div>
+            <span class="app-label">Notes</span>
+          </button>
+
+          <!-- App 7: Reminders -->
+          <button class="app-item" onclick="openCrmApp('chat', 'What should I do today?')">
+            <div class="app-icon reminders">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2">
+                <polyline points="9 11 12 14 22 4"/>
+                <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+              </svg>
+            </div>
+            <span class="app-label">Reminders</span>
+          </button>
+
+          <!-- App 8: Settings -->
+          <button class="app-item" onclick="openAuthModal()">
+            <div class="app-icon settings">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+              </svg>
+            </div>
+            <span class="app-label">Settings</span>
+          </button>
+        </div>
+
+        <!-- Bottom Dock Bar -->
+        <div class="home-dock">
+          <!-- Phone -->
+          <div class="dock-item" onclick="openCrmApp('chat', 'What calls do I need to make today?')" title="Phone">
+            <div class="dock-icon phone-app">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- Messages -->
+          <div class="dock-item" onclick="openCrmApp('chat', 'Show my recent messages')" title="Messages">
+            <div class="dock-icon messages-app">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+              </svg>
+            </div>
+          </div>
+
+          <!-- CRM AI (Featured in Dock) -->
+          <div class="dock-item" onclick="openCrmApp('chat')" title="CRM AI Copilot">
+            <div class="dock-icon crm-ai" style="width:50px; height:50px; border-radius:14px;">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2">
+                <path d="M12 8V4m0 4a4 4 0 100 8 4 4 0 000-8zm0 8v4m-8-6h4m8 0h4"/>
+              </svg>
+              <span class="app-badge">1</span>
+            </div>
+          </div>
+
+          <!-- Safari / Web-to-Lead -->
+          <div class="dock-item" onclick="openCrmApp('pipeline')" title="Browser">
+            <div class="dock-icon safari-app">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0284c7" stroke-width="2">
+                <circle cx="12" cy="12" r="10"/>
+                <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===================================================================
+           SCREEN 3: FULL MOBILE CRM APP
+           =================================================================== -->
+      <div class="screen-view" id="appScreen">
+        <!-- In-App Header -->
+        <div class="app-header">
+          <div class="header-left">
+            <button class="btn-back-home" onclick="goHome()" title="Exit to Home Screen">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                <polyline points="15 18 9 12 15 6"/>
+              </svg>
+            </button>
+
+            <div class="header-info">
+              <div class="bot-avatar">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 8V4m0 4a4 4 0 100 8 4 4 0 000-8zm0 8v4m-8-6h4m8 0h4"/>
+                </svg>
+                <div class="online-indicator"></div>
+              </div>
+              <div class="bot-meta">
+                <h2>CRM AI Copilot</h2>
+                <span><span class="status-dot"></span> Online • Live Assistant</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="header-btns">
+            <button class="icon-btn" onclick="clearChatHistory()" title="Clear Conversation">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+              </svg>
+            </button>
+            <button class="icon-btn" onclick="openAuthModal()" title="Settings">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- In-App Tab Views Container -->
+        <div class="app-tab-content">
+
+          <!-- TAB 1: COPILOT CHAT -->
+          <div class="tab-pane active" id="tabChat">
+            <!-- Messages Stream -->
+            <div class="chat-messages" id="chatMessages">
+              <!-- Rendered dynamically -->
+            </div>
+
+            <!-- Thinking Indicator -->
+            <div id="typingIndicator" style="display: none; padding: 0 0.75rem;">
+              <div class="typing-row">
+                <span class="typing-label">Copilot is thinking</span>
+                <div class="dot"></div>
+                <div class="dot"></div>
+                <div class="dot"></div>
+              </div>
+            </div>
+
+            <!-- Suggestion Chips -->
+            <div class="suggestions-container" id="suggestionsContainer">
+              <button class="suggestion-chip" onclick="handleQuickSend('what is the status of REYYA')">
+                🔍 Status of REYYA
+              </button>
+              <button class="suggestion-chip" onclick="handleQuickSend('Show my overdue leads')">
+                ⚡ Overdue leads
+              </button>
+              <button class="suggestion-chip" onclick="handleQuickSend('Summarize my pipeline')">
+                📊 Pipeline summary
+              </button>
+              <button class="suggestion-chip" onclick="handleQuickSend('What should I do today?')">
+                🎯 Today's action plan
+              </button>
+            </div>
+
+            <!-- Bottom Input Bar -->
+            <div class="chat-input-bar">
+              <div class="input-wrapper">
+                <input
+                  type="text"
+                  id="chatInput"
+                  placeholder="Ask your CRM Copilot..."
+                  autocomplete="off"
+                  onkeydown="if(event.key === 'Enter') handleSend();"
+                />
+              </div>
+              <button class="send-btn" id="sendBtn" onclick="handleSend()" title="Send Message">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"/>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- TAB 2: LEADS LIST -->
+          <div class="tab-pane" id="tabLeads">
+            <div class="leads-view">
+              <div class="leads-header-title">
+                <span>Active CRM Leads</span>
+                <span style="font-size:0.7rem; color:var(--text-dim); font-weight:normal;">1 Total</span>
+              </div>
+
+              <!-- Lead Card: REYYA Achu -->
+              <div class="lead-mobile-card">
+                <div class="lead-card-top">
+                  <div class="lead-card-name">REYYA Achu</div>
+                  <span class="stage-pill">Demo Scheduled</span>
+                </div>
+
+                <div class="lead-card-detail">
+                  <span>Priority: <strong style="color:#f59e0b;">MEDIUM</strong> • Value: $0.00</span>
+                  <span>Phone: <a href="tel:+91545555445" style="color:var(--primary); text-decoration:none;">+91 545555445</a></span>
+                  <span>Pending Task: Follow-up call (Demo Scheduled stage)</span>
+                </div>
+
+                <div class="lead-actions-row">
+                  <button class="btn-lead-action btn-lead-ai" onclick="switchTab('chat'); handleQuickSend('what is the status of REYYA');">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <path d="M12 8V4m0 4a4 4 0 100 8 4 4 0 000-8zm0 8v4m-8-6h4m8 0h4"/>
+                    </svg>
+                    <span>Ask AI About Lead</span>
+                  </button>
+                  <button class="btn-lead-action btn-lead-call" onclick="switchTab('chat'); handleQuickSend('Move REYYA Achu to Negotiation stage');">
+                    <span>Move Stage</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TAB 3: PIPELINE -->
+          <div class="tab-pane" id="tabPipeline">
+            <div class="pipeline-view">
+              <div class="leads-header-title">
+                <span>Deal Pipeline Funnel</span>
+              </div>
+
+              <div class="pipeline-summary-card">
+                <div class="pipe-stat">
+                  <h4>1</h4>
+                  <span>Active Deals</span>
+                </div>
+                <div class="pipe-stat">
+                  <h4>$0.00</h4>
+                  <span>Total Value</span>
+                </div>
+                <div class="pipe-stat">
+                  <h4 style="color:var(--warning);">1</h4>
+                  <span>Due Today</span>
+                </div>
+              </div>
+
+              <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.35rem;">
+                <div class="stage-row-item">
+                  <span>1. New Leads</span>
+                  <span style="color:var(--text-dim);">0 deals</span>
+                </div>
+                <div class="stage-row-item">
+                  <span>2. Contacted</span>
+                  <span style="color:var(--text-dim);">0 deals</span>
+                </div>
+                <div class="stage-row-item" style="border-color:rgba(59,130,246,0.4); background:rgba(59,130,246,0.08);">
+                  <span style="font-weight:700; color:#93c5fd;">3. Demo Scheduled</span>
+                  <span style="font-weight:700; color:#60a5fa;">1 lead (REYYA)</span>
+                </div>
+                <div class="stage-row-item">
+                  <span>4. Negotiation</span>
+                  <span style="color:var(--text-dim);">0 deals</span>
+                </div>
+                <div class="stage-row-item">
+                  <span>5. Closed Won</span>
+                  <span style="color:var(--success);">0 deals</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- In-App Bottom Tab Bar -->
+        <div class="app-bottom-nav">
+          <button class="nav-tab-btn active" id="tabBtnChat" onclick="switchTab('chat')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+            </svg>
+            <span>Copilot</span>
+          </button>
+
+          <button class="nav-tab-btn" id="tabBtnLeads" onclick="switchTab('leads')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+            </svg>
+            <span>Leads</span>
+          </button>
+
+          <button class="nav-tab-btn" id="tabBtnPipeline" onclick="switchTab('pipeline')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            <span>Pipeline</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- iOS Home Swipe Bar (Global at Bottom of Phone) -->
+      <div class="home-bar-area" onclick="goHome()" title="Swipe or Tap to return Home">
         <div class="home-indicator"></div>
       </div>
 
@@ -1068,19 +2057,21 @@
     let API_BASE_URL = localStorage.getItem('crm_api_url') || 'http://localhost:8000';
     let ACCESS_TOKEN = localStorage.getItem('crm_access_token') || '';
     let IS_DEMO_MODE = !ACCESS_TOKEN;
+    let isPhoneLocked = true;
+    let activeAppOpen = false;
 
     const messages = [
       {
         id: 1,
         sender: 'assistant',
-        text: "Hello! I'm your **CRM AI Copilot**.\n\nI can evaluate your live sales pipeline, review overdue follow-ups, summarize leads, and draft deal updates directly from your mobile screen.\n\nWhat would you like to review?",
+        text: "Hello Eleanor! I'm your **CRM AI Copilot**.\n\nI have evaluated your live CRM pipeline:\n* You have **1 active lead** (**REYYA Achu**) in **Demo Scheduled** stage.\n* An overdue follow-up call is pending.\n\nAsk me anything or tap an action below!",
         time: getCurrentFormattedTime(),
         action_required: false,
         action_payload: null
       }
     ];
 
-    // Initialize UI
+    // Initialize UI on startup
     window.addEventListener('DOMContentLoaded', async () => {
       updateClock();
       setInterval(updateClock, 1000);
@@ -1090,7 +2081,7 @@
       const urlInput = document.getElementById('apiBaseUrl');
       if (urlInput) urlInput.value = API_BASE_URL;
 
-      // Auto-connect to live backend immediately on startup
+      // Auto-connect to live backend in background
       if (ACCESS_TOKEN) {
         const ok = await checkTokenHealth();
         if (!ok) {
@@ -1101,13 +2092,28 @@
       }
     });
 
+    // Clock & Date updater
     function updateClock() {
       const now = new Date();
-      let hours = now.getHours();
+      let hours = String(now.getHours()).padStart(2, '0');
       const minutes = String(now.getMinutes()).padStart(2, '0');
       const timeStr = `${hours}:${minutes}`;
+
       const elem = document.getElementById('statusTime');
       if (elem) elem.textContent = timeStr;
+
+      const lockClock = document.getElementById('lockClock');
+      if (lockClock) lockClock.textContent = timeStr;
+
+      const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+      const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const dateStr = `${days[now.getDay()]}, ${months[now.getMonth()]} ${now.getDate()}`;
+
+      const lockDate = document.getElementById('lockDate');
+      if (lockDate) lockDate.textContent = dateStr;
+
+      const calDay = document.getElementById('calendarDay');
+      if (calDay) calDay.textContent = String(now.getDate());
     }
 
     function getCurrentFormattedTime() {
@@ -1115,6 +2121,113 @@
       return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     }
 
+    // =========================================================================
+    // PHONE OS INTERACTION & SCREEN NAVIGATION
+    // =========================================================================
+    function unlockPhone() {
+      if (!isPhoneLocked) return;
+      isPhoneLocked = false;
+
+      // Animate dynamic island FaceID pulse
+      const island = document.getElementById('dynamicIsland');
+      if (island) {
+        island.style.width = '120px';
+        setTimeout(() => { island.style.width = '96px'; }, 400);
+      }
+
+      const lockScreen = document.getElementById('lockScreen');
+      if (lockScreen) {
+        lockScreen.classList.add('unlocked');
+      }
+    }
+
+    function lockPhone() {
+      isPhoneLocked = true;
+      activeAppOpen = false;
+
+      const lockScreen = document.getElementById('lockScreen');
+      if (lockScreen) lockScreen.classList.remove('unlocked');
+
+      const appScreen = document.getElementById('appScreen');
+      if (appScreen) appScreen.classList.remove('active');
+
+      const homeScreen = document.getElementById('homeScreen');
+      if (homeScreen) homeScreen.classList.remove('app-open');
+    }
+
+    function togglePower() {
+      if (isPhoneLocked) {
+        unlockPhone();
+      } else {
+        lockPhone();
+      }
+    }
+
+    function openCrmApp(tab = 'chat', autoPrompt = null) {
+      // Auto-unlock if locked
+      if (isPhoneLocked) {
+        unlockPhone();
+      }
+
+      activeAppOpen = true;
+
+      const homeScreen = document.getElementById('homeScreen');
+      if (homeScreen) homeScreen.classList.add('app-open');
+
+      const appScreen = document.getElementById('appScreen');
+      if (appScreen) appScreen.classList.add('active');
+
+      switchTab(tab);
+
+      if (autoPrompt) {
+        setTimeout(() => {
+          handleQuickSend(autoPrompt);
+        }, 350);
+      }
+    }
+
+    function goHome() {
+      if (activeAppOpen) {
+        activeAppOpen = false;
+        const appScreen = document.getElementById('appScreen');
+        if (appScreen) appScreen.classList.remove('active');
+
+        const homeScreen = document.getElementById('homeScreen');
+        if (homeScreen) homeScreen.classList.remove('app-open');
+      } else if (!isPhoneLocked) {
+        // Already on home screen, optional lock or shake
+      }
+    }
+
+    function handleIslandClick() {
+      if (activeAppOpen) {
+        goHome();
+      } else if (!isPhoneLocked) {
+        openCrmApp('chat');
+      } else {
+        unlockPhone();
+      }
+    }
+
+    function switchTab(tabName) {
+      document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
+      document.querySelectorAll('.nav-tab-btn').forEach(el => el.classList.remove('active'));
+
+      if (tabName === 'chat') {
+        document.getElementById('tabChat')?.classList.add('active');
+        document.getElementById('tabBtnChat')?.classList.add('active');
+      } else if (tabName === 'leads') {
+        document.getElementById('tabLeads')?.classList.add('active');
+        document.getElementById('tabBtnLeads')?.classList.add('active');
+      } else if (tabName === 'pipeline') {
+        document.getElementById('tabPipeline')?.classList.add('active');
+        document.getElementById('tabBtnPipeline')?.classList.add('active');
+      }
+    }
+
+    // =========================================================================
+    // API & AUTHENTICATION
+    // =========================================================================
     function updateConnectionStatusBadge() {
       const dot = document.getElementById('statusDot');
       const label = document.getElementById('connectionLabel');
@@ -1138,9 +2251,7 @@
           updateConnectionStatusBadge();
           return true;
         }
-      } catch (e) {
-        // Fall through
-      }
+      } catch (e) {}
       return false;
     }
 
@@ -1171,7 +2282,6 @@
       return false;
     }
 
-    // Modal Control
     function openAuthModal() {
       document.getElementById('authModal').classList.add('open');
     }
@@ -1219,7 +2329,7 @@
       ACCESS_TOKEN = '';
       updateConnectionStatusBadge();
       closeAuthModal();
-      appendAssistantMessage("Operating in **Offline / Demo Mode**. I will simulate pipeline responses and deal mutations.");
+      appendAssistantMessage("Operating in **Offline / Demo Mode**. I will simulate pipeline responses.");
     }
 
     function togglePhoneFrame() {
@@ -1243,7 +2353,9 @@
       }
     }
 
-    /* MARKDOWN PARSER (STRIPS ASTERISKS & FORMATS BOLD/BULLETS CLEANLY) */
+    // =========================================================================
+    // MARKDOWN PARSER (STRIPS ASTERISKS & FORMATS BOLD/BULLETS CLEANLY)
+    // =========================================================================
     function escapeHtml(str) {
       return String(str)
         .replace(/&/g, '&amp;')
@@ -1254,7 +2366,6 @@
     function renderInlineMarkdown(text) {
       if (!text) return '';
 
-      // Token regex matching ***bold italic***, **bold**, *italic*, `code`, and [links](url)
       const regex = /(\*\*\*[^*]+?\*\*\*|\*\*[^*]+?\*\*|\*[^*]+?\*|___[^_]+?___|__[^_]+?__|_[^_]+?_|`[^`]+?`|\[[^\]]+?\]\([^)]+?\))/g;
 
       let html = '';
@@ -1301,14 +2412,13 @@
     function parseMarkdownBlocks(rawText) {
       if (!rawText) return '';
 
-      // Normalize line endings and break inline bullets after colon/punctuation
       let text = String(rawText)
         .replace(/\r\n/g, '\n')
         .replace(/([:\.\?!])\s+([\*\-•])\s+/g, (m, p1, p2) => `${p1}\n${p2} `);
 
       const lines = text.split('\n');
       let outHtml = '';
-      let currentList = null; // 'ul' or 'ol'
+      let currentList = null;
       let currentParagraph = [];
 
       function flushPara() {
@@ -1367,7 +2477,7 @@
         if (headingMatch) {
           flushPara();
           flushList();
-          outHtml += `<h4 style="margin:0.5rem 0 0.25rem 0; font-weight:700;">${renderInlineMarkdown(headingMatch[2])}</h4>`;
+          outHtml += `<h4 style="margin:0.4rem 0 0.2rem 0; font-weight:700;">${renderInlineMarkdown(headingMatch[2])}</h4>`;
           continue;
         }
 
@@ -1381,9 +2491,12 @@
       return outHtml;
     }
 
-    /* CHAT STREAM RENDERING */
+    // =========================================================================
+    // CHAT ENGINE
+    // =========================================================================
     function renderMessages() {
       const container = document.getElementById('chatMessages');
+      if (!container) return;
       container.innerHTML = '';
 
       messages.forEach(msg => {
@@ -1393,13 +2506,11 @@
         const bubble = document.createElement('div');
         bubble.className = 'message-bubble';
 
-        // Render formatted content
         const markdownDiv = document.createElement('div');
         markdownDiv.className = 'markdown-content';
         markdownDiv.innerHTML = parseMarkdownBlocks(msg.text);
         bubble.appendChild(markdownDiv);
 
-        // Action confirmation card if needed
         if (msg.action_required && msg.action_payload) {
           const card = document.createElement('div');
           card.className = 'action-card';
@@ -1436,7 +2547,6 @@
         container.appendChild(row);
       });
 
-      // Scroll to bottom
       container.scrollTop = container.scrollHeight;
     }
 
@@ -1466,13 +2576,15 @@
     }
 
     function showTyping(show) {
-      document.getElementById('typingIndicator').style.display = show ? 'block' : 'none';
+      const el = document.getElementById('typingIndicator');
+      if (el) el.style.display = show ? 'block' : 'none';
       const container = document.getElementById('chatMessages');
-      container.scrollTop = container.scrollHeight;
+      if (container) container.scrollTop = container.scrollHeight;
     }
 
     function handleQuickSend(query) {
-      document.getElementById('chatInput').value = query;
+      const input = document.getElementById('chatInput');
+      if (input) input.value = query;
       handleSend();
     }
 
@@ -1485,12 +2597,10 @@
       appendUserMessage(text);
       showTyping(true);
 
-      // Attempt auto-login if not yet authenticated
       if (!ACCESS_TOKEN) {
         await autoLoginDefaultAdmin();
       }
 
-      // Call Live Backend
       if (ACCESS_TOKEN) {
         try {
           const res = await fetch(`${API_BASE_URL}/api/ai/chat/`, {
@@ -1518,7 +2628,6 @@
             updateConnectionStatusBadge();
             return;
           } else if (res.status === 401) {
-            // Token expired or invalid, auto re-login once
             const relogged = await autoLoginDefaultAdmin();
             if (relogged) {
               const retryRes = await fetch(`${API_BASE_URL}/api/ai/chat/`, {
@@ -1544,11 +2653,10 @@
             }
           }
         } catch (err) {
-          console.warn('[CRM Copilot] API call failed, falling back to simulated response:', err);
+          console.warn('[CRM Copilot] Live API call failed, using fallback:', err);
         }
       }
 
-      // Simulated Demo Response (only if server is completely offline)
       setTimeout(() => {
         showTyping(false);
         const simulated = getSimulatedResponse(text);
@@ -1556,7 +2664,6 @@
       }, 600);
     }
 
-    /* ACTION EXECUTION */
     async function confirmAction(msgId) {
       const msg = messages.find(m => m.id === msgId);
       if (!msg || !msg.action_payload) return;
@@ -1583,7 +2690,6 @@
         }
       }
 
-      // Fallback local execution
       msg.action_status = 'EXECUTED';
       msg.action_result = `Successfully executed: ${msg.action_payload.description}`;
       renderMessages();
@@ -1597,7 +2703,6 @@
       }
     }
 
-    /* SIMULATED RESPONSES FOR DEMO/OFFLINE MODE */
     function getSimulatedResponse(prompt) {
       const q = prompt.toLowerCase();
 
@@ -1666,4 +2771,3 @@
   </script>
 </body>
 </html>
-
