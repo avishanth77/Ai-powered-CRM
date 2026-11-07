@@ -662,6 +662,16 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
                     'target_stage_name': stage_val.name,
                 })
 
+            # PLD stage gates: a lead may not move into a stage whose requirements are unmet.
+            missing_gates = _check_stage_gate(self.instance, stage_val)
+            if missing_gates:
+                raise serializers.ValidationError({
+                    'stage': [f"Cannot move to stage '{stage_val.name}': "
+                              + ' '.join(item['message'] for item in missing_gates)],
+                    'missing': [item['code'] for item in missing_gates],
+                    'missing_messages': [item['message'] for item in missing_gates],
+                })
+
         # Role-based validation for assignment
         request = self.context.get('request')
         if request and request.user.is_authenticated:
