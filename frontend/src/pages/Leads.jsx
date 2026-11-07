@@ -20,6 +20,7 @@ import { PriorityBadge } from '../components/PriorityBadge';
 import { SearchBar } from '../components/SearchBar';
 import { Pagination } from '../components/Pagination';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { SkeletonTable, SkeletonCardList } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { ConfirmModal } from '../components/ConfirmModal';
 
@@ -193,6 +194,22 @@ export const Leads = () => {
   const [assignedToFilter, setAssignedToFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
   const [availableProducts, setAvailableProducts] = useState([]);
+
+  const hasActiveFilters = Boolean(
+    search || statusFilter || priorityFilter || icpStatusFilter || pldStatusFilter || sourceFilter || assignedToFilter || productFilter
+  );
+
+  const handleResetAllFilters = () => {
+    setSearch('');
+    setStatusFilter('');
+    setPriorityFilter('');
+    setIcpStatusFilter('');
+    setPldStatusFilter('');
+    setSourceFilter('');
+    setAssignedToFilter('');
+    setProductFilter('');
+    setCurrentPage(1);
+  };
 
   // Bulk Handover State
   const [selectedLeads, setSelectedLeads] = useState([]);
@@ -1335,14 +1352,28 @@ export const Leads = () => {
       )}
       <div className="table-responsive">
         {loading ? (
-          <LoadingSpinner text="Retrieving leads..." />
+          <SkeletonTable rows={8} cols={canHandoverLeads ? 8 : 7} />
         ) : leads.length === 0 ? (
-          <EmptyState
-            title="No leads found"
-            message="No leads match your current search and filter criteria."
-            actionLabel="Create First Lead"
-            onAction={() => navigate('/leads/create')}
-          />
+          hasActiveFilters ? (
+            <EmptyState
+              variant="search-no-results"
+              title="No matching leads found"
+              message="No records match your active search or filter criteria. Clear filters to view all leads."
+              actionLabel="Clear All Filters"
+              onAction={handleResetAllFilters}
+              secondaryActionLabel="+ New Lead"
+              onSecondaryAction={() => navigate('/leads/create')}
+            />
+          ) : (
+            <EmptyState
+              title="No leads yet"
+              message="Your sales pipeline is empty. Create your first lead or import from a spreadsheet to start qualifying deals."
+              actionLabel="+ Create First Lead"
+              onAction={() => navigate('/leads/create')}
+              secondaryActionLabel="Import Spreadsheet"
+              onSecondaryAction={() => setImportModalOpen(true)}
+            />
+          )
         ) : (
           <table className="crm-table">
             <thead>
@@ -1586,7 +1617,7 @@ export const Leads = () => {
 
           <div className="followup-compact-list">
             {panelsLoading ? (
-              <LoadingSpinner size={22} text="Loading follow-ups..." />
+              <SkeletonCardList count={2} />
             ) : followups.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--text-dim)', fontSize: '0.8125rem' }}>
                 No upcoming follow-ups scheduled
@@ -1633,7 +1664,7 @@ export const Leads = () => {
 
           <div className="activity-compact-list">
             {panelsLoading ? (
-              <LoadingSpinner size={22} text="Loading activity..." />
+              <SkeletonCardList count={2} />
             ) : activities.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '1.5rem 1rem', color: 'var(--text-dim)', fontSize: '0.8125rem' }}>
                 No recent activity recorded

@@ -3,6 +3,8 @@ import { Link } from 'react-router-dom';
 import { reportApi } from '../api/reportApi';
 import { formatCurrency, formatRelativeTime } from '../utils/formatters';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { Skeleton, SkeletonKpiGrid } from '../components/Skeleton';
+import { ErrorState } from '../components/ErrorState';
 import { useAuth } from '../context/AuthContext';
 import {
   Users,
@@ -46,18 +48,46 @@ export const Dashboard = () => {
   };
 
   if (loading) {
-    return <LoadingSpinner text="Computing real-time CRM KPIs..." />;
+    return (
+      <div className="dashboard-page" aria-busy="true">
+        <div className="page-header">
+          <div>
+            <Skeleton width="280px" height="32px" style={{ marginBottom: '8px' }} />
+            <Skeleton width="420px" height="16px" />
+          </div>
+          <div className="page-actions">
+            <Skeleton width="110px" height="38px" borderRadius="var(--radius-md)" />
+            <Skeleton width="130px" height="38px" borderRadius="var(--radius-md)" />
+          </div>
+        </div>
+        <SkeletonKpiGrid count={6} cols={3} />
+        <div className="dashboard-charts-grid">
+          <div className="chart-card-lg" style={{ gridColumn: 'span 8' }}>
+            <div className="card" style={{ height: '320px' }}>
+              <Skeleton width="40%" height="20px" style={{ marginBottom: '16px' }} />
+              <Skeleton width="100%" height="220px" borderRadius="var(--radius-md)" />
+            </div>
+          </div>
+          <div className="chart-card-sm" style={{ gridColumn: 'span 4' }}>
+            <div className="card" style={{ height: '320px' }}>
+              <Skeleton width="50%" height="20px" style={{ marginBottom: '16px' }} />
+              <Skeleton width="100%" height="220px" borderRadius="var(--radius-md)" />
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   if (error || !data) {
     return (
-      <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-        <AlertCircle size={40} color="var(--danger)" style={{ margin: '0 auto 1rem' }} />
-        <h3>Unable to load dashboard</h3>
-        <p className="text-muted" style={{ margin: '0.5rem 0 1.5rem' }}>{error || 'No dashboard data was returned.'}</p>
-        <button className="btn btn-primary" onClick={loadDashboard}>
-          Retry Connection
-        </button>
+      <div className="dashboard-page">
+        <ErrorState
+          title="Unable to load CRM Dashboard"
+          message={error || 'No analytics or pipeline summary data was returned by the server.'}
+          onRetry={loadDashboard}
+          retryLabel="Retry Connection"
+        />
       </div>
     );
   }

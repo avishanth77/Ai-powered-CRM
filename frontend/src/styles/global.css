@@ -630,30 +630,122 @@ td.table-truncate-cell {
   align-items: center;
   justify-content: center;
   text-align: center;
-  padding: 4rem 2rem;
+  padding: 3.5rem 2rem;
 }
 
 .empty-state-icon {
-  width: 72px;
-  height: 72px;
+  width: 64px;
+  height: 64px;
   border-radius: 50%;
   background-color: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: var(--text-dim);
+  color: var(--primary-light);
   margin-bottom: 1.25rem;
 }
 
 .empty-state-title {
   font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-main);
   margin-bottom: 0.5rem;
 }
 
 .empty-state-message {
   color: var(--text-muted);
-  max-width: 420px;
+  max-width: 440px;
   font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.empty-state-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ==========================================================================
+   SaaS 5-State System: Skeletons & Shimmers
+   ========================================================================== */
+.saas-skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-surface-elevated) 25%,
+    var(--bg-surface-hover) 50%,
+    var(--bg-surface-elevated) 75%
+  );
+  background-size: 200% 100%;
+  animation: saas-shimmer 1.6s infinite ease-in-out;
+  display: inline-block;
+}
+
+[data-theme="dark"] .saas-skeleton {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.09) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+}
+
+@keyframes saas-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.skeleton-kpi-card {
+  pointer-events: none;
+  border-color: var(--border-subtle);
+}
+
+.skeleton-kpi-card::before {
+  opacity: 0.4;
+}
+
+/* Shared Error Recovery Card */
+.error-recovery-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 3rem 2rem;
+  margin: 1.5rem 0;
+}
+
+.error-icon-wrapper {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background-color: var(--danger-bg);
+  color: var(--danger);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.error-card-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: 0.5rem;
+}
+
+.error-card-message {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  max-width: 460px;
+  line-height: 1.5;
 }
 
 /* Loading Spinner */

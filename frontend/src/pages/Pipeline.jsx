@@ -6,6 +6,8 @@ import { formatCurrency, getInitials } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
 import { LEAD_STATUS_CONFIG } from '../utils/constants';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { Skeleton } from '../components/Skeleton';
+import { ErrorState } from '../components/ErrorState';
 import { PriorityBadge } from '../components/PriorityBadge';
 import { LostReasonModal } from '../components/LostReasonModal';
 import StageTaskCheckpointModal from '../components/StageTaskCheckpointModal';
@@ -441,17 +443,43 @@ export const Pipeline = () => {
   };
 
   if (loading) {
-    return <LoadingSpinner text="Loading sales pipeline stages..." />;
+    return (
+      <div className="pipeline-page" aria-busy="true">
+        <div className="page-header">
+          <div>
+            <Skeleton width="220px" height="32px" style={{ marginBottom: '8px' }} />
+            <Skeleton width="340px" height="16px" />
+          </div>
+          <div className="page-actions">
+            <Skeleton width="120px" height="38px" borderRadius="var(--radius-md)" />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: '1rem', marginTop: '1rem' }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="card" style={{ height: '480px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Skeleton width="60%" height="20px" />
+                <Skeleton variant="pill" width="30px" height="20px" />
+              </div>
+              <Skeleton width="100%" height="100px" borderRadius="var(--radius-md)" />
+              <Skeleton width="100%" height="100px" borderRadius="var(--radius-md)" />
+              <Skeleton width="100%" height="100px" borderRadius="var(--radius-md)" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   }
 
   if (!pipelineData) {
     return (
-      <div className="card" style={{ textAlign: 'center', padding: '3rem' }}>
-        <h3>Unable to load pipeline</h3>
-        <p className="text-muted" style={{ margin: '0.5rem 0 1.5rem' }}>{error || 'No pipeline data was returned.'}</p>
-        <button className="btn btn-primary" onClick={fetchPipeline}>
-          Retry
-        </button>
+      <div className="pipeline-page">
+        <ErrorState
+          title="Unable to load sales pipeline"
+          message={error || 'No pipeline stage or lead distribution data was returned by the server.'}
+          onRetry={fetchPipeline}
+          retryLabel="Retry Connection"
+        />
       </div>
     );
   }

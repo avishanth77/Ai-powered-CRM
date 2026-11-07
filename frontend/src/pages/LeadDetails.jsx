@@ -19,6 +19,7 @@ import {
 import { StatusBadge } from '../components/StatusBadge';
 import { PriorityBadge } from '../components/PriorityBadge';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { Skeleton } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { ConfirmModal } from '../components/ConfirmModal';
 import { LostReasonModal } from '../components/LostReasonModal';
@@ -669,7 +670,44 @@ export const LeadDetails = () => {
   };
 
   if (loading || !lead) {
-    return <LoadingSpinner text="Loading lead profile..." />;
+    return (
+      <div className="lead-details-page" aria-busy="true" style={{ padding: '1.5rem 2rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+          <div>
+            <Skeleton width="280px" height="32px" style={{ marginBottom: '8px' }} />
+            <Skeleton width="180px" height="16px" />
+          </div>
+          <div style={{ display: 'flex', gap: '8px' }}>
+            <Skeleton width="100px" height="36px" borderRadius="var(--radius-md)" />
+            <Skeleton width="120px" height="36px" borderRadius="var(--radius-md)" />
+          </div>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr 340px', gap: '1.5rem' }}>
+          <div className="card" style={{ height: '520px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <Skeleton width="50%" height="18px" />
+            <Skeleton width="100%" height="40px" />
+            <Skeleton width="80%" height="20px" />
+            <Skeleton width="90%" height="20px" />
+            <Skeleton width="70%" height="20px" />
+          </div>
+          <div className="card" style={{ height: '520px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <Skeleton width="100px" height="28px" borderRadius="var(--radius-pill)" />
+              <Skeleton width="100px" height="28px" borderRadius="var(--radius-pill)" />
+              <Skeleton width="100px" height="28px" borderRadius="var(--radius-pill)" />
+            </div>
+            <Skeleton width="100%" height="120px" borderRadius="var(--radius-md)" />
+            <Skeleton width="100%" height="120px" borderRadius="var(--radius-md)" />
+          </div>
+          <div className="card" style={{ height: '520px', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <Skeleton width="60%" height="18px" />
+            <Skeleton width="100%" height="60px" />
+            <Skeleton width="100%" height="60px" />
+            <Skeleton width="100%" height="60px" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   const handleAutoAssignLead = async () => {

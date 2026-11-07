@@ -6,6 +6,7 @@ import { formatDate, formatCurrency } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
 import { useToast } from '../context/ToastContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { SkeletonTable } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { SearchBar } from '../components/SearchBar';
 import { Pagination } from '../components/Pagination';
@@ -319,9 +320,10 @@ export const Customers = () => {
       {/* Table */}
       <div className="table-responsive">
         {loading ? (
-          <LoadingSpinner text="Retrieving customer records..." />
+          <SkeletonTable rows={6} cols={6} />
         ) : loadError ? (
           <EmptyState
+            variant="search-no-results"
             title="Could not load customers"
             message={loadError}
             actionLabel="Retry"
@@ -329,6 +331,7 @@ export const Customers = () => {
           />
         ) : customers.length === 0 ? (
           <EmptyState
+            variant={hasActiveFilters ? 'search-no-results' : 'default'}
             title="No customer accounts match your criteria"
             message={
               hasActiveFilters

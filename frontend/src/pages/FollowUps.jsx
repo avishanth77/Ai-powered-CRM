@@ -8,6 +8,7 @@ import { formatDateTime, toLocalDateTimeInput } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
 import { useDialogA11y } from '../hooks/useDialogA11y';
 import { LoadingSpinner } from '../components/LoadingSpinner';
+import { SkeletonTable } from '../components/Skeleton';
 import { EmptyState } from '../components/EmptyState';
 import { StatusBadge } from '../components/StatusBadge';
 import { SearchBar } from '../components/SearchBar';
@@ -358,9 +359,10 @@ export const FollowUps = () => {
       {/* Table */}
       <div className="table-responsive">
         {loading ? (
-          <LoadingSpinner text="Retrieving follow-ups..." />
+          <SkeletonTable rows={6} cols={6} />
         ) : followups.length === 0 ? (
           <EmptyState
+            variant={hasActiveFilters ? 'search-no-results' : 'default'}
             title="No follow-ups found"
             message={
               hasActiveFilters
