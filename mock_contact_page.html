@@ -1,0 +1,912 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Website Contact Us — Web-to-Lead Test Portal</title>
+  <style>
+    :root {
+      --primary: #4F46E5;
+      --primary-hover: #4338CA;
+      --primary-light: #EEF2FF;
+      --success: #10B981;
+      --success-light: #ECFDF5;
+      --warning: #F59E0B;
+      --danger: #EF4444;
+      --danger-light: #FEF2F2;
+      --dark: #0F172A;
+      --gray-900: #0F172A;
+      --gray-800: #1E293B;
+      --gray-700: #334155;
+      --gray-600: #475569;
+      --gray-500: #64748B;
+      --gray-300: #CBD5E1;
+      --gray-200: #E2E8F0;
+      --gray-100: #F1F5F9;
+      --gray-50: #F8FAFC;
+      --white: #FFFFFF;
+      --radius: 12px;
+      --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+      --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background: #F8FAFC;
+      color: var(--gray-800);
+      line-height: 1.5;
+      padding: 2rem 1rem 4rem 1rem;
+    }
+
+    .container {
+      max-width: 1040px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius);
+      padding: 1.75rem 2rem;
+      margin-bottom: 2rem;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+
+    .brand-title {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--gray-900);
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+    }
+
+    .brand-title svg {
+      color: var(--primary);
+    }
+
+    .brand-subtitle {
+      font-size: 0.875rem;
+      color: var(--gray-500);
+      margin-top: 0.25rem;
+    }
+
+    .endpoint-badge-box {
+      background: var(--primary-light);
+      border: 1px solid #C7D2FE;
+      padding: 0.6rem 1rem;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+
+    .http-method {
+      background: var(--primary);
+      color: var(--white);
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      letter-spacing: 0.05em;
+    }
+
+    .endpoint-url {
+      font-family: monospace;
+      font-size: 0.85rem;
+      color: var(--gray-800);
+      font-weight: 600;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1.25fr 1fr;
+      gap: 2rem;
+    }
+
+    @media (max-width: 860px) {
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--white);
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius);
+      padding: 1.75rem;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card-title {
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--gray-900);
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card-subtitle {
+      font-size: 0.825rem;
+      color: var(--gray-500);
+      margin-bottom: 1.25rem;
+    }
+
+    /* Preset Buttons */
+    .presets-container {
+      margin-bottom: 1.5rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    .presets-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--gray-500);
+      margin-bottom: 0.6rem;
+      display: block;
+    }
+
+    .presets-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .btn-preset {
+      background: var(--gray-100);
+      border: 1px solid var(--gray-200);
+      color: var(--gray-700);
+      padding: 0.4rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .btn-preset:hover {
+      background: var(--primary-light);
+      border-color: #C7D2FE;
+      color: var(--primary);
+    }
+
+    /* Form Fields */
+    .form-group {
+      margin-bottom: 1rem;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    label {
+      display: block;
+      font-size: 0.825rem;
+      font-weight: 600;
+      color: var(--gray-700);
+      margin-bottom: 0.35rem;
+    }
+
+    .required {
+      color: var(--danger);
+    }
+
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="number"],
+    textarea,
+    select {
+      width: 100%;
+      padding: 0.6rem 0.85rem;
+      border: 1px solid var(--gray-300);
+      border-radius: 6px;
+      font-size: 0.9rem;
+      color: var(--gray-900);
+      background: var(--white);
+      transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    }
+
+    input:focus,
+    textarea:focus,
+    select:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15);
+    }
+
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+
+    .form-actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+    }
+
+    .btn-submit {
+      flex: 1;
+      background: var(--primary);
+      color: var(--white);
+      border: none;
+      padding: 0.75rem 1.25rem;
+      font-size: 0.95rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      transition: background 0.15s ease, transform 0.1s ease;
+    }
+
+    .btn-submit:hover {
+      background: var(--primary-hover);
+    }
+
+    .btn-submit:active {
+      transform: scale(0.99);
+    }
+
+    .btn-submit:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+
+    .btn-clear {
+      background: transparent;
+      color: var(--gray-600);
+      border: 1px solid var(--gray-300);
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .btn-clear:hover {
+      background: var(--gray-100);
+    }
+
+    /* Anti-Spam Honeypot toggle */
+    .bot-test-toggle {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.75rem;
+      padding: 0.6rem 0.85rem;
+      background: var(--gray-50);
+      border: 1px dashed var(--gray-300);
+      border-radius: 6px;
+      font-size: 0.775rem;
+      color: var(--gray-600);
+      cursor: pointer;
+    }
+
+    /* Response Panel */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 20px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      margin-bottom: 0.75rem;
+    }
+
+    .status-badge.success {
+      background: var(--success-light);
+      color: #047857;
+      border: 1px solid #A7F3D0;
+    }
+
+    .status-badge.error {
+      background: var(--danger-light);
+      color: #B91C1C;
+      border: 1px solid #FECACA;
+    }
+
+    .status-badge.info {
+      background: var(--primary-light);
+      color: var(--primary);
+      border: 1px solid #C7D2FE;
+    }
+
+    .success-lead-card {
+      background: var(--success-light);
+      border: 1px solid #A7F3D0;
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+
+    .success-lead-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 0.75rem;
+    }
+
+    .lead-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: #065F46;
+    }
+
+    .lead-company {
+      font-size: 0.85rem;
+      color: #047857;
+    }
+
+    .lead-details-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      color: #065F46;
+      background: rgba(255, 255, 255, 0.65);
+      padding: 0.75rem;
+      border-radius: 6px;
+      margin-bottom: 0.75rem;
+    }
+
+    .btn-view-lead {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #059669;
+      color: var(--white);
+      text-decoration: none;
+      font-size: 0.825rem;
+      font-weight: 600;
+      padding: 0.45rem 0.85rem;
+      border-radius: 6px;
+      transition: background 0.15s ease;
+    }
+
+    .btn-view-lead:hover {
+      background: #047857;
+    }
+
+    /* JSON Output Display */
+    .json-box {
+      background: var(--gray-900);
+      color: #E2E8F0;
+      padding: 1rem;
+      border-radius: 8px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 0.775rem;
+      line-height: 1.45;
+      max-height: 250px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+
+    /* Session History */
+    .history-section {
+      margin-top: 1.5rem;
+      padding-top: 1.25rem;
+      border-top: 1px solid var(--gray-200);
+    }
+
+    .history-title {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--gray-700);
+      margin-bottom: 0.75rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .history-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+
+    .history-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--gray-50);
+      border: 1px solid var(--gray-200);
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.8rem;
+    }
+
+    .history-item a {
+      color: var(--primary);
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .history-item a:hover {
+      text-decoration: underline;
+    }
+
+    .history-time {
+      font-size: 0.7rem;
+      color: var(--gray-500);
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 2.5rem 1rem;
+      color: var(--gray-500);
+      font-size: 0.85rem;
+    }
+
+    .empty-state svg {
+      color: var(--gray-300);
+      margin-bottom: 0.75rem;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <!-- Header -->
+  <header>
+    <div>
+      <div class="brand-title">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"></circle>
+          <line x1="2" y1="12" x2="22" y2="12"></line>
+          <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+        </svg>
+        Website Contact Form — Web-to-Lead Test Portal
+      </div>
+      <div class="brand-subtitle">
+        Mock website contact page designed to test sending leads into CRM Lite with auto-tasks, auto-assignment, and note capture.
+      </div>
+    </div>
+
+    <div class="endpoint-badge-box">
+      <span class="http-method">POST</span>
+      <span class="endpoint-url" id="endpoint-display">http://localhost:8000/api/leads/web-to-lead/</span>
+    </div>
+  </header>
+
+  <!-- Two Column Grid -->
+  <div class="grid">
+    <!-- Left Column: Form -->
+    <div class="card">
+      <div class="card-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+          <polyline points="22,6 12,13 2,6"></polyline>
+        </svg>
+        Website Contact Form
+      </div>
+      <div class="card-subtitle">
+        Fill out customer details or select a one-click mock lead below.
+      </div>
+
+      <!-- Quick Mock Lead Presets -->
+      <div class="presets-container">
+        <span class="presets-label">⚡ Quick Mock Presets</span>
+        <div class="presets-buttons">
+          <button type="button" class="btn-preset" onclick="loadPreset('enterprise')">
+            🏢 Enterprise Cloud ($50k)
+          </button>
+          <button type="button" class="btn-preset" onclick="loadPreset('startup')">
+            🚀 AI SaaS Startup ($15k)
+          </button>
+          <button type="button" class="btn-preset" onclick="loadPreset('consulting')">
+            💼 Consulting Demo ($8k)
+          </button>
+          <button type="button" class="btn-preset" onclick="loadPreset('random')">
+            🎲 Unique Random Lead
+          </button>
+        </div>
+      </div>
+
+      <!-- The Real Contact Form -->
+      <form id="contact-form" onsubmit="handleFormSubmit(event)">
+        <!-- Honeypot anti-spam field (hidden from humans) -->
+        <input type="text" id="website_url_hp" name="website_url_hp" style="display:none !important;" tabindex="-1" autocomplete="off" />
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="name">Full Name <span class="required">*</span></label>
+            <input type="text" id="name" name="name" required placeholder="e.g. Rachel Adams" />
+          </div>
+
+          <div class="form-group">
+            <label for="phone">Phone / WhatsApp <span class="required">*</span></label>
+            <input type="tel" id="phone" name="phone" required placeholder="e.g. +1 555-0199" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" name="email" placeholder="rachel@acme.com" />
+          </div>
+
+          <div class="form-group">
+            <label for="company_name">Company Name</label>
+            <input type="text" id="company_name" name="company_name" placeholder="Acme Global Inc" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="subject">Subject / Inquiry Headline</label>
+            <input type="text" id="subject" name="subject" placeholder="Inquiry about Enterprise plan" />
+          </div>
+
+          <div class="form-group">
+            <label for="expected_value">Estimated Budget / Value (₹ / $)</label>
+            <input type="number" id="expected_value" name="expected_value" placeholder="15000" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="message">Message / Requirements</label>
+          <textarea id="message" name="message" rows="3" placeholder="Describe the inquiry or questions for the sales team..."></textarea>
+        </div>
+
+        <!-- Optional Honeypot Bot Simulation -->
+        <label class="bot-test-toggle">
+          <input type="checkbox" id="simulate-bot" onchange="toggleBotMode(this.checked)" />
+          <span>🤖 Simulate Spambot (fills hidden honeypot field to test bot defense)</span>
+        </label>
+
+        <div class="form-actions">
+          <button type="submit" id="submit-btn" class="btn-submit">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+            Send HTTP POST Request
+          </button>
+          <button type="button" class="btn-clear" onclick="resetForm()">Clear</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Right Column: Live Response & Details -->
+    <div class="card" style="display:flex; flex-direction:column;">
+      <div class="card-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
+        </svg>
+        Live Webhook Response
+      </div>
+      <div class="card-subtitle">
+        Real-time feedback returned by http://localhost:8000/api/leads/web-to-lead/
+      </div>
+
+      <div id="response-container" style="flex:1;">
+        <div class="empty-state">
+          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 14 14"></polyline>
+          </svg>
+          <p>No request sent yet.</p>
+          <p style="font-size:0.775rem; margin-top:0.25rem;">Pick a preset on the left and click "Send HTTP POST Request".</p>
+        </div>
+      </div>
+
+      <!-- Session History -->
+      <div class="history-section" id="history-section" style="display:none;">
+        <div class="history-title">
+          <span>Captured Leads (This Session)</span>
+          <span id="history-count" style="font-size:0.75rem; background:var(--gray-200); padding:0.1rem 0.45rem; border-radius:10px;">0</span>
+        </div>
+        <ul class="history-list" id="history-list"></ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_ENDPOINT = 'http://localhost:8000/api/leads/web-to-lead/';
+  const CRM_FRONTEND_URL = 'http://localhost:5173';
+
+  // Preset Data Library
+  const PRESETS = {
+    enterprise: {
+      name: 'Dr. Evelyn Reed',
+      email: 'e.reed@quantumdynamics.org',
+      phone: '+1 415-555-0182',
+      company_name: 'Quantum Dynamics Corp',
+      subject: 'Global Multi-Region CRM Deployment',
+      expected_value: 50000,
+      message: 'Evaluating platform for 45 sales reps across North America and EMEA. Require custom stage gate progression and automated follow-ups.'
+    },
+    startup: {
+      name: 'Liam Chen',
+      email: 'liam@novapay.io',
+      phone: '+1 650-555-0144',
+      company_name: 'NovaPay Fintech',
+      subject: '15-Seat Sales Team Onboarding',
+      expected_value: 15000,
+      message: 'Looking to transition our inbound leads from web contact forms to sales executives automatically. Please schedule a product demo.'
+    },
+    consulting: {
+      name: 'Sophia Martinez',
+      email: 'smartinez@nexusadvisory.com',
+      phone: '+1 312-555-0199',
+      company_name: 'Nexus Strategic Advisors',
+      subject: 'Consulting Practice CRM Setup',
+      expected_value: 8500,
+      message: 'We want to track high-touch client advisory deals with stage-by-stage mandatory checkpoints.'
+    }
+  };
+
+  function loadPreset(type) {
+    if (type === 'random') {
+      const randId = Math.floor(1000 + Math.random() * 9000);
+      const names = ['Michael Scott', 'Donna Paulsen', 'Harvey Specter', 'Claire Underwood', 'Bruce Wayne', 'Tony Stark', 'Wanda Maximoff'];
+      const companies = ['Stark Industries', 'Wayne Enterprises', 'Pearson Specter', 'Dunder Mifflin', 'Pym Technologies'];
+      const randomName = names[Math.floor(Math.random() * names.length)];
+      const randomCompany = companies[Math.floor(Math.random() * companies.length)];
+
+      document.getElementById('name').value = `${randomName} (${randId})`;
+      document.getElementById('email').value = `lead.${randId}@${randomCompany.toLowerCase().replace(/[^a-z]/g, '')}.com`;
+      document.getElementById('phone').value = `+1 555-01${randId.toString().slice(0, 2)}`;
+      document.getElementById('company_name').value = randomCompany;
+      document.getElementById('subject').value = `New Inquiry #${randId}`;
+      document.getElementById('expected_value').value = (Math.floor(Math.random() * 40) + 5) * 1000;
+      document.getElementById('message').value = `Interested in exploring CRM Lite for ${randomCompany}. Need pricing and workflow details.`;
+      return;
+    }
+
+    const p = PRESETS[type];
+    if (!p) return;
+    document.getElementById('name').value = p.name;
+    document.getElementById('email').value = p.email;
+    document.getElementById('phone').value = p.phone;
+    document.getElementById('company_name').value = p.company_name;
+    document.getElementById('subject').value = p.subject;
+    document.getElementById('expected_value').value = p.expected_value;
+    document.getElementById('message').value = p.message;
+  }
+
+  function toggleBotMode(checked) {
+    const hp = document.getElementById('website_url_hp');
+    if (checked) {
+      hp.value = 'http://spambot-link.xyz';
+    } else {
+      hp.value = '';
+    }
+  }
+
+  function resetForm() {
+    document.getElementById('contact-form').reset();
+    document.getElementById('simulate-bot').checked = false;
+    document.getElementById('website_url_hp').value = '';
+  }
+
+  // Load a default preset on first page load
+  window.addEventListener('DOMContentLoaded', () => {
+    loadPreset('enterprise');
+  });
+
+  const sessionHistory = [];
+
+  async function handleFormSubmit(e) {
+    e.preventDefault();
+
+    const submitBtn = document.getElementById('submit-btn');
+    const responseContainer = document.getElementById('response-container');
+
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = `
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;">
+        <line x1="12" y1="2" x2="12" y2="6"></line>
+        <line x1="12" y1="18" x2="12" y2="22"></line>
+        <line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line>
+        <line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line>
+        <line x1="2" y1="12" x2="6" y2="12"></line>
+        <line x1="18" y1="12" x2="22" y2="12"></line>
+        <line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line>
+        <line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line>
+      </svg>
+      Sending POST Request...
+    `;
+
+    const payload = {
+      name: document.getElementById('name').value.trim(),
+      email: document.getElementById('email').value.trim(),
+      phone: document.getElementById('phone').value.trim(),
+      company_name: document.getElementById('company_name').value.trim(),
+      subject: document.getElementById('subject').value.trim(),
+      expected_value: document.getElementById('expected_value').value || 0,
+      message: document.getElementById('message').value.trim(),
+      website_url_hp: document.getElementById('website_url_hp').value.trim(),
+      source: 'Website'
+    };
+
+    const startTime = performance.now();
+
+    try {
+      const resp = await fetch(API_ENDPOINT, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const elapsed = Math.round(performance.now() - startTime);
+      const json = await resp.json();
+
+      renderResponse(resp.status, json, elapsed);
+
+      if (resp.ok && json.lead) {
+        addHistoryItem(json.lead, json.is_new);
+      }
+    } catch (err) {
+      const elapsed = Math.round(performance.now() - startTime);
+      renderError(err, elapsed);
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"></line>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+        </svg>
+        Send HTTP POST Request
+      `;
+    }
+  }
+
+  function renderResponse(status, json, elapsedMs) {
+    const isSuccess = status >= 200 && status < 300;
+    const badgeClass = isSuccess ? 'success' : 'error';
+    const statusText = status === 201 ? '201 CREATED' : (status === 200 ? '200 OK' : `${status} ERROR`);
+
+    let leadHtml = '';
+    if (json.lead) {
+      const crmUrl = `${CRM_FRONTEND_URL}/leads/${json.lead.id}`;
+      leadHtml = `
+        <div class="success-lead-card">
+          <div class="success-lead-header">
+            <div>
+              <div class="lead-name">#${json.lead.id} — ${escapeHtml(json.lead.name)}</div>
+              <div class="lead-company">${escapeHtml(json.lead.company_name || 'No Company')}</div>
+            </div>
+            <a href="${crmUrl}" target="_blank" class="btn-view-lead">
+              View in CRM ↗
+            </a>
+          </div>
+
+          <div class="lead-details-grid">
+            <div><strong>Stage:</strong> ${escapeHtml(json.lead.stage || 'New')}</div>
+            <div><strong>Assigned Rep:</strong> ${escapeHtml(json.lead.assigned_to || 'Unassigned')}</div>
+            <div><strong>Phone:</strong> ${escapeHtml(json.lead.phone || 'N/A')}</div>
+            <div><strong>Email:</strong> ${escapeHtml(json.lead.email || 'N/A')}</div>
+          </div>
+
+          <div style="font-size:0.775rem; color:#047857; margin-top:0.25rem;">
+            ${json.is_new ? '✓ Automated Stage Tasks instantiated & rep notified' : '✓ Re-contact note added to existing lead'}
+          </div>
+        </div>
+      `;
+    }
+
+    const container = document.getElementById('response-container');
+    container.innerHTML = `
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="status-badge ${badgeClass}">
+            HTTP ${statusText}
+          </span>
+          <span style="font-size:0.75rem; color:var(--gray-500);">${elapsedMs}ms</span>
+        </div>
+
+        <p style="font-size:0.875rem; font-weight:600; margin-bottom:0.75rem; color:${isSuccess ? '#065F46' : '#991B1B'}">
+          ${escapeHtml(json.message || '')}
+        </p>
+
+        ${leadHtml}
+
+        <label style="font-size:0.75rem; color:var(--gray-500); margin-top:0.5rem; display:block;">RAW JSON RESPONSE</label>
+        <pre class="json-box">${escapeHtml(JSON.stringify(json, null, 2))}</pre>
+      </div>
+    `;
+  }
+
+  function renderError(err, elapsedMs) {
+    const container = document.getElementById('response-container');
+    container.innerHTML = `
+      <div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span class="status-badge error">
+            Network Error
+          </span>
+          <span style="font-size:0.75rem; color:var(--gray-500);">${elapsedMs}ms</span>
+        </div>
+        <p style="font-size:0.85rem; color:#991B1B; margin-bottom:0.75rem;">
+          Could not reach backend server at ${API_ENDPOINT}.
+        </p>
+        <pre class="json-box">${escapeHtml(err.toString())}\n\nMake sure your Django server is running on port 8000 (python manage.py runserver 8000).</pre>
+      </div>
+    `;
+  }
+
+  function addHistoryItem(lead, isNew) {
+    sessionHistory.unshift({ ...lead, isNew, time: new Date() });
+    const list = document.getElementById('history-list');
+    const count = document.getElementById('history-count');
+    const section = document.getElementById('history-section');
+
+    section.style.display = 'block';
+    count.textContent = sessionHistory.length;
+
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const crmUrl = `${CRM_FRONTEND_URL}/leads/${lead.id}`;
+
+    list.innerHTML = sessionHistory.map(item => `
+      <li class="history-item">
+        <div>
+          <a href="${CRM_FRONTEND_URL}/leads/${item.id}" target="_blank">
+            #${item.id} ${escapeHtml(item.name)}
+          </a>
+          <span style="font-size:0.75rem; color:var(--gray-500); margin-left:0.35rem;">
+            (${escapeHtml(item.company_name || 'Individual')})
+          </span>
+          <div style="font-size:0.7rem; color:var(--gray-600);">
+            Assigned: <strong>${escapeHtml(item.assigned_to || 'None')}</strong> | Stage: <strong>${escapeHtml(item.stage || 'New')}</strong>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <span style="font-size:0.68rem; font-weight:700; color:${item.isNew ? '#059669' : '#D97706'}">
+            ${item.isNew ? 'NEW' : 'RE-CONTACT'}
+          </span>
+          <div class="history-time">${timeStr}</div>
+        </div>
+      </li>
+    `).join('');
+  }
+
+  function escapeHtml(str) {
+    if (!str) return '';
+    return String(str)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
+  }
+</script>
+
+</body>
+</html>
