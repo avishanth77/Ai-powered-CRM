@@ -100,11 +100,48 @@
   }
 
   .main-sidebar {
+    width: 280px;
     transform: translateX(-100%);
   }
 
   .main-sidebar.mobile-open {
     transform: translateX(0);
+    box-shadow: 6px 0 30px rgba(0, 0, 0, 0.6);
+  }
+
+  .main-sidebar.mobile-open .brand-text,
+  .main-sidebar.mobile-open .sidebar-link-text,
+  .main-sidebar.mobile-open .sidebar-team-status .status-label {
+    opacity: 1;
+    pointer-events: auto;
+    display: inline;
+  }
+
+  .main-sidebar.mobile-open .sidebar-dropdown-toggle .chevron-icon {
+    display: block;
+  }
+
+  .main-sidebar.mobile-open .sidebar-section-title {
+    opacity: 1;
+    height: auto;
+    padding: 0.5rem 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  .main-sidebar.mobile-open .sidebar-submenu {
+    display: flex;
+  }
+
+  .main-sidebar.mobile-open .sidebar-brand {
+    padding: 0 1.25rem;
+  }
+
+  .main-sidebar.mobile-open .sidebar-footer {
+    padding: 1rem 1.25rem;
+  }
+
+  .main-sidebar.mobile-open .sidebar-team-status {
+    justify-content: flex-start;
   }
 
   .sidebar-backdrop {

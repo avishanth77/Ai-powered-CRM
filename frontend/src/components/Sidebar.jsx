@@ -246,9 +246,10 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
                     `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
                   }
                   onClick={onCloseMobile}
+                  title={item.label}
                 >
                   <Icon size={19} className="nav-icon" />
-                  <span>{item.label}</span>
+                  <span className="sidebar-link-text">{item.label}</span>
                 </NavLink>
               );
             })}
@@ -268,7 +269,7 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <Settings size={19} className="nav-icon" />
-                <span>Settings</span>
+                <span className="sidebar-link-text">Settings</span>
               </div>
               <ChevronDown
                 size={16}
@@ -296,9 +297,10 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
                       className={`sidebar-sublink ${isSubActive ? 'sidebar-sublink-active' : ''}`}
                       onClick={onCloseMobile}
                       role="menuitem"
+                      title={subItem.label}
                     >
                       <SubIcon size={14} className="sublink-icon" />
-                      <span>{subItem.label}</span>
+                      <span className="sidebar-sublink-text">{subItem.label}</span>
                     </NavLink>
                   );
                 })}

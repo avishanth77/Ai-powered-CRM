@@ -59,6 +59,7 @@
   --radius-lg: 16px;
   --radius-full: 9999px;
   --sidebar-width: 260px;
+  --sidebar-collapsed-width: 72px;
   --navbar-height: 68px;
 
   /* Transitions */
@@ -238,8 +239,9 @@ button, input, select, textarea {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  width: calc(100% - var(--sidebar-width));
-  margin-left: var(--sidebar-width);
+  width: calc(100% - var(--sidebar-collapsed-width, 72px));
+  margin-left: var(--sidebar-collapsed-width, 72px);
+  transition: width var(--transition-normal), margin-left var(--transition-normal);
 }
 
 .page-container {
