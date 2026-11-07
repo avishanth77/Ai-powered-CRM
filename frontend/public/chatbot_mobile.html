@@ -149,7 +149,7 @@
       top: 0;
       left: 0;
       right: 0;
-      bottom: 16px;
+      bottom: 0;
       display: flex;
       flex-direction: column;
       overflow: hidden;
@@ -163,7 +163,7 @@
     #lockScreen {
       z-index: 40;
       background: radial-gradient(circle at 50% 25%, #1e293b 0%, #090d16 100%);
-      padding: 1.25rem 1.15rem 1rem 1.15rem;
+      padding: 1.25rem 1.15rem 1.35rem 1.15rem;
       justify-content: space-between;
       align-items: center;
       transform: translateY(0);
@@ -340,7 +340,7 @@
     #homeScreen {
       z-index: 10;
       background: radial-gradient(circle at 30% 10%, #1e1b4b 0%, #0f172a 45%, #030712 100%);
-      padding: 1.35rem 0.85rem 0.5rem 0.85rem;
+      padding: 1.35rem 0.85rem 0.95rem 0.85rem;
       justify-content: space-between;
       transform: scale(1);
       opacity: 1;
@@ -1187,30 +1187,6 @@
       color: var(--primary);
     }
 
-    /* iOS Home Swipe Bar (Global at Bottom of Phone) */
-    .home-bar-area {
-      height: 16px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: var(--phone-bg);
-      flex-shrink: 0;
-      z-index: 50;
-      cursor: pointer;
-    }
-
-    .home-indicator {
-      width: 110px;
-      height: 4px;
-      background: rgba(255, 255, 255, 0.25);
-      border-radius: 10px;
-      transition: background 0.2s ease, width 0.2s ease;
-    }
-    .home-bar-area:hover .home-indicator {
-      background: rgba(255, 255, 255, 0.55);
-      width: 125px;
-    }
-
     /* Settings / Auth Modal Sheet */
     .modal-backdrop {
       position: absolute;
@@ -1812,11 +1788,6 @@
             <span>Pipeline</span>
           </button>
         </div>
-      </div>
-
-      <!-- iOS Home Swipe Bar (Global at Bottom of Phone) -->
-      <div class="home-bar-area" onclick="goHome()" title="Swipe or Tap to return Home">
-        <div class="home-indicator"></div>
       </div>
 
       <!-- AUTH & API CONFIG MODAL SHEET -->
