@@ -1050,79 +1050,200 @@
     }
 
     /* -------------------------------------------------------------------------
-       TAB 2: LEADS SCREEN (MOBILE LIST)
+       TAB 2: LEADS SCREEN (SAAS MOBILE REDESIGN)
        ------------------------------------------------------------------------- */
     .leads-view {
       flex: 1;
-      padding: 0.75rem 0.85rem;
+      padding: 0.65rem 0.75rem;
       overflow-y: auto;
+      overflow-x: hidden;
       display: flex;
       flex-direction: column;
-      gap: 0.65rem;
+      gap: 0.55rem;
+      min-height: 0;
     }
 
-    .leads-header-title {
-      font-size: 0.8125rem;
-      font-weight: 700;
-      color: var(--text-main);
+    .leads-search-wrapper {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: var(--phone-bg);
+      padding-bottom: 0.25rem;
+    }
+
+    .search-input-box {
       display: flex;
       align-items: center;
-      justify-content: space-between;
-      margin-bottom: 0.25rem;
+      gap: 0.45rem;
+      background: var(--phone-surface-2);
+      border: 1px solid var(--phone-border);
+      border-radius: var(--radius-sm);
+      padding: 0.4rem 0.65rem;
+      transition: border-color 0.2s ease;
+    }
+    .search-input-box:focus-within {
+      border-color: var(--primary);
+    }
+    .search-input-box svg {
+      color: var(--text-muted);
+      flex-shrink: 0;
+    }
+    .search-input-box input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-main);
+      font-size: 0.75rem;
+      font-family: inherit;
+    }
+    .search-input-box input::placeholder {
+      color: var(--text-muted);
+    }
+    .search-clear-btn {
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 0 0.2rem;
+    }
+
+    .filter-pills-scroll {
+      display: flex;
+      gap: 0.35rem;
+      overflow-x: auto;
+      scrollbar-width: none;
+      padding-bottom: 2px;
+    }
+    .filter-pills-scroll::-webkit-scrollbar { display: none; }
+
+    .filter-pill {
+      background: var(--phone-surface);
+      border: 1px solid var(--phone-border);
+      color: var(--text-dim);
+      padding: 0.25rem 0.55rem;
+      border-radius: 14px;
+      font-size: 0.65rem;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      min-height: 28px;
+    }
+    .filter-pill.active {
+      background: var(--primary);
+      border-color: var(--primary-dark);
+      color: #ffffff;
+      box-shadow: 0 2px 6px var(--primary-glow);
+    }
+
+    .leads-cards-container {
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
     }
 
     .lead-mobile-card {
       background: var(--phone-surface);
       border: 1px solid var(--phone-border);
       border-radius: var(--radius-md);
-      padding: 0.75rem;
+      padding: 0.7rem;
       display: flex;
       flex-direction: column;
-      gap: 0.45rem;
+      gap: 0.4rem;
       box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+      transition: border-color 0.2s ease, transform 0.15s ease;
+    }
+    .lead-mobile-card:active {
+      transform: scale(0.99);
     }
 
     .lead-card-top {
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: space-between;
+      gap: 0.5rem;
+    }
+
+    .lead-card-title-group {
+      display: flex;
+      flex-direction: column;
     }
 
     .lead-card-name {
-      font-size: 0.875rem;
+      font-size: 0.825rem;
       font-weight: 700;
       color: #ffffff;
+      line-height: 1.25;
+    }
+
+    .lead-card-company {
+      font-size: 0.6875rem;
+      color: var(--text-muted);
     }
 
     .stage-pill {
-      font-size: 0.65rem;
-      font-weight: 600;
-      padding: 0.15rem 0.45rem;
-      border-radius: 12px;
-      background: rgba(59, 130, 246, 0.15);
-      color: #60a5fa;
-      border: 1px solid rgba(59, 130, 246, 0.3);
+      font-size: 0.625rem;
+      font-weight: 700;
+      padding: 0.18rem 0.45rem;
+      border-radius: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      white-space: nowrap;
     }
+    .stage-pill.new { background: rgba(148, 163, 184, 0.15); color: #cbd5e1; border: 1px solid rgba(148, 163, 184, 0.3); }
+    .stage-pill.contacted { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
+    .stage-pill.demo { background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
+    .stage-pill.negotiation { background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3); }
+    .stage-pill.won { background: rgba(16, 185, 129, 0.15); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .stage-pill.lost { background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
 
-    .lead-card-detail {
-      font-size: 0.725rem;
-      color: var(--text-dim);
+    .lead-card-metrics {
       display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.35rem 0.5rem;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 6px;
+      font-size: 0.7rem;
+    }
+    .lead-val {
+      font-weight: 700;
+      color: #38bdf8;
+    }
+    .lead-priority {
+      font-weight: 600;
+      font-size: 0.65rem;
+    }
+    .lead-priority.HIGH { color: #f87171; }
+    .lead-priority.MEDIUM { color: #fbbf24; }
+    .lead-priority.LOW { color: #94a3b8; }
+
+    .lead-card-notes {
+      font-size: 0.6875rem;
+      color: var(--text-dim);
+      line-height: 1.35;
+      background: rgba(255, 255, 255, 0.02);
+      padding: 0.3rem 0.45rem;
+      border-radius: 4px;
+      border-left: 2px solid var(--primary);
     }
 
     .lead-actions-row {
       display: flex;
-      gap: 0.4rem;
-      margin-top: 0.25rem;
+      gap: 0.35rem;
+      margin-top: 0.15rem;
     }
 
     .btn-lead-action {
       flex: 1;
-      padding: 0.35rem 0.5rem;
+      padding: 0.35rem 0.45rem;
       border-radius: 6px;
-      font-size: 0.7rem;
+      font-size: 0.6875rem;
       font-weight: 600;
       cursor: pointer;
       display: flex;
@@ -1131,8 +1252,9 @@
       gap: 0.25rem;
       border: none;
       transition: all 0.15s ease;
+      min-height: 32px;
+      text-decoration: none;
     }
-
     .btn-lead-ai {
       background: rgba(59, 130, 246, 0.15);
       color: #93c5fd;
@@ -1142,66 +1264,279 @@
       background: var(--primary);
       color: #ffffff;
     }
-
     .btn-lead-call {
       background: rgba(16, 185, 129, 0.15);
       color: #6ee7b7;
       border: 1px solid rgba(16, 185, 129, 0.3);
     }
+    .btn-lead-call:hover {
+      background: var(--success);
+      color: #ffffff;
+    }
+    .btn-lead-move {
+      background: rgba(245, 158, 11, 0.12);
+      color: #fcd34d;
+      border: 1px solid rgba(245, 158, 11, 0.25);
+    }
+    .btn-lead-move:hover {
+      background: var(--warning);
+      color: #000000;
+    }
 
     /* -------------------------------------------------------------------------
-       TAB 3: PIPELINE SCREEN
+       TAB 3: PIPELINE SCREEN (FUNNEL & CONVERSIONS)
        ------------------------------------------------------------------------- */
     .pipeline-view {
       flex: 1;
-      padding: 0.75rem 0.85rem;
+      padding: 0.65rem 0.75rem;
       overflow-y: auto;
+      overflow-x: hidden;
       display: flex;
       flex-direction: column;
       gap: 0.65rem;
+      min-height: 0;
     }
 
-    .pipeline-summary-card {
-      background: linear-gradient(135deg, rgba(37, 99, 235, 0.2) 0%, rgba(99, 102, 241, 0.15) 100%);
-      border: 1px solid rgba(59, 130, 246, 0.3);
-      border-radius: var(--radius-md);
-      padding: 0.75rem;
-      display: flex;
-      justify-content: space-around;
-      text-align: center;
+    .pipeline-kpis {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.4rem;
     }
 
-    .pipe-stat h4 {
-      font-size: 1.15rem;
-      font-weight: 800;
-      color: #ffffff;
-    }
-    .pipe-stat span {
-      font-size: 0.65rem;
-      color: var(--text-dim);
-    }
-
-    .stage-row-item {
+    .pipe-kpi-card {
       background: var(--phone-surface);
       border: 1px solid var(--phone-border);
       border-radius: var(--radius-sm);
-      padding: 0.6rem 0.75rem;
+      padding: 0.5rem 0.4rem;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      gap: 0.15rem;
+    }
+    .pipe-kpi-card h4 {
+      font-size: 0.95rem;
+      font-weight: 800;
+      color: #ffffff;
+      line-height: 1.1;
+    }
+    .pipe-kpi-card span {
+      font-size: 0.6rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+    }
+
+    .funnel-card {
+      background: var(--phone-surface);
+      border: 1px solid var(--phone-border);
+      border-radius: var(--radius-md);
+      padding: 0.65rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.55rem;
+    }
+
+    .funnel-card-header {
+      font-size: 0.75rem;
+      font-weight: 700;
+      color: var(--text-main);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .funnel-stage-row {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+      padding: 0.45rem 0.5rem;
+      background: rgba(0, 0, 0, 0.2);
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .funnel-stage-row:hover {
+      background: rgba(59, 130, 246, 0.1);
+    }
+
+    .funnel-stage-meta {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      font-weight: 600;
+    }
+
+    .funnel-progress-track {
+      height: 6px;
+      background: rgba(255, 255, 255, 0.06);
+      border-radius: 3px;
+      overflow: hidden;
+    }
+    .funnel-progress-fill {
+      height: 100%;
+      border-radius: 3px;
+      background: linear-gradient(90deg, var(--primary) 0%, #60a5fa 100%);
+      transition: width 0.4s ease;
+    }
+
+    /* -------------------------------------------------------------------------
+       TAB 4: AGENDA SCREEN (TASKS & OVERDUE CALLS)
+       ------------------------------------------------------------------------- */
+    .agenda-view {
+      flex: 1;
+      padding: 0.65rem 0.75rem;
+      overflow-y: auto;
+      overflow-x: hidden;
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+      min-height: 0;
+    }
+
+    .agenda-section-title {
+      font-size: 0.725rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
       display: flex;
       align-items: center;
+      gap: 0.35rem;
+    }
+    .agenda-section-title.urgent { color: #f87171; }
+    .agenda-section-title.today { color: #60a5fa; }
+
+    .agenda-card {
+      background: var(--phone-surface);
+      border: 1px solid var(--phone-border);
+      border-radius: var(--radius-md);
+      padding: 0.65rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      position: relative;
+    }
+    .agenda-card.overdue {
+      border-color: rgba(239, 68, 68, 0.3);
+      background: linear-gradient(135deg, var(--phone-surface) 0%, rgba(239, 68, 68, 0.06) 100%);
+    }
+
+    .agenda-card-top {
+      display: flex;
       justify-content: space-between;
-      font-size: 0.75rem;
+      align-items: center;
+    }
+
+    .agenda-lead-name {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .agenda-time-badge {
+      font-size: 0.625rem;
+      font-weight: 600;
+      padding: 0.15rem 0.4rem;
+      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-dim);
+    }
+    .agenda-time-badge.urgent {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+    }
+
+    .agenda-purpose {
+      font-size: 0.725rem;
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .agenda-notes {
+      font-size: 0.6875rem;
+      color: var(--text-dim);
+      line-height: 1.35;
+    }
+
+    /* -------------------------------------------------------------------------
+       5-STATE HELPERS (LOADING SKELETONS & EMPTY STATES)
+       ------------------------------------------------------------------------- */
+    .skeleton-box {
+      background: linear-gradient(90deg, rgba(255, 255, 255, 0.03) 25%, rgba(255, 255, 255, 0.08) 50%, rgba(255, 255, 255, 0.03) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 6px;
+    }
+    @keyframes shimmer {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+
+    .skeleton-card {
+      background: var(--phone-surface);
+      border: 1px solid var(--phone-border);
+      border-radius: var(--radius-md);
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    .empty-state-card {
+      text-align: center;
+      padding: 1.5rem 1rem;
+      background: var(--phone-surface);
+      border: 1px dashed var(--phone-border);
+      border-radius: var(--radius-md);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.5rem;
+    }
+    .empty-state-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-muted);
+    }
+    .empty-state-title {
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+    .empty-state-desc {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      line-height: 1.35;
+    }
+    .btn-empty-action {
+      margin-top: 0.35rem;
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      cursor: pointer;
     }
 
     /* IN-APP BOTTOM TAB BAR */
     .app-bottom-nav {
-      height: 44px;
-      background: rgba(20, 26, 36, 0.95);
+      height: 48px;
+      background: rgba(18, 25, 39, 0.96);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
       border-top: 1px solid var(--phone-border);
       display: flex;
       align-items: center;
       justify-content: space-around;
       flex-shrink: 0;
-      padding: 0 0.5rem;
+      padding: 0 0.4rem;
     }
 
     .nav-tab-btn {
@@ -1211,20 +1546,28 @@
       display: flex;
       flex-direction: column;
       align-items: center;
+      justify-content: center;
       gap: 0.15rem;
       cursor: pointer;
       font-size: 0.625rem;
       font-weight: 600;
       font-family: inherit;
-      padding: 0.25rem 0.5rem;
-      transition: color 0.15s ease;
+      padding: 0.25rem 0.4rem;
+      min-width: 48px;
+      min-height: 40px;
+      border-radius: 8px;
+      transition: all 0.15s ease;
     }
     .nav-tab-btn svg {
       width: 17px;
       height: 17px;
+      transition: transform 0.15s ease;
     }
     .nav-tab-btn.active {
       color: var(--primary);
+    }
+    .nav-tab-btn.active svg {
+      transform: translateY(-1px);
     }
 
     /* Settings / Auth Modal Sheet */
@@ -1734,89 +2077,54 @@
           <!-- TAB 2: LEADS LIST -->
           <div class="tab-pane" id="tabLeads">
             <div class="leads-view">
-              <div class="leads-header-title">
-                <span>Active CRM Leads</span>
-                <span style="font-size:0.7rem; color:var(--text-dim); font-weight:normal;">1 Total</span>
+              <!-- Search & Stage Filter Bar -->
+              <div class="leads-search-wrapper">
+                <div class="search-input-box">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                  </svg>
+                  <input type="text" id="leadSearchInput" placeholder="Search leads by name, phone..." oninput="handleLeadSearch(this.value)" />
+                  <button id="leadSearchClear" class="search-clear-btn" onclick="clearLeadSearch()" style="display:none;">✕</button>
+                </div>
+
+                <div class="filter-pills-scroll">
+                  <button class="filter-pill active" data-stage="ALL" onclick="filterLeadsByStage('ALL')">All Leads</button>
+                  <button class="filter-pill" data-stage="NEW" onclick="filterLeadsByStage('NEW')">New</button>
+                  <button class="filter-pill" data-stage="CONTACTED" onclick="filterLeadsByStage('CONTACTED')">Contacted</button>
+                  <button class="filter-pill" data-stage="DEMO" onclick="filterLeadsByStage('DEMO')">Demo</button>
+                  <button class="filter-pill" data-stage="NEGOTIATION" onclick="filterLeadsByStage('NEGOTIATION')">Negotiation</button>
+                  <button class="filter-pill" data-stage="WON" onclick="filterLeadsByStage('WON')">Won</button>
+                </div>
               </div>
 
-              <!-- Lead Card: REYYA Achu -->
-              <div class="lead-mobile-card">
-                <div class="lead-card-top">
-                  <div class="lead-card-name">REYYA Achu</div>
-                  <span class="stage-pill">Demo Scheduled</span>
-                </div>
-
-                <div class="lead-card-detail">
-                  <span>Priority: <strong style="color:#f59e0b;">MEDIUM</strong> • Value: $0.00</span>
-                  <span>Phone: <a href="tel:+91545555445" style="color:var(--primary); text-decoration:none;">+91 545555445</a></span>
-                  <span>Pending Task: Follow-up call (Demo Scheduled stage)</span>
-                </div>
-
-                <div class="lead-actions-row">
-                  <button class="btn-lead-action btn-lead-ai" onclick="switchTab('chat'); handleQuickSend('what is the status of REYYA');">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                      <path d="M12 8V4m0 4a4 4 0 100 8 4 4 0 000-8zm0 8v4m-8-6h4m8 0h4"/>
-                    </svg>
-                    <span>Ask AI About Lead</span>
-                  </button>
-                  <button class="btn-lead-action btn-lead-call" onclick="switchTab('chat'); handleQuickSend('Move REYYA Achu to Negotiation stage');">
-                    <span>Move Stage</span>
-                  </button>
-                </div>
+              <!-- Leads Container (5-State: Loading / Empty / Error / Success) -->
+              <div id="leadsListContainer" class="leads-cards-container">
+                <!-- Dynamically rendered -->
               </div>
             </div>
           </div>
 
-          <!-- TAB 3: PIPELINE -->
+          <!-- TAB 3: PIPELINE FUNNEL -->
           <div class="tab-pane" id="tabPipeline">
             <div class="pipeline-view">
-              <div class="leads-header-title">
-                <span>Deal Pipeline Funnel</span>
+              <div id="pipelineContainer">
+                <!-- Dynamically rendered funnel & stats -->
               </div>
+            </div>
+          </div>
 
-              <div class="pipeline-summary-card">
-                <div class="pipe-stat">
-                  <h4>1</h4>
-                  <span>Active Deals</span>
-                </div>
-                <div class="pipe-stat">
-                  <h4>$0.00</h4>
-                  <span>Total Value</span>
-                </div>
-                <div class="pipe-stat">
-                  <h4 style="color:var(--warning);">1</h4>
-                  <span>Due Today</span>
-                </div>
-              </div>
-
-              <div style="display:flex; flex-direction:column; gap:0.5rem; margin-top:0.35rem;">
-                <div class="stage-row-item">
-                  <span>1. New Leads</span>
-                  <span style="color:var(--text-dim);">0 deals</span>
-                </div>
-                <div class="stage-row-item">
-                  <span>2. Contacted</span>
-                  <span style="color:var(--text-dim);">0 deals</span>
-                </div>
-                <div class="stage-row-item" style="border-color:rgba(59,130,246,0.4); background:rgba(59,130,246,0.08);">
-                  <span style="font-weight:700; color:#93c5fd;">3. Demo Scheduled</span>
-                  <span style="font-weight:700; color:#60a5fa;">1 lead (REYYA)</span>
-                </div>
-                <div class="stage-row-item">
-                  <span>4. Negotiation</span>
-                  <span style="color:var(--text-dim);">0 deals</span>
-                </div>
-                <div class="stage-row-item">
-                  <span>5. Closed Won</span>
-                  <span style="color:var(--success);">0 deals</span>
-                </div>
+          <!-- TAB 4: AGENDA & OVERDUE TASKS -->
+          <div class="tab-pane" id="tabAgenda">
+            <div class="agenda-view">
+              <div id="agendaContainer">
+                <!-- Dynamically rendered agenda items -->
               </div>
             </div>
           </div>
 
         </div>
 
-        <!-- In-App Bottom Tab Bar -->
+        <!-- In-App Bottom Tab Bar (4-Tab Precision Mobile DS) -->
         <div class="app-bottom-nav">
           <button class="nav-tab-btn active" id="tabBtnChat" onclick="switchTab('chat')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -1829,6 +2137,7 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/>
               <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 00-3-3.87m-4-12a4 4 0 010 7.75"/>
             </svg>
             <span>Leads</span>
           </button>
@@ -1840,6 +2149,14 @@
               <line x1="6" y1="20" x2="6" y2="14"/>
             </svg>
             <span>Pipeline</span>
+          </button>
+
+          <button class="nav-tab-btn" id="tabBtnAgenda" onclick="switchTab('agenda')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 11 12 14 22 4"/>
+              <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+            </svg>
+            <span>Agenda</span>
           </button>
         </div>
       </div>
@@ -2036,6 +2353,16 @@
       }
     }
 
+    // =========================================================================
+    // DYNAMIC CRM DATA MANAGEMENT (LEADS, PIPELINE, AGENDA)
+    // =========================================================================
+    let leadsData = [];
+    let followupsData = [];
+    let currentStageFilter = 'ALL';
+    let currentSearchTerm = '';
+    let isLoadingLeads = false;
+    let isLoadingAgenda = false;
+
     function switchTab(tabName) {
       document.querySelectorAll('.tab-pane').forEach(el => el.classList.remove('active'));
       document.querySelectorAll('.nav-tab-btn').forEach(el => el.classList.remove('active'));
@@ -2046,10 +2373,512 @@
       } else if (tabName === 'leads') {
         document.getElementById('tabLeads')?.classList.add('active');
         document.getElementById('tabBtnLeads')?.classList.add('active');
+        if (leadsData.length === 0) {
+          fetchLeads();
+        } else {
+          renderLeads();
+        }
       } else if (tabName === 'pipeline') {
         document.getElementById('tabPipeline')?.classList.add('active');
         document.getElementById('tabBtnPipeline')?.classList.add('active');
+        if (leadsData.length === 0) {
+          fetchLeads().then(() => renderPipeline());
+        } else {
+          renderPipeline();
+        }
+      } else if (tabName === 'agenda') {
+        document.getElementById('tabAgenda')?.classList.add('active');
+        document.getElementById('tabBtnAgenda')?.classList.add('active');
+        if (followupsData.length === 0) {
+          fetchAgenda();
+        } else {
+          renderAgenda();
+        }
       }
+    }
+
+    async function fetchLeads() {
+      isLoadingLeads = true;
+      renderLeads();
+
+      if (!IS_DEMO_MODE && ACCESS_TOKEN) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/leads/`, {
+            headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const list = Array.isArray(data) ? data : (data.results || data.data || []);
+            if (list.length > 0) {
+              leadsData = list.map(l => ({
+                id: l.id,
+                name: l.name,
+                company: l.company_name || l.company || 'Direct Client',
+                phone: l.phone || '+91 9876543210',
+                email: l.email || '',
+                stage: l.stage_name || (typeof l.stage === 'object' ? l.stage?.name : l.stage) || 'New',
+                value: parseFloat(l.expected_value || l.value || 0),
+                priority: l.priority || 'MEDIUM',
+                notes: l.notes || 'Lead tracked in CRM pipeline.'
+              }));
+              isLoadingLeads = false;
+              renderLeads();
+              renderPipeline();
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('[CRM Mobile] Live leads fetch error, using demo fallback:', e);
+        }
+      }
+
+      leadsData = getDemoLeads();
+      isLoadingLeads = false;
+      renderLeads();
+      renderPipeline();
+    }
+
+    function getDemoLeads() {
+      return [
+        {
+          id: 133,
+          name: "REYYA Achu",
+          company: "Achu Enterprises",
+          phone: "+91 545555445",
+          email: "reyya@achu.com",
+          stage: "Demo Scheduled",
+          value: 150000,
+          priority: "HIGH",
+          notes: "[sent the poster] Reach out to REYYA Achu to initiate next steps."
+        },
+        {
+          id: 134,
+          name: "Acme Industrial Tech",
+          company: "Acme Corp",
+          phone: "+1 555-0192",
+          email: "contact@acmetech.io",
+          stage: "Negotiation",
+          value: 420000,
+          priority: "HIGH",
+          notes: "Contract review in progress. Awaiting pricing approval."
+        },
+        {
+          id: 135,
+          name: "Global Logistics Ltd",
+          company: "Global Logistics",
+          phone: "+44 20 7946 0912",
+          email: "ops@globallogistics.co.uk",
+          stage: "Contacted",
+          value: 85000,
+          priority: "MEDIUM",
+          notes: "Introductory discovery call completed. Pitch deck dispatched."
+        },
+        {
+          id: 136,
+          name: "Stellar Dynamics",
+          company: "Stellar Inc",
+          phone: "+1 555-0144",
+          email: "hello@stellardynamics.com",
+          stage: "New",
+          value: 250000,
+          priority: "LOW",
+          notes: "Inbound inquiry via website web-to-lead form."
+        },
+        {
+          id: 137,
+          name: "Apex Cloud Systems",
+          company: "Apex Cloud",
+          phone: "+1 555-0188",
+          email: "billing@apexcloud.com",
+          stage: "Closed Won",
+          value: 750000,
+          priority: "HIGH",
+          notes: "Annual enterprise contract finalized."
+        }
+      ];
+    }
+
+    function handleLeadSearch(val) {
+      currentSearchTerm = (val || '').trim().toLowerCase();
+      const clearBtn = document.getElementById('leadSearchClear');
+      if (clearBtn) {
+        clearBtn.style.display = currentSearchTerm ? 'block' : 'none';
+      }
+      renderLeads();
+    }
+
+    function clearLeadSearch() {
+      currentSearchTerm = '';
+      const input = document.getElementById('leadSearchInput');
+      if (input) input.value = '';
+      const clearBtn = document.getElementById('leadSearchClear');
+      if (clearBtn) clearBtn.style.display = 'none';
+      renderLeads();
+    }
+
+    function filterLeadsByStage(stage) {
+      currentStageFilter = stage;
+      document.querySelectorAll('.filter-pill').forEach(btn => {
+        btn.classList.toggle('active', btn.getAttribute('data-stage') === stage);
+      });
+      renderLeads();
+    }
+
+    function getStageClass(stageName) {
+      const s = (stageName || '').toLowerCase();
+      if (s.includes('new')) return 'new';
+      if (s.includes('contact')) return 'contacted';
+      if (s.includes('demo')) return 'demo';
+      if (s.includes('negotiat')) return 'negotiation';
+      if (s.includes('won')) return 'won';
+      if (s.includes('lost')) return 'lost';
+      return 'new';
+    }
+
+    function renderLeads() {
+      const container = document.getElementById('leadsListContainer');
+      if (!container) return;
+
+      if (isLoadingLeads) {
+        container.innerHTML = `
+          <div class="skeleton-card">
+            <div class="skeleton-box" style="width: 45%; height: 14px;"></div>
+            <div class="skeleton-box" style="width: 30%; height: 10px;"></div>
+            <div class="skeleton-box" style="width: 100%; height: 26px;"></div>
+            <div class="skeleton-box" style="width: 80%; height: 24px;"></div>
+          </div>
+          <div class="skeleton-card">
+            <div class="skeleton-box" style="width: 55%; height: 14px;"></div>
+            <div class="skeleton-box" style="width: 35%; height: 10px;"></div>
+            <div class="skeleton-box" style="width: 100%; height: 26px;"></div>
+            <div class="skeleton-box" style="width: 75%; height: 24px;"></div>
+          </div>
+        `;
+        return;
+      }
+
+      let filtered = leadsData.filter(l => {
+        // Stage filter
+        if (currentStageFilter !== 'ALL') {
+          const s = (l.stage || '').toUpperCase();
+          if (currentStageFilter === 'NEW' && !s.includes('NEW')) return false;
+          if (currentStageFilter === 'CONTACTED' && !s.includes('CONTACT')) return false;
+          if (currentStageFilter === 'DEMO' && !s.includes('DEMO')) return false;
+          if (currentStageFilter === 'NEGOTIATION' && !s.includes('NEGOTIAT')) return false;
+          if (currentStageFilter === 'WON' && !s.includes('WON')) return false;
+        }
+
+        // Search term filter
+        if (currentSearchTerm) {
+          const hay = `${l.name} ${l.company} ${l.phone} ${l.stage}`.toLowerCase();
+          if (!hay.includes(currentSearchTerm)) return false;
+        }
+
+        return true;
+      });
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state-card">
+            <div class="empty-state-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+              </svg>
+            </div>
+            <div class="empty-state-title">No matching leads</div>
+            <div class="empty-state-desc">Try resetting your stage filter or search term to view all records.</div>
+            <button class="btn-empty-action" onclick="clearLeadSearch(); filterLeadsByStage('ALL');">Clear Filters</button>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(lead => {
+        const stageCls = getStageClass(lead.stage);
+        const formattedVal = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(lead.value);
+
+        return `
+          <div class="lead-mobile-card">
+            <div class="lead-card-top">
+              <div class="lead-card-title-group">
+                <span class="lead-card-name">${escapeHtml(lead.name)}</span>
+                <span class="lead-card-company">${escapeHtml(lead.company)}</span>
+              </div>
+              <span class="stage-pill ${stageCls}">${escapeHtml(lead.stage)}</span>
+            </div>
+
+            <div class="lead-card-metrics">
+              <span class="lead-val">${formattedVal}</span>
+              <span class="lead-priority ${lead.priority}">Priority: ${lead.priority}</span>
+            </div>
+
+            ${lead.notes ? `<div class="lead-card-notes">${escapeHtml(lead.notes)}</div>` : ''}
+
+            <div class="lead-actions-row">
+              <button class="btn-lead-action btn-lead-ai" onclick="askAiAboutLead('${escapeHtml(lead.name)}')" title="Ask AI About Lead">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 8V4m0 4a4 4 0 100 8 4 4 0 000-8zm0 8v4m-8-6h4m8 0h4"/>
+                </svg>
+                <span>Ask AI</span>
+              </button>
+
+              ${lead.phone ? `
+                <a class="btn-lead-action btn-lead-call" href="tel:${escapeHtml(lead.phone)}" title="Direct Phone Call">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z"/>
+                  </svg>
+                  <span>Call</span>
+                </a>
+              ` : ''}
+
+              <button class="btn-lead-action btn-lead-move" onclick="moveLeadStageViaAi('${escapeHtml(lead.name)}')" title="Move Stage">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 18 15 12 9 6"/>
+                </svg>
+                <span>Move</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function askAiAboutLead(leadName) {
+      switchTab('chat');
+      handleQuickSend(`what is the status of ${leadName}`);
+    }
+
+    function moveLeadStageViaAi(leadName) {
+      switchTab('chat');
+      handleQuickSend(`Move ${leadName} to Negotiation stage`);
+    }
+
+    function renderPipeline() {
+      const container = document.getElementById('pipelineContainer');
+      if (!container) return;
+
+      const totalDeals = leadsData.length;
+      const totalVal = leadsData.reduce((acc, l) => acc + (l.value || 0), 0);
+      const formattedTotal = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(totalVal);
+
+      const stageCounts = {
+        'New Leads': leadsData.filter(l => (l.stage || '').toLowerCase().includes('new')).length,
+        'Contacted': leadsData.filter(l => (l.stage || '').toLowerCase().includes('contact')).length,
+        'Demo Scheduled': leadsData.filter(l => (l.stage || '').toLowerCase().includes('demo')).length,
+        'Negotiation': leadsData.filter(l => (l.stage || '').toLowerCase().includes('negotiat')).length,
+        'Closed Won': leadsData.filter(l => (l.stage || '').toLowerCase().includes('won')).length,
+      };
+
+      const maxCount = Math.max(1, ...Object.values(stageCounts));
+
+      container.innerHTML = `
+        <div class="pipeline-kpis">
+          <div class="pipe-kpi-card">
+            <h4>${totalDeals}</h4>
+            <span>Deals</span>
+          </div>
+          <div class="pipe-kpi-card">
+            <h4 style="font-size:0.85rem; color:#38bdf8;">${formattedTotal}</h4>
+            <span>Pipeline</span>
+          </div>
+          <div class="pipe-kpi-card">
+            <h4 style="color:#f59e0b;">1</h4>
+            <span>Due Today</span>
+          </div>
+        </div>
+
+        <div class="funnel-card">
+          <div class="funnel-card-header">
+            <span>Conversion Funnel</span>
+            <span style="font-size:0.65rem; color:var(--text-dim);">Live Stage Health</span>
+          </div>
+
+          ${Object.entries(stageCounts).map(([stage, count]) => {
+            const pct = Math.round((count / maxCount) * 100);
+            return `
+              <div class="funnel-stage-row" onclick="filterLeadsByStage('${stage.toUpperCase().split(' ')[0]}'); switchTab('leads');" title="Filter leads in ${stage}">
+                <div class="funnel-stage-meta">
+                  <span style="color:#ffffff;">${stage}</span>
+                  <span style="color:${count > 0 ? '#60a5fa' : 'var(--text-muted)'};">${count} deal${count !== 1 ? 's' : ''}</span>
+                </div>
+                <div class="funnel-progress-track">
+                  <div class="funnel-progress-fill" style="width: ${count > 0 ? Math.max(12, pct) : 0}%;"></div>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      `;
+    }
+
+    async function fetchAgenda() {
+      isLoadingAgenda = true;
+      renderAgenda();
+
+      if (!IS_DEMO_MODE && ACCESS_TOKEN) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/followups/`, {
+            headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const list = Array.isArray(data) ? data : (data.results || data.data || []);
+            if (list.length > 0) {
+              followupsData = list.map(f => ({
+                id: f.id,
+                lead_id: f.lead,
+                lead_name: f.lead_name || 'CRM Lead',
+                phone: f.phone || '+91 545555445',
+                type: f.followup_type || 'CALL',
+                status: f.is_overdue ? 'OVERDUE' : 'TODAY',
+                time: f.scheduled_at || 'Today',
+                purpose: f.purpose || f.notes || 'Follow-up Call',
+                notes: f.notes || ''
+              }));
+              isLoadingAgenda = false;
+              renderAgenda();
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('[CRM Mobile] Live followups fetch error:', e);
+        }
+      }
+
+      followupsData = getDemoFollowups();
+      isLoadingAgenda = false;
+      renderAgenda();
+    }
+
+    function getDemoFollowups() {
+      return [
+        {
+          id: 1,
+          lead_id: 133,
+          lead_name: "REYYA Achu",
+          phone: "+91 545555445",
+          type: "CALL",
+          status: "OVERDUE",
+          time: "Yesterday, 11:30 AM",
+          purpose: "Demo Scheduled Stage Follow-up",
+          notes: "[sent the poster] Reach out to REYYA Achu to initiate next steps."
+        },
+        {
+          id: 2,
+          lead_id: 134,
+          lead_name: "Acme Industrial Tech",
+          phone: "+1 555-0192",
+          type: "CALL",
+          status: "TODAY",
+          time: "Today, 3:00 PM",
+          purpose: "Final Contract Negotiation",
+          notes: "Review enterprise SLA terms & pricing sign-off."
+        },
+        {
+          id: 3,
+          lead_id: 135,
+          lead_name: "Global Logistics Ltd",
+          phone: "+44 20 7946 0912",
+          type: "EMAIL",
+          status: "TODAY",
+          time: "Today, 5:30 PM",
+          purpose: "Send Customized Pitch Deck",
+          notes: "Attach case studies on cross-dock logistics automation."
+        }
+      ];
+    }
+
+    function renderAgenda() {
+      const container = document.getElementById('agendaContainer');
+      if (!container) return;
+
+      if (isLoadingAgenda) {
+        container.innerHTML = `
+          <div class="skeleton-card">
+            <div class="skeleton-box" style="width: 40%; height: 14px;"></div>
+            <div class="skeleton-box" style="width: 100%; height: 28px;"></div>
+          </div>
+          <div class="skeleton-card">
+            <div class="skeleton-box" style="width: 50%; height: 14px;"></div>
+            <div class="skeleton-box" style="width: 100%; height: 28px;"></div>
+          </div>
+        `;
+        return;
+      }
+
+      const overdue = followupsData.filter(f => f.status === 'OVERDUE');
+      const today = followupsData.filter(f => f.status !== 'OVERDUE');
+
+      if (followupsData.length === 0) {
+        container.innerHTML = `
+          <div class="empty-state-card">
+            <div class="empty-state-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            <div class="empty-state-title">All Caught Up!</div>
+            <div class="empty-state-desc">You have completed all pending follow-up activities for today.</div>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = `
+        ${overdue.length > 0 ? `
+          <div class="agenda-section-title urgent">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+            <span>Overdue Follow-ups (${overdue.length})</span>
+          </div>
+
+          ${overdue.map(item => `
+            <div class="agenda-card overdue">
+              <div class="agenda-card-top">
+                <span class="agenda-lead-name">${escapeHtml(item.lead_name)}</span>
+                <span class="agenda-time-badge urgent">${escapeHtml(item.time)}</span>
+              </div>
+              <div class="agenda-purpose">${escapeHtml(item.purpose)}</div>
+              ${item.notes ? `<div class="agenda-notes">${escapeHtml(item.notes)}</div>` : ''}
+              <div class="lead-actions-row">
+                <a class="btn-lead-action btn-lead-call" href="tel:${escapeHtml(item.phone)}">
+                  <span>Call Now</span>
+                </a>
+                <button class="btn-lead-action btn-lead-ai" onclick="askAiAboutLead('${escapeHtml(item.lead_name)}')">
+                  <span>Ask AI</span>
+                </button>
+              </div>
+            </div>
+          `).join('')}
+        ` : ''}
+
+        <div class="agenda-section-title today" style="margin-top:0.4rem;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          </svg>
+          <span>Today's Schedule (${today.length})</span>
+        </div>
+
+        ${today.map(item => `
+          <div class="agenda-card">
+            <div class="agenda-card-top">
+              <span class="agenda-lead-name">${escapeHtml(item.lead_name)}</span>
+              <span class="agenda-time-badge">${escapeHtml(item.time)}</span>
+            </div>
+            <div class="agenda-purpose">${escapeHtml(item.purpose)}</div>
+            ${item.notes ? `<div class="agenda-notes">${escapeHtml(item.notes)}</div>` : ''}
+            <div class="lead-actions-row">
+              <a class="btn-lead-action btn-lead-call" href="tel:${escapeHtml(item.phone)}">
+                <span>Call Lead</span>
+              </a>
+              <button class="btn-lead-action btn-lead-ai" onclick="askAiAboutLead('${escapeHtml(item.lead_name)}')">
+                <span>Ask AI</span>
+              </button>
+            </div>
+          </div>
+        `).join('')}
+      `;
     }
 
     // =========================================================================
