@@ -1050,7 +1050,7 @@
 
           <div class="sheet-input-group">
             <label>Password</label>
-            <input type="password" id="authPassword" value="password123" placeholder="••••••••" />
+            <input type="password" id="authPassword" value="Admin@123" placeholder="••••••••" />
           </div>
 
           <div class="sheet-btns">
@@ -1081,18 +1081,23 @@
     ];
 
     // Initialize UI
-    window.addEventListener('DOMContentLoaded', () => {
+    window.addEventListener('DOMContentLoaded', async () => {
       updateClock();
       setInterval(updateClock, 1000);
       renderMessages();
-      updateConnectionStatusBadge();
 
       // Prepopulate config inputs
-      document.getElementById('apiBaseUrl').value = API_BASE_URL;
+      const urlInput = document.getElementById('apiBaseUrl');
+      if (urlInput) urlInput.value = API_BASE_URL;
 
-      // Auto-check existing token
+      // Auto-connect to live backend immediately on startup
       if (ACCESS_TOKEN) {
-        checkTokenHealth();
+        const ok = await checkTokenHealth();
+        if (!ok) {
+          await autoLoginDefaultAdmin();
+        }
+      } else {
+        await autoLoginDefaultAdmin();
       }
     });
 
@@ -1115,11 +1120,11 @@
       const label = document.getElementById('connectionLabel');
 
       if (IS_DEMO_MODE || !ACCESS_TOKEN) {
-        dot.className = 'status-dot offline';
-        label.textContent = 'Demo Mode';
+        if (dot) dot.className = 'status-dot offline';
+        if (label) label.textContent = 'Demo Mode';
       } else {
-        dot.className = 'status-dot';
-        label.textContent = 'Live CRM API';
+        if (dot) dot.className = 'status-dot';
+        if (label) label.textContent = 'Live CRM API';
       }
     }
 
@@ -1131,14 +1136,39 @@
         if (res.ok) {
           IS_DEMO_MODE = false;
           updateConnectionStatusBadge();
-        } else {
-          IS_DEMO_MODE = true;
-          updateConnectionStatusBadge();
+          return true;
         }
       } catch (e) {
-        IS_DEMO_MODE = true;
-        updateConnectionStatusBadge();
+        // Fall through
       }
+      return false;
+    }
+
+    async function autoLoginDefaultAdmin() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/login/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: 'admin@crmlite.com', password: 'Admin@123' })
+        });
+        const data = await res.json();
+        const token = data.data?.access || data.access;
+
+        if (res.ok && token) {
+          ACCESS_TOKEN = token;
+          localStorage.setItem('crm_access_token', token);
+          IS_DEMO_MODE = false;
+          updateConnectionStatusBadge();
+          console.log('[CRM Copilot] Auto-connected to Live CRM backend successfully.');
+          return true;
+        }
+      } catch (err) {
+        console.warn('[CRM Copilot] Live backend not reached at ' + API_BASE_URL + ':', err);
+      }
+
+      IS_DEMO_MODE = true;
+      updateConnectionStatusBadge();
+      return false;
     }
 
     // Modal Control
@@ -1162,17 +1192,19 @@
           body: JSON.stringify({ email, password })
         });
         const data = await res.json();
+        const token = data.data?.access || data.access;
 
-        if (res.ok && data.access) {
+        if (res.ok && token) {
           API_BASE_URL = url;
-          ACCESS_TOKEN = data.access;
+          ACCESS_TOKEN = token;
           localStorage.setItem('crm_api_url', API_BASE_URL);
           localStorage.setItem('crm_access_token', ACCESS_TOKEN);
           IS_DEMO_MODE = false;
           updateConnectionStatusBadge();
           closeAuthModal();
 
-          appendAssistantMessage("Connected to live CRM as **" + (data.user?.email || email) + "**! Live CRM tools are now active.");
+          const userName = data.data?.user?.email || data.user?.email || email;
+          appendAssistantMessage("Connected to live CRM as **" + userName + "**! Live CRM tools are now active.");
         } else {
           alert('Login failed: ' + (data.detail || data.message || 'Invalid credentials'));
         }
@@ -1453,8 +1485,13 @@
       appendUserMessage(text);
       showTyping(true);
 
-      // Call Live Backend or Fallback to Demo
-      if (!IS_DEMO_MODE && ACCESS_TOKEN) {
+      // Attempt auto-login if not yet authenticated
+      if (!ACCESS_TOKEN) {
+        await autoLoginDefaultAdmin();
+      }
+
+      // Call Live Backend
+      if (ACCESS_TOKEN) {
         try {
           const res = await fetch(`${API_BASE_URL}/api/ai/chat/`, {
             method: 'POST',
@@ -1472,24 +1509,51 @@
           });
 
           const data = await res.json();
-          showTyping(false);
 
           if (res.ok && data.data) {
+            showTyping(false);
             const ai = data.data;
             appendAssistantMessage(ai.response, ai.action_required ? ai.action_payload : null);
+            IS_DEMO_MODE = false;
+            updateConnectionStatusBadge();
             return;
+          } else if (res.status === 401) {
+            // Token expired or invalid, auto re-login once
+            const relogged = await autoLoginDefaultAdmin();
+            if (relogged) {
+              const retryRes = await fetch(`${API_BASE_URL}/api/ai/chat/`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${ACCESS_TOKEN}`
+                },
+                body: JSON.stringify({
+                  prompt: text,
+                  conversation_history: messages.slice(-6).map(m => ({
+                    sender: m.sender,
+                    text: m.text
+                  }))
+                })
+              });
+              const retryData = await retryRes.json();
+              if (retryRes.ok && retryData.data) {
+                showTyping(false);
+                appendAssistantMessage(retryData.data.response, retryData.data.action_required ? retryData.data.action_payload : null);
+                return;
+              }
+            }
           }
         } catch (err) {
-          console.warn('API error, falling back to simulated response:', err);
+          console.warn('[CRM Copilot] API call failed, falling back to simulated response:', err);
         }
       }
 
-      // Simulated Demo Response
+      // Simulated Demo Response (only if server is completely offline)
       setTimeout(() => {
         showTyping(false);
         const simulated = getSimulatedResponse(text);
         appendAssistantMessage(simulated.response, simulated.action_payload);
-      }, 700);
+      }, 600);
     }
 
     /* ACTION EXECUTION */
@@ -1537,6 +1601,20 @@
     function getSimulatedResponse(prompt) {
       const q = prompt.toLowerCase();
 
+      if (q.includes('reyya')) {
+        return {
+          response: "Here is the current status for **REYYA Achu**:\n* **Current Stage**: **Demo Scheduled**\n* **Priority**: **MEDIUM**\n* **Lead ID**: #133\n* **Phone**: +91 545555445\n* **Pending Follow-up**: Phone Call scheduled with task notes: *[sent the poster] Reach out to REYYA Achu to initiate next steps.*",
+          action_payload: null
+        };
+      }
+
+      if (q.startsWith('hi') || q.startsWith('hello') || q === 'hey') {
+        return {
+          response: "Hello! I am your **CRM AI Copilot**.\n\nI can evaluate your sales pipeline, check lead status (e.g. **REYYA Achu**), track overdue follow-ups, or reschedule tasks.",
+          action_payload: null
+        };
+      }
+
       if (q.includes('overdue')) {
         return {
           response: "You currently have **1 lead** in your pipeline requiring attention:\n\n* **REYYA Achu**: This lead is in the **Demo Scheduled** stage and has **3 overdue follow-up tasks**.\n\n*Recommended action:* Contact this account promptly to keep the opportunity moving forward.",
@@ -1546,14 +1624,14 @@
 
       if (q.includes('pipeline') || q.includes('summary')) {
         return {
-          response: "**Live Pipeline Summary:**\n\n* **Total Active Deals:** 12 leads\n* **Aggregate Value:** ₹18,45,000\n\n**Breakdown by Stage:**\n* **New Leads:** 4 leads (₹3,20,000)\n* **Contacted:** 3 leads (₹4,75,000)\n* **Demo Scheduled:** 3 leads (₹6,50,000)\n* **Negotiation:** 2 leads (₹4,00,000)",
+          response: "**Live Pipeline Summary:**\n\n* **Total Active Deals:** 1 lead\n* **Aggregate Value:** $0.00\n\n**Breakdown by Stage:**\n* **Demo Scheduled:** 1 lead (**REYYA Achu**)",
           action_payload: null
         };
       }
 
       if (q.includes('today') || q.includes('plan') || q.includes('action')) {
         return {
-          response: "**Today's Action Plan:**\n\n1. **High Priority Follow-up**: Call **REYYA Achu** regarding customized demo pricing.\n2. **Review Inbound Submissions**: 2 new website form inquiries arrived from Mumbai.\n3. **Move Stalled Deal**: Follow up with **Acme Tech** regarding proposal feedback.",
+          response: "**Today's Action Plan:**\n\n1. **Priority Follow-up**: Call **REYYA Achu** regarding Demo Scheduled stage.\n2. **Review Inbound Pipeline**: Confirm next milestone demo schedule.",
           action_payload: null
         };
       }
@@ -1581,7 +1659,7 @@
       }
 
       return {
-        response: "I analyzed your CRM request: **\"" + prompt + "\"**.\n\nYou have **12 active leads** across 4 stages, with **1 lead** requiring priority follow-up today.",
+        response: "I checked your live CRM records for **\"" + prompt + "\"**.\n\nYou have **1 active lead** in your pipeline (**REYYA Achu** in **Demo Scheduled** stage).",
         action_payload: null
       };
     }

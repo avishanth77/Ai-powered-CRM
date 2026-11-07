@@ -140,13 +140,36 @@ class ChatbotService:
         if any(w in prompt_lower for w in ['reassign', 'assign', 'team', 'rep', 'executive', 'manager', 'owner', 'member', 'who']):
             crm_context["team_members"] = CRMTools.get_team_members()
 
-        # 5. Search for specific lead mention
-        # Check against top leads or query
+        # 5. Search for specific lead mention (supports full name, company, or partial name tokens like "REYYA")
         leads_qs = CRMTools.get_scoped_leads_qs(user)
-        for ld in leads_qs[:15]:
-            if ld.name.lower() in prompt_lower or (ld.company_name and ld.company_name.lower() in prompt_lower):
+        stop_words = {
+            'the', 'what', 'status', 'lead', 'show', 'tell', 'about', 'with', 'from', 'have',
+            'does', 'stage', 'today', 'call', 'next', 'info', 'detail', 'details', 'give',
+            'this', 'that', 'where', 'when', 'which', 'here', 'there', 'please', 'know'
+        }
+        prompt_words = set(re.findall(r'\b[a-zA-Z0-9]{3,}\b', prompt_lower)) - stop_words
+
+        for ld in leads_qs[:30]:
+            ld_name_lower = ld.name.lower()
+            ld_comp_lower = (ld.company_name or '').lower()
+
+            # Direct substring match
+            if ld_name_lower in prompt_lower or (ld_comp_lower and ld_comp_lower in prompt_lower):
                 crm_context["target_lead"] = CRMTools.get_lead_details(user, ld.id)
                 break
+
+            # Partial word token match (e.g. user asks for "REYYA" matching "REYYA Achu")
+            if prompt_words:
+                ld_tokens = set(re.findall(r'\b[a-zA-Z0-9]{3,}\b', ld_name_lower))
+                if ld_tokens & prompt_words:
+                    crm_context["target_lead"] = CRMTools.get_lead_details(user, ld.id)
+                    break
+
+                if ld_comp_lower:
+                    comp_tokens = set(re.findall(r'\b[a-zA-Z0-9]{3,}\b', ld_comp_lower))
+                    if comp_tokens & prompt_words:
+                        crm_context["target_lead"] = CRMTools.get_lead_details(user, ld.id)
+                        break
 
         # If user asks for high-value leads
         if any(w in prompt_lower for w in ['high-value', 'high value', 'top deal', 'biggest']):
