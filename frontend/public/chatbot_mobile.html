@@ -141,12 +141,52 @@
       min-height: 0;
     }
 
+    /* Clean Top Status Bar (Time & WiFi, No Dynamic Island Capsule) */
+    .phone-status-bar {
+      height: 28px;
+      padding: 0 1.15rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-main);
+      z-index: 50;
+      flex-shrink: 0;
+      position: relative;
+      background: transparent;
+      transition: background 0.2s ease;
+    }
+
+    body.in-app .phone-status-bar {
+      background: var(--phone-surface);
+    }
+
+    .phone-time {
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: 0.75rem;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+    }
+
+    .phone-status-icons {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      color: var(--text-main);
+    }
+
+    .phone-status-icons svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
     /* =========================================================================
        SCREEN VIEWS (LOCK SCREEN, HOME SCREEN, APP SCREEN)
        ========================================================================= */
     .screen-view {
       position: absolute;
-      top: 0;
+      top: 28px;
       left: 0;
       right: 0;
       bottom: 0;
@@ -182,7 +222,7 @@
       flex-direction: column;
       align-items: center;
       gap: 0.35rem;
-      margin-top: 2rem;
+      margin-top: 1rem;
     }
 
     .lock-padlock {
@@ -340,7 +380,7 @@
     #homeScreen {
       z-index: 10;
       background: radial-gradient(circle at 30% 10%, #1e1b4b 0%, #0f172a 45%, #030712 100%);
-      padding: 1.35rem 0.85rem 0.95rem 0.85rem;
+      padding: 0.85rem 0.85rem 0.95rem 0.85rem;
       justify-content: space-between;
       transform: scale(1);
       opacity: 1;
@@ -574,7 +614,7 @@
 
     /* In-App Header */
     .app-header {
-      padding: 0.8rem 0.75rem 0.6rem 0.75rem;
+      padding: 0.5rem 0.75rem 0.55rem 0.75rem;
       background: var(--phone-surface);
       border-bottom: 1px solid var(--phone-border);
       display: flex;
@@ -1356,6 +1396,20 @@
     <div class="power-btn-hardware" onclick="togglePower()" title="Power / Lock Button"></div>
 
     <div class="phone-screen">
+
+      <!-- Clean Status Bar (Time & WiFi, No Dynamic Island) -->
+      <div class="phone-status-bar">
+        <span class="phone-time" id="statusTime">23:57</span>
+
+        <div class="phone-status-icons">
+          <!-- Cellular signal -->
+          <svg viewBox="0 0 24 24"><path d="M2 20h2v-4H2v4zm5 0h2v-8H7v8zm5 0h2V8h-2v12zm5 0h2V4h-2v16z"/></svg>
+          <!-- Wifi -->
+          <svg viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4zm0 4.5c3.34 0 6.36 1.34 8.56 3.52L12 20.65 3.44 12.02A12.07 12.07 0 0 1 12 8.5z"/></svg>
+          <!-- Battery -->
+          <svg viewBox="0 0 24 24"><path d="M17 6H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h13c1.1 0 2-.9 2-2v-1.5h1c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1h-1V8c0-1.1-.9-2-2-2zm0 10H4V8h13v8zm-2-7H6v6h9V9z"/></svg>
+        </div>
+      </div>
 
       <!-- ===================================================================
            SCREEN 1: LOCK SCREEN
