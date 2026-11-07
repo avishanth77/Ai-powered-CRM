@@ -23,7 +23,7 @@ from accounts.views import (
     ResetPasswordView,
 )
 
-from leads.views import LeadStageViewSet
+from leads.views import LeadStageViewSet, StageTaskRuleViewSet
 from leads.views_email import EmailTestView
 from followups.views_calendar import CalendarEventsView
 from leads.views_comments import InternalCommentDetailView, MentionSuggestionsView
@@ -35,6 +35,10 @@ user_router.register(r'', UserViewSet, basename='system-users')
 # Top-level API router for Lead Stages
 stage_router = DefaultRouter()
 stage_router.register(r'', LeadStageViewSet, basename='lead-stages')
+
+# Top-level API router for Stage Task Automation Rules
+task_rule_router = DefaultRouter()
+task_rule_router.register(r'', StageTaskRuleViewSet, basename='stage-task-rules')
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -57,12 +61,14 @@ urlpatterns = [
 
     # Dynamic Lead Stages
     path('api/lead-stages/', include(stage_router.urls)),
+    path('api/stage-task-rules/', include(task_rule_router.urls)),
 
     # Core CRM Modules
     path('api/leads/', include('leads.urls')),
     path('api/leads/', include('icp.lead_urls')),
     path('api/leads/', include('pld.lead_urls')),
     path('api/customers/', include('customers.urls')),
+    path('api/products/', include('products.urls')),
     path('api/follow-ups/', include('followups.urls')),
     path('api/calendar/events/', CalendarEventsView.as_view(), name='crm-calendar-events'),
     path('api/activity/', include('activity.urls')),

@@ -10,6 +10,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { StatusBadge } from '../components/StatusBadge';
 import { PriorityBadge } from '../components/PriorityBadge';
 import { LEAD_STATUS, LEAD_PRIORITY } from '../utils/constants';
+import WinProbabilityFunnel from '../components/WinProbabilityFunnel';
 
 import {
   BarChart3,
@@ -672,6 +673,11 @@ export const Reports = () => {
           )}
         </div>
       )}
+
+      {/* Opportunity Stage Distribution & Win Probability Funnel */}
+      <div style={{ marginBottom: '2rem' }}>
+        <WinProbabilityFunnel />
+      </div>
 
       {/* User-Wise Performance Report Table (Manager & Admin) */}
       {isManagerOrAdmin && user_performance && user_performance.length > 0 && (

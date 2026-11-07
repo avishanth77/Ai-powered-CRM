@@ -85,6 +85,7 @@ export const AuthProvider = ({ children }) => {
     canManageStages: isAdmin,
     canManageIcp: isManagerOrAdmin,
     canManagePld: isManagerOrAdmin,
+    canManageTaskRules: isManagerOrAdmin,
   };
 
 

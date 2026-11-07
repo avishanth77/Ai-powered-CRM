@@ -74,17 +74,29 @@ class ReportSummaryView(APIView):
 
         # Charts Data
 
-        # 1. Leads by status / stage (Dynamic from database)
+        # 1. Leads by status / stage (Dynamic from database with win probability & reason)
         status_data = []
         for st in LeadStage.objects.all().order_by('display_order', 'id'):
-            cnt = leads_qs.filter(stage=st).count()
+            leads_in_st = leads_qs.filter(stage=st)
+            cnt = leads_in_st.count()
+            val = float(leads_in_st.aggregate(s=Sum('expected_value'))['s'] or 0)
+            win_prob = getattr(st, 'win_probability', 10)
+            reason = getattr(st, 'win_probability_reason', '')
+            weighted = round(val * win_prob / 100, 2)
+            dist_pct = round((cnt / total_leads * 100), 2) if total_leads > 0 else 0.0
+
             status_data.append({
                 'status': st.slug.upper().replace('-', '_'),
                 'stage_id': st.id,
                 'stage_slug': st.slug,
                 'label': st.name,
                 'color': st.color,
-                'count': cnt
+                'count': cnt,
+                'total_value': val,
+                'win_probability': win_prob,
+                'win_probability_reason': reason,
+                'weighted_value': weighted,
+                'distribution_percentage': dist_pct,
             })
 
         # 2. Leads by source
@@ -99,6 +111,28 @@ class ReportSummaryView(APIView):
         for pr_key, pr_label in Lead.Priority.choices:
             cnt = leads_qs.filter(priority=pr_key).count()
             priority_data.append({'priority': pr_key, 'label': pr_label, 'count': cnt})
+
+        # Products breakdown
+        product_data = []
+        try:
+            from products.models import Product, LeadProduct
+            for p in Product.objects.all():
+                p_leads = leads_qs.filter(lead_products__product=p)
+                cnt = p_leads.count()
+                val = float(LeadProduct.objects.filter(lead__in=leads_qs, product=p).aggregate(s=Sum('total_price'))['s'] or 0)
+                won_cnt = p_leads.filter(stage__slug='won').count()
+                product_data.append({
+                    'id': p.id,
+                    'name': p.name,
+                    'code': p.code,
+                    'category': p.category,
+                    'unit_price': float(p.unit_price),
+                    'count': cnt,
+                    'won_count': won_cnt,
+                    'total_value': val,
+                })
+        except Exception:
+            product_data = []
 
         # 4. Monthly lead creation (last 6 months)
         six_months_ago = now - timedelta(days=180)
@@ -184,7 +218,8 @@ class ReportSummaryView(APIView):
                         'won': won_leads,
                         'lost': lost_leads,
                         'active': total_leads - closed_leads
-                    }
+                    },
+                    'by_product': product_data
                 },
                 'user_performance': user_performance,
                 'leads_by_executive': leads_by_executive,

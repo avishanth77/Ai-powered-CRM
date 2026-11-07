@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { leadApi } from '../api/leadApi';
 import { reportApi } from '../api/reportApi';
+import { productApi } from '../api/productApi';
 import { followupApi } from '../api/followupApi';
 import { activityApi } from '../api/activityApi';
 import { userApi } from '../api/userApi';
@@ -47,7 +48,125 @@ import {
   UserPlus,
   FileSpreadsheet,
   Share2,
+  Package,
+  CheckSquare,
+  SlidersHorizontal,
+  Settings2,
+  Table,
+  RefreshCw,
+  AlertCircle,
+  Check,
+  X,
 } from 'lucide-react';
+
+const TARGET_CRM_FIELDS = [
+  { value: 'name', label: '👤 Lead / Contact Name' },
+  { value: 'phone', label: '📞 Phone Number' },
+  { value: 'email', label: '✉️ Email Address' },
+  { value: 'company_name', label: '🏢 Company / Organization' },
+  { value: 'expected_value', label: '💰 Expected Deal Value (₹)' },
+  { value: 'priority', label: '⚡ Priority (LOW/MED/HIGH/URGENT)' },
+  { value: 'source', label: '🌐 Lead Source' },
+  { value: 'status', label: '📊 Initial Stage / Status' },
+  { value: 'address', label: '📍 Address / Location' },
+  { value: 'skip', label: '🚫 Skip / Do Not Import' },
+];
+
+const INITIAL_TEMPLATE_FIELDS = [
+  { key: 'name', label: 'Lead Name', customHeader: 'Name', enabled: true, sample: 'Aarav Sharma', sample2: 'Sara Khan' },
+  { key: 'phone', label: 'Phone Number', customHeader: 'Phone', enabled: true, sample: '+919876543210', sample2: '+919123456780' },
+  { key: 'email', label: 'Email Address', customHeader: 'Email', enabled: true, sample: 'aarav@example.com', sample2: 'sara@example.com' },
+  { key: 'company_name', label: 'Company / Organization', customHeader: 'Company', enabled: true, sample: 'Apex Traders', sample2: 'Bright Retail' },
+  { key: 'expected_value', label: 'Expected Deal Value', customHeader: 'Expected Value', enabled: true, sample: '75000', sample2: '25000' },
+  { key: 'priority', label: 'Priority', customHeader: 'Priority', enabled: true, sample: 'HIGH', sample2: 'MEDIUM' },
+  { key: 'source', label: 'Lead Source', customHeader: 'Source', enabled: true, sample: 'Website', sample2: 'Referral' },
+  { key: 'status', label: 'Initial Stage', customHeader: 'Stage', enabled: false, sample: 'New', sample2: 'New' },
+  { key: 'address', label: 'Address / Location', customHeader: 'Address', enabled: true, sample: 'Mumbai', sample2: 'Delhi' },
+];
+
+const CRM_FIELD_PRESETS = [
+  { preset: 'custom', label: 'Custom Field (Define Your Own)', defaultKey: '', defaultHeader: '', defaultSample: 'Custom Value' },
+  { preset: 'notes', label: 'Initial Notes / Inquiry Details', defaultKey: 'notes', defaultHeader: 'Notes', defaultSample: 'Customer inquired about enterprise annual plan' },
+  { preset: 'designation', label: 'Job Title / Designation', defaultKey: 'designation', defaultHeader: 'Job Title', defaultSample: 'Chief Technology Officer' },
+  { preset: 'industry', label: 'Industry / Sector', defaultKey: 'industry', defaultHeader: 'Industry', defaultSample: 'Information Technology' },
+  { preset: 'website', label: 'Website / Domain', defaultKey: 'website', defaultHeader: 'Website', defaultSample: 'https://example.com' },
+  { preset: 'products', label: 'Product Interest', defaultKey: 'products', defaultHeader: 'Product', defaultSample: 'Enterprise Suite' },
+  { preset: 'city', label: 'City / Town', defaultKey: 'city', defaultHeader: 'City', defaultSample: 'Bengaluru' },
+  { preset: 'state', label: 'State / Province', defaultKey: 'state', defaultHeader: 'State', defaultSample: 'Karnataka' },
+  { preset: 'country', label: 'Country', defaultKey: 'country', defaultHeader: 'Country', defaultSample: 'India' },
+  { preset: 'postal_code', label: 'Postal Code / PIN', defaultKey: 'postal_code', defaultHeader: 'Postal Code', defaultSample: '560001' },
+  { preset: 'first_name', label: 'First Name', defaultKey: 'first_name', defaultHeader: 'First Name', defaultSample: 'Aarav' },
+  { preset: 'last_name', label: 'Last Name', defaultKey: 'last_name', defaultHeader: 'Last Name', defaultSample: 'Sharma' },
+];
+
+const parseCsvSnippet = (csvText) => {
+  const lines = [];
+  let currentRow = [];
+  let currentCell = '';
+  let insideQuote = false;
+
+  for (let i = 0; i < csvText.length; i++) {
+    const char = csvText[i];
+    const nextChar = csvText[i + 1];
+
+    if (char === '"') {
+      if (insideQuote && nextChar === '"') {
+        currentCell += '"';
+        i++;
+      } else {
+        insideQuote = !insideQuote;
+      }
+    } else if (char === ',' && !insideQuote) {
+      currentRow.push(currentCell.trim());
+      currentCell = '';
+    } else if ((char === '\r' || char === '\n') && !insideQuote) {
+      if (char === '\r' && nextChar === '\n') {
+        i++;
+      }
+      currentRow.push(currentCell.trim());
+      if (currentRow.some((c) => c !== '')) {
+        lines.push(currentRow);
+      }
+      currentRow = [];
+      currentCell = '';
+    } else {
+      currentCell += char;
+    }
+  }
+
+  if (currentCell !== '' || currentRow.length > 0) {
+    currentRow.push(currentCell.trim());
+    if (currentRow.some((c) => c !== '')) {
+      lines.push(currentRow);
+    }
+  }
+
+  if (lines.length === 0) return { headers: [], rows: [], totalRowCount: 0 };
+  const headers = lines[0].map((h) => h.replace(/^["']|["']$/g, '').trim());
+  const rows = lines.slice(1, 4).map((r) => {
+    const obj = {};
+    headers.forEach((h, idx) => {
+      obj[h] = r[idx] !== undefined ? r[idx] : '';
+    });
+    return obj;
+  });
+
+  return { headers, rows, totalRowCount: Math.max(0, lines.length - 1) };
+};
+
+const guessTargetField = (headerName) => {
+  const norm = (headerName || '').toLowerCase().trim().replace(/[-_\s]+/g, ' ');
+  if (/name|contact person|prospect|client name|customer/i.test(norm)) return 'name';
+  if (/phone|mobile|cell|contact num|tel|whatsapp/i.test(norm)) return 'phone';
+  if (/email|e[-_]?mail|mail/i.test(norm)) return 'email';
+  if (/company|organization|organisation|firm|business|account/i.test(norm)) return 'company_name';
+  if (/value|deal|amount|revenue|worth|budget|price|expected/i.test(norm)) return 'expected_value';
+  if (/priority|urgency|tier/i.test(norm)) return 'priority';
+  if (/source|channel|campaign|medium|origin/i.test(norm)) return 'source';
+  if (/stage|status|pipeline state/i.test(norm)) return 'status';
+  if (/address|city|location|state|country/i.test(norm)) return 'address';
+  return 'skip';
+};
 
 export const Leads = () => {
   const { user, canDeleteLeads, canHandoverLeads } = useAuth();
@@ -72,6 +191,8 @@ export const Leads = () => {
   const [pldStatusFilter, setPldStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [assignedToFilter, setAssignedToFilter] = useState('');
+  const [productFilter, setProductFilter] = useState('');
+  const [availableProducts, setAvailableProducts] = useState([]);
 
   // Bulk Handover State
   const [selectedLeads, setSelectedLeads] = useState([]);
@@ -96,7 +217,23 @@ export const Leads = () => {
   const [deleting, setDeleting] = useState(false);
 
   const [importModalOpen, setImportModalOpen] = useState(false);
+  const [importActiveTab, setImportActiveTab] = useState('upload'); // 'upload' | 'builder'
   const [selectedFile, setSelectedFile] = useState(null);
+  const [csvHeaders, setCsvHeaders] = useState([]);
+  const [csvPreviewRows, setCsvPreviewRows] = useState([]);
+  const [csvTotalRows, setCsvTotalRows] = useState(0);
+  const [columnMapping, setColumnMapping] = useState({});
+  const [defaultImportStage, setDefaultImportStage] = useState('');
+  const [defaultImportPriority, setDefaultImportPriority] = useState('');
+  const [availableCrmFields, setAvailableCrmFields] = useState(TARGET_CRM_FIELDS);
+  const [templateFields, setTemplateFields] = useState(INITIAL_TEMPLATE_FIELDS);
+  const [showPreviewTable, setShowPreviewTable] = useState(true);
+  const [showAddFieldModal, setShowAddFieldModal] = useState(false);
+  const [newFieldPreset, setNewFieldPreset] = useState('custom');
+  const [newFieldKey, setNewFieldKey] = useState('');
+  const [newFieldLabel, setNewFieldLabel] = useState('');
+  const [newFieldHeader, setNewFieldHeader] = useState('');
+  const [newFieldSample, setNewFieldSample] = useState('');
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState(null);
 
@@ -140,6 +277,11 @@ export const Leads = () => {
         })
         .catch(() => {});
     }
+
+    productApi
+      .getSimpleProducts()
+      .then((data) => setAvailableProducts(Array.isArray(data) ? data : []))
+      .catch(() => {});
   }, [canHandoverLeads]);
 
   // Fetch KPI Summary Data
@@ -205,6 +347,7 @@ export const Leads = () => {
         pld_status: pldStatusFilter || undefined,
         source: sourceFilter || undefined,
         assigned_to: assignedToFilter || undefined,
+        product: productFilter || undefined,
       };
 
       const res = await leadApi.getLeads(params);
@@ -222,7 +365,7 @@ export const Leads = () => {
     } finally {
       if (requestId === leadsRequestId.current) setLoading(false);
     }
-  }, [currentPage, search, statusFilter, priorityFilter, icpStatusFilter, pldStatusFilter, sourceFilter, assignedToFilter, showToast]);
+  }, [currentPage, search, statusFilter, priorityFilter, icpStatusFilter, pldStatusFilter, sourceFilter, assignedToFilter, productFilter, showToast]);
 
   useEffect(() => {
     fetchLeads();
@@ -418,6 +561,53 @@ export const Leads = () => {
     }
     setImportResult(null);
     setSelectedFile(file);
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const text = e.target.result;
+        const { headers, rows, totalRowCount } = parseCsvSnippet(text);
+        setCsvHeaders(headers);
+        setCsvPreviewRows(rows);
+        setCsvTotalRows(totalRowCount);
+
+        const initialMap = {};
+        headers.forEach((h) => {
+          initialMap[h] = guessTargetField(h);
+        });
+        setColumnMapping(initialMap);
+
+        // Update template builder with detected header names
+        setTemplateFields((prev) =>
+          prev.map((field) => {
+            const matchedHeader = headers.find((h) => initialMap[h] === field.key);
+            if (matchedHeader) {
+              return { ...field, customHeader: matchedHeader, enabled: true };
+            }
+            return field;
+          })
+        );
+      } catch (err) {
+        console.error('Failed to parse CSV preview', err);
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const handleColumnMapChange = (header, targetField) => {
+    setColumnMapping((prev) => ({
+      ...prev,
+      [header]: targetField,
+    }));
+  };
+
+  const handleResetMapping = () => {
+    const freshMap = {};
+    csvHeaders.forEach((h) => {
+      freshMap[h] = guessTargetField(h);
+    });
+    setColumnMapping(freshMap);
+    showToast('Reset column mapping to auto-detected CRM fields', 'info');
   };
 
   const handleDownloadTemplate = () => {
@@ -440,6 +630,288 @@ export const Leads = () => {
     showToast('Sample template downloaded!', 'info');
   };
 
+  // Download a CSV template customized to the exact structure of the uploaded CSV
+  const handleDownloadMatchingTemplate = () => {
+    if (!csvHeaders || csvHeaders.length === 0) {
+      showToast('Please select or drop a CSV file first.', 'warning');
+      return;
+    }
+    const sampleLookup1 = {
+      name: 'Aarav Sharma',
+      phone: '+919876543210',
+      email: 'aarav.sharma@example.com',
+      company_name: 'Apex Traders Pvt Ltd',
+      expected_value: '75000',
+      priority: 'HIGH',
+      source: 'Website',
+      status: 'New',
+      address: 'Mumbai, Maharashtra',
+      skip: 'Sample Note',
+    };
+    const sampleLookup2 = {
+      name: 'Sara Khan',
+      phone: '+919123456780',
+      email: 'sara.khan@brightretail.in',
+      company_name: 'Bright Retailers',
+      expected_value: '25000',
+      priority: 'MEDIUM',
+      source: 'Referral',
+      status: 'New',
+      address: 'New Delhi',
+      skip: 'Sample Note',
+    };
+
+    const escapeCell = (cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`;
+    const row1 = csvHeaders.map((h) => {
+      const target = columnMapping[h];
+      const matched = templateFields.find((f) => f.key === target);
+      if (matched) return matched.sample;
+      return sampleLookup1[target] || 'Sample 1';
+    });
+    const row2 = csvHeaders.map((h) => {
+      const target = columnMapping[h];
+      const matched = templateFields.find((f) => f.key === target);
+      if (matched) return matched.sample2 || matched.sample;
+      return sampleLookup2[target] || 'Sample 2';
+    });
+
+    const csv = [csvHeaders, row1, row2].map((r) => r.map(escapeCell).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const baseName = (selectedFile?.name || 'leads_template').replace(/\.csv$/i, '');
+    a.download = `${baseName}_custom_template.csv`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    showToast('Customized CSV template matching uploaded structure downloaded!', 'success');
+  };
+
+  const handlePresetChange = (presetKey) => {
+    setNewFieldPreset(presetKey);
+    const found = CRM_FIELD_PRESETS.find((p) => p.preset === presetKey);
+    if (found && presetKey !== 'custom') {
+      setNewFieldKey(found.defaultKey);
+      setNewFieldLabel(found.label.split('/')[0].trim());
+      setNewFieldHeader(found.defaultHeader);
+      setNewFieldSample(found.defaultSample);
+    } else {
+      setNewFieldKey('');
+      setNewFieldLabel('');
+      setNewFieldHeader('');
+      setNewFieldSample('');
+    }
+  };
+
+  const handleAddCrmField = (e) => {
+    if (e) e.preventDefault();
+    const label = (newFieldLabel || '').trim();
+    if (!label) {
+      showToast('Please enter a field name in CRM.', 'warning');
+      return;
+    }
+    const header = (newFieldHeader || label).trim();
+    const cleanKey = (newFieldKey.trim() || label.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')) || 'custom_field';
+
+    if (templateFields.some((f) => f.key === cleanKey)) {
+      showToast(`Field '${label}' already exists in template.`, 'warning');
+      return;
+    }
+
+    const newFieldObj = {
+      key: cleanKey,
+      label,
+      customHeader: header,
+      enabled: true,
+      sample: (newFieldSample || 'Sample Value').trim(),
+      sample2: (newFieldSample || 'Sample Value').trim(),
+      isCustom: true,
+    };
+
+    setTemplateFields((prev) => [...prev, newFieldObj]);
+
+    setAvailableCrmFields((prev) => {
+      const skipItem = prev.find((opt) => opt.value === 'skip');
+      const filtered = prev.filter((opt) => opt.value !== 'skip' && opt.value !== cleanKey);
+      return [
+        ...filtered,
+        { value: cleanKey, label: `✨ ${label}` },
+        ...(skipItem ? [skipItem] : []),
+      ];
+    });
+
+    showToast(`Added CRM Field '${label}' to template and mapping!`, 'success');
+    setShowAddFieldModal(false);
+    setNewFieldPreset('custom');
+    setNewFieldKey('');
+    setNewFieldLabel('');
+    setNewFieldHeader('');
+    setNewFieldSample('');
+  };
+
+  const handleRemoveCustomField = (keyToRemove) => {
+    setTemplateFields((prev) => prev.filter((f) => f.key !== keyToRemove));
+    setAvailableCrmFields((prev) => prev.filter((opt) => opt.value !== keyToRemove));
+    setColumnMapping((prev) => {
+      const updated = { ...prev };
+      Object.keys(updated).forEach((header) => {
+        if (updated[header] === keyToRemove) {
+          updated[header] = 'skip';
+        }
+      });
+      return updated;
+    });
+    showToast('Custom field removed', 'info');
+  };
+
+  const handleToggleTemplateField = (key) => {
+    setTemplateFields((prev) =>
+      prev.map((f) => (f.key === key ? { ...f, enabled: !f.enabled } : f))
+    );
+  };
+
+  const handleUpdateTemplateHeader = (key, customHeader) => {
+    setTemplateFields((prev) =>
+      prev.map((f) => (f.key === key ? { ...f, customHeader } : f))
+    );
+  };
+
+  const handleSelectAllTemplateFields = (selectState) => {
+    setTemplateFields((prev) => prev.map((f) => ({ ...f, enabled: selectState })));
+  };
+
+  const handleDownloadCustomBuilderTemplate = () => {
+    const active = templateFields.filter((f) => f.enabled);
+    if (active.length === 0) {
+      showToast('Please select at least one field for your custom template.', 'warning');
+      return;
+    }
+    const headers = active.map((f) => f.customHeader.trim() || f.label);
+    const row1 = active.map((f) => f.sample);
+    const row2 = active.map((f) => f.sample2);
+
+    const escapeCell = (cell) => `"${String(cell ?? '').replace(/"/g, '""')}"`;
+    const csv = [headers, row1, row2].map((r) => r.map(escapeCell).join(',')).join('\r\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'crm_lite_customized_leads_template.csv';
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    showToast('Customized CSV template downloaded!', 'success');
+  };
+
+  const renderAddCrmFieldCard = () => (
+    <div className="add-crm-field-box">
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <Plus size={16} color="var(--primary)" />
+          <strong style={{ fontSize: '0.9375rem', color: 'var(--text-main)' }}>Add CRM Field</strong>
+        </div>
+        <button
+          type="button"
+          onClick={() => setShowAddFieldModal(false)}
+          aria-label="Close"
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-dim)' }}
+        >
+          <X size={16} />
+        </button>
+      </div>
+
+      <p style={{ margin: '0 0 0.75rem', fontSize: '0.8125rem', color: 'var(--text-dim)' }}>
+        Add a preset or custom CRM field to map CSV columns into and include in downloadable templates.
+      </p>
+
+      <div className="add-crm-field-grid">
+        <div>
+          <label className="form-label" style={{ fontSize: '0.78125rem', marginBottom: '0.25rem' }}>
+            Field Preset
+          </label>
+          <select
+            className="form-control"
+            style={{ fontSize: '0.8125rem', padding: '0.375rem 0.5rem' }}
+            value={newFieldPreset}
+            onChange={(e) => handlePresetChange(e.target.value)}
+          >
+            {CRM_FIELD_PRESETS.map((p) => (
+              <option key={p.preset} value={p.preset}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="form-label form-label-required" style={{ fontSize: '0.78125rem', marginBottom: '0.25rem' }}>
+            CRM Field Name
+          </label>
+          <input
+            type="text"
+            className="form-control"
+            style={{ fontSize: '0.8125rem', padding: '0.375rem 0.5rem' }}
+            placeholder="e.g. Job Title, Industry, Product"
+            value={newFieldLabel}
+            onChange={(e) => setNewFieldLabel(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="form-label" style={{ fontSize: '0.78125rem', marginBottom: '0.25rem' }}>
+            Column Header in CSV
+          </label>
+          <input
+            type="text"
+            className="form-control"
+            style={{ fontSize: '0.8125rem', padding: '0.375rem 0.5rem' }}
+            placeholder="Header title in CSV"
+            value={newFieldHeader}
+            onChange={(e) => setNewFieldHeader(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="form-label" style={{ fontSize: '0.78125rem', marginBottom: '0.25rem' }}>
+            Sample Value
+          </label>
+          <input
+            type="text"
+            className="form-control"
+            style={{ fontSize: '0.8125rem', padding: '0.375rem 0.5rem' }}
+            placeholder="e.g. Sample data"
+            value={newFieldSample}
+            onChange={(e) => setNewFieldSample(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>
+        <button
+          type="button"
+          className="btn btn-secondary"
+          style={{ fontSize: '0.8125rem', padding: '0.3125rem 0.75rem' }}
+          onClick={() => setShowAddFieldModal(false)}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          className="btn btn-primary"
+          style={{ fontSize: '0.8125rem', padding: '0.3125rem 0.875rem' }}
+          onClick={handleAddCrmField}
+          disabled={!newFieldLabel.trim()}
+        >
+          <Plus size={13} />
+          <span>Add CRM Field</span>
+        </button>
+      </div>
+    </div>
+  );
+
   const handleImportSubmit = async (e) => {
     e.preventDefault();
     if (!selectedFile) {
@@ -449,7 +921,12 @@ export const Leads = () => {
     setImporting(true);
     setImportResult(null);
     try {
-      const res = await leadApi.importLeads(selectedFile);
+      const options = {
+        columnMapping,
+        defaultStage: defaultImportStage || undefined,
+        defaultPriority: defaultImportPriority || undefined,
+      };
+      const res = await leadApi.importLeads(selectedFile, options);
       const data = res.data || { imported: 0, skipped: 0, total: 0, errors: [] };
       setImportResult(data);
       showToast(
@@ -458,9 +935,14 @@ export const Leads = () => {
       );
       fetchLeads();
       fetchKpis();
-      if (!data.skipped) {
-        setImportModalOpen(false);
-        setSelectedFile(null);
+      if (!data.skipped && data.imported > 0) {
+        setTimeout(() => {
+          setImportModalOpen(false);
+          setSelectedFile(null);
+          setCsvHeaders([]);
+          setCsvPreviewRows([]);
+          setColumnMapping({});
+        }, 1500);
       }
     } catch (err) {
       showToast(extractErrorMessage(err, 'CSV import failed'), 'error');
@@ -768,6 +1250,23 @@ export const Leads = () => {
 
           <select
             className="filter-select"
+            value={productFilter}
+            onChange={(e) => {
+              setProductFilter(e.target.value);
+              setCurrentPage(1);
+            }}
+            aria-label="Filter by Product"
+          >
+            <option value="">All Products</option>
+            {availableProducts.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} ({p.code})
+              </option>
+            ))}
+          </select>
+
+          <select
+            className="filter-select"
             value={sourceFilter}
             onChange={handleSourceChange}
             aria-label="Filter by Source"
@@ -892,6 +1391,48 @@ export const Leads = () => {
                       <span className="lead-company-name">
                         {lead.company_name ? lead.company_name : 'Individual / No Company'}
                       </span>
+                      {lead.products && lead.products.length > 0 && (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '3px' }}>
+                          {lead.products.slice(0, 2).map((p) => (
+                            <span
+                              key={p.id}
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                                fontSize: '0.67rem',
+                                padding: '1px 5px',
+                                borderRadius: '4px',
+                                backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                color: 'var(--primary)',
+                                border: '1px solid rgba(99, 102, 241, 0.25)',
+                                maxWidth: '120px',
+                                overflow: 'hidden',
+                                textOverflow: 'ellipsis',
+                                whiteSpace: 'nowrap',
+                              }}
+                              title={`${p.name} (${p.code}) - ${formatCurrency(p.unit_price)}`}
+                            >
+                              <Package size={9} />
+                              {p.name}
+                            </span>
+                          ))}
+                          {lead.products.length > 2 && (
+                            <span
+                              style={{
+                                fontSize: '0.65rem',
+                                padding: '1px 4px',
+                                borderRadius: '4px',
+                                backgroundColor: 'var(--bg-card-subtle)',
+                                color: 'var(--text-dim)',
+                              }}
+                              title={lead.products.slice(2).map((p) => p.name).join(', ')}
+                            >
+                              +{lead.products.length - 2}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td className="table-truncate-cell">
@@ -908,6 +1449,30 @@ export const Leads = () => {
                   </td>
                   <td>
                     <StatusBadge status={lead.stage_details || lead.status} />
+                    {lead.stage_task_summary && (
+                      <div style={{ marginTop: '3px' }}>
+                        <Link
+                          to={`/leads/${lead.id}?tab=stage-tasks`}
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '3px',
+                            fontSize: '0.67rem',
+                            padding: '1px 5px',
+                            borderRadius: '9999px',
+                            textDecoration: 'none',
+                            fontWeight: 600,
+                            backgroundColor: lead.stage_task_summary.can_progress ? 'rgba(16, 185, 129, 0.12)' : 'rgba(245, 158, 11, 0.12)',
+                            color: lead.stage_task_summary.can_progress ? '#10b981' : '#f59e0b',
+                            border: `1px solid ${lead.stage_task_summary.can_progress ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`,
+                          }}
+                          title="Click to view stage tasks"
+                        >
+                          <CheckSquare size={10} />
+                          <span>{lead.stage_task_summary.completed_mandatory_tasks}/{lead.stage_task_summary.mandatory_tasks} Tasks</span>
+                        </Link>
+                      </div>
+                    )}
                   </td>
                   <td>
                     <PriorityBadge priority={lead.priority} />
@@ -942,6 +1507,14 @@ export const Leads = () => {
                   </td>
                   <td className="table-action-col">
                     <div className="action-buttons-group" style={{ justifyContent: 'flex-end' }}>
+                      <Link
+                        to={`/leads/${lead.id}?tab=stage-tasks`}
+                        className="icon-action-btn"
+                        title="View Stage Tasks"
+                        aria-label={`View stage tasks for ${lead.name}`}
+                      >
+                        <CheckSquare size={15} />
+                      </Link>
                       <button
                         type="button"
                         className="icon-action-btn"
@@ -1167,122 +1740,713 @@ export const Leads = () => {
         </div>
       )}
 
-      {/* Modal: Import Leads CSV */}
+      {/* Modal: Import Leads CSV & Custom Template Builder */}
       {importModalOpen && (
         <div className="modal-backdrop" onClick={() => setImportModalOpen(false)}>
-          <div className="modal-container" ref={importDialogRef} role="dialog" aria-modal="true" aria-label="Import leads from CSV" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="modal-container import-modal-container"
+            ref={importDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Import leads from CSV and customize template"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="modal-header">
               <div className="modal-title-row">
-                <UploadCloud size={18} color="var(--primary)" />
-                <h3>Import Prospect Leads from CSV</h3>
-              </div>
-              <button className="modal-close-btn" onClick={() => setImportModalOpen(false)} aria-label="Close dialog">✕</button>
-            </div>
-            <form onSubmit={handleImportSubmit}>
-              <div className="modal-body form-layout">
-                <p className="text-muted font-sm">
-                  Bulk upload prospective contacts, company details, phone numbers, and initial stages.
-                </p>
-
-                <label
-                  htmlFor="csv-file-input"
-                  className="import-drop-zone"
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Select a CSV file to import"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      document.getElementById('csv-file-input').click();
-                    }
-                  }}
-                  onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => {
-                    e.preventDefault();
-                    if (e.dataTransfer.files?.[0]) handleImportFile(e.dataTransfer.files[0]);
-                  }}
-                >
-                  <FileSpreadsheet size={36} className="import-drop-icon" />
-                  <div>
-                    <strong className="text-main" style={{ display: 'block', fontSize: '0.9375rem' }}>
-                      {selectedFile ? selectedFile.name : 'Click to browse or drop CSV spreadsheet'}
-                    </strong>
-                    <span className="text-dim font-sm">
-                      {selectedFile
-                        ? `${(selectedFile.size / 1024).toFixed(1)} KB • Ready for upload`
-                        : 'Supported formats: .CSV (Max 10MB)'}
-                    </span>
-                  </div>
-                  <input
-                    id="csv-file-input"
-                    type="file"
-                    accept=".csv"
-                    style={{ display: 'none' }}
-                    onChange={(e) => {
-                      handleImportFile(e.target.files?.[0]);
-                      e.target.value = '';
-                    }}
-                  />
-                </label>
-
-                <div
-                  className="import-template-download"
-                  role="button"
-                  tabIndex={0}
-                  aria-label="Download sample CSV template"
-                  onClick={handleDownloadTemplate}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      handleDownloadTemplate();
-                    }
-                  }}
-                >
-                  <Download size={14} />
-                  <span>Download Sample Leads CSV Template</span>
+                <FileSpreadsheet size={20} color="var(--primary)" />
+                <div>
+                  <h3 style={{ margin: 0 }}>Import Leads & Custom CSV Template</h3>
+                  <span className="text-dim font-sm">
+                    Upload any CSV, customize column mapping, or build a matching template
+                  </span>
                 </div>
-
-                {importResult && (
-                  <div
-                    role="status"
-                    style={{
-                      padding: '0.875rem 1rem',
-                      borderRadius: 'var(--radius-md)',
-                      backgroundColor: 'var(--bg-surface-elevated)',
-                      border: '1px solid var(--border-subtle)',
-                      fontSize: '0.875rem',
-                      color: 'var(--text-main)',
-                    }}
-                  >
-                    <strong>
-                      Imported {importResult.imported} of {importResult.total} lead(s).
-                      {importResult.skipped > 0 && ` ${importResult.skipped} row(s) skipped.`}
-                    </strong>
-                    {importResult.errors?.length > 0 && (
-                      <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', color: 'var(--danger)', fontSize: '0.8125rem' }}>
-                        {importResult.errors.map((rowErr, i) => (
-                          <li key={`${rowErr.row}-${i}`}>
-                            Row {rowErr.row}: {rowErr.message}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
               </div>
-              <div className="modal-footer">
-                <button type="button" className="btn btn-secondary" onClick={() => setImportModalOpen(false)}>
-                  Cancel
+              <button
+                className="modal-close-btn"
+                onClick={() => setImportModalOpen(false)}
+                aria-label="Close dialog"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Segmented Mode Switcher */}
+            <div style={{ padding: '0.75rem 1.5rem 0', backgroundColor: 'var(--bg-surface)' }}>
+              <div className="import-mode-switch">
+                <button
+                  type="button"
+                  className={`import-mode-btn ${importActiveTab === 'upload' ? 'active' : ''}`}
+                  onClick={() => setImportActiveTab('upload')}
+                >
+                  <UploadCloud size={16} />
+                  <span>Upload & Map CSV {selectedFile ? `(${selectedFile.name})` : ''}</span>
                 </button>
                 <button
-                  type="submit"
-                  className="btn btn-primary"
-                  disabled={importing || !selectedFile}
+                  type="button"
+                  className={`import-mode-btn ${importActiveTab === 'builder' ? 'active' : ''}`}
+                  onClick={() => setImportActiveTab('builder')}
                 >
-                  {importing ? 'Processing File...' : 'Upload & Import Leads'}
+                  <SlidersHorizontal size={16} />
+                  <span>Customize CSV Template Builder</span>
                 </button>
               </div>
-            </form>
+            </div>
+
+            {importActiveTab === 'upload' ? (
+              <form onSubmit={handleImportSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                <div className="import-modal-body">
+                  {!selectedFile ? (
+                    <>
+                      <label
+                        htmlFor="csv-file-input"
+                        className="import-drop-zone"
+                        role="button"
+                        tabIndex={0}
+                        aria-label="Select a CSV file to import"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            document.getElementById('csv-file-input').click();
+                          }
+                        }}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          if (e.dataTransfer.files?.[0]) handleImportFile(e.dataTransfer.files[0]);
+                        }}
+                      >
+                        <FileSpreadsheet size={40} className="import-drop-icon" />
+                        <div>
+                          <strong className="text-main" style={{ display: 'block', fontSize: '1rem', marginBottom: '0.25rem' }}>
+                            Click to browse or drag & drop any CSV spreadsheet
+                          </strong>
+                          <span className="text-dim font-sm">
+                            Any column format supported. You can customize column mapping and preview data before importing. (Max 10MB)
+                          </span>
+                        </div>
+                        <input
+                          id="csv-file-input"
+                          type="file"
+                          accept=".csv"
+                          style={{ display: 'none' }}
+                          onChange={(e) => {
+                            handleImportFile(e.target.files?.[0]);
+                            e.target.value = '';
+                          }}
+                        />
+                      </label>
+
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.75rem', marginTop: '0.25rem' }}>
+                        <div
+                          className="import-template-download"
+                          role="button"
+                          tabIndex={0}
+                          aria-label="Download standard sample CSV template"
+                          onClick={handleDownloadTemplate}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              handleDownloadTemplate();
+                            }
+                          }}
+                        >
+                          <Download size={14} />
+                          <span>Download Standard Sample Template</span>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="btn btn-secondary"
+                          style={{ fontSize: '0.8125rem', padding: '0.375rem 0.75rem' }}
+                          onClick={() => setImportActiveTab('builder')}
+                        >
+                          <SlidersHorizontal size={14} />
+                          <span>Build Custom CSV Template</span>
+                        </button>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Active File Banner */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '0.75rem 1rem',
+                          background: 'var(--bg-surface-elevated)',
+                          border: '1px solid var(--border-subtle)',
+                          borderRadius: 'var(--radius-md)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <FileSpreadsheet size={24} color="var(--primary)" />
+                          <div>
+                            <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.9375rem' }}>
+                              {selectedFile.name}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                              {(selectedFile.size / 1024).toFixed(1)} KB • {csvTotalRows} data rows detected • {csvHeaders.length} columns found
+                            </div>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <label
+                            htmlFor="csv-file-input-reupload"
+                            className="btn btn-secondary"
+                            style={{ fontSize: '0.78125rem', padding: '0.3125rem 0.625rem', cursor: 'pointer', margin: 0 }}
+                          >
+                            Change File
+                            <input
+                              id="csv-file-input-reupload"
+                              type="file"
+                              accept=".csv"
+                              style={{ display: 'none' }}
+                              onChange={(e) => {
+                                handleImportFile(e.target.files?.[0]);
+                                e.target.value = '';
+                              }}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ fontSize: '0.78125rem', padding: '0.3125rem 0.625rem', color: 'var(--danger)' }}
+                            onClick={() => {
+                              setSelectedFile(null);
+                              setCsvHeaders([]);
+                              setCsvPreviewRows([]);
+                              setColumnMapping({});
+                              setImportResult(null);
+                            }}
+                          >
+                            Remove
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Matching Template Download & Mapping Actions Banner */}
+                      <div
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '0.75rem',
+                          padding: '0.75rem 1rem',
+                          backgroundColor: 'rgba(34, 197, 94, 0.08)',
+                          border: '1px solid rgba(34, 197, 94, 0.25)',
+                          borderRadius: 'var(--radius-md)',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.84375rem' }}>
+                            Need this exact format for future uploads?
+                          </div>
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                            Download a blank CSV template matching your file's columns and mapping.
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ fontSize: '0.78125rem', padding: '0.375rem 0.75rem' }}
+                            onClick={() => setShowAddFieldModal(!showAddFieldModal)}
+                          >
+                            <Plus size={13} />
+                            <span>Add CRM Field</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-secondary"
+                            style={{ fontSize: '0.78125rem', padding: '0.375rem 0.75rem' }}
+                            onClick={handleResetMapping}
+                            title="Re-run auto heuristic detection for columns"
+                          >
+                            <RefreshCw size={13} />
+                            <span>Reset Auto-Mapping</span>
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-primary"
+                            style={{ fontSize: '0.78125rem', padding: '0.375rem 0.75rem' }}
+                            onClick={handleDownloadMatchingTemplate}
+                          >
+                            <Download size={13} />
+                            <span>Download Template Matching This CSV</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {showAddFieldModal && renderAddCrmFieldCard()}
+
+                      {/* Interactive Column Mapping Card */}
+                      <div className="import-card">
+                        <div className="import-card-header">
+                          <div className="import-card-title">
+                            <SlidersHorizontal size={16} color="var(--primary)" />
+                            <span>Customize Column Mapping</span>
+                            <span
+                              style={{
+                                fontSize: '0.75rem',
+                                padding: '0.125rem 0.5rem',
+                                borderRadius: '12px',
+                                backgroundColor: 'var(--primary-subtle)',
+                                color: 'var(--primary)',
+                                fontWeight: 600,
+                              }}
+                            >
+                              {Object.values(columnMapping).filter((v) => v && v !== 'skip').length} of {csvHeaders.length} columns imported
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '0.78125rem', color: 'var(--text-dim)' }}>
+                            Map each column to its CRM field or choose "Skip" to ignore.
+                          </span>
+                        </div>
+
+                        <div className="import-mapping-grid">
+                          {csvHeaders.map((header) => {
+                            const currentTarget = columnMapping[header] || 'skip';
+                            const isSkipped = currentTarget === 'skip';
+                            const sampleValue = csvPreviewRows[0]?.[header];
+
+                            return (
+                              <div
+                                key={header}
+                                className={`import-mapping-row ${isSkipped ? 'skipped' : ''}`}
+                              >
+                                <div className="import-source-col">
+                                  <span className="import-source-name" title={header}>
+                                    {header}
+                                  </span>
+                                  <span className="import-source-sample" title={sampleValue || 'Empty'}>
+                                    Sample: {sampleValue ? `"${sampleValue}"` : '(blank)'}
+                                  </span>
+                                </div>
+
+                                <div className="import-mapping-arrow">→</div>
+
+                                <div>
+                                  <select
+                                    className="import-target-select"
+                                    value={currentTarget}
+                                    onChange={(e) => handleColumnMapChange(header, e.target.value)}
+                                    aria-label={`Map CSV header ${header} to CRM field`}
+                                  >
+                                    {availableCrmFields.map((opt) => (
+                                      <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Default Fallback Settings */}
+                      <div
+                        style={{
+                          display: 'grid',
+                          gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                          gap: '0.75rem',
+                          padding: '0.75rem 1rem',
+                          background: 'var(--bg-surface-elevated)',
+                          border: '1px solid var(--border-subtle)',
+                          borderRadius: 'var(--radius-md)',
+                        }}
+                      >
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.78125rem', marginBottom: '0.25rem' }}>
+                            Default Stage (Fallback)
+                          </label>
+                          <select
+                            className="form-control"
+                            style={{ fontSize: '0.8125rem', padding: '0.375rem 0.625rem' }}
+                            value={defaultImportStage}
+                            onChange={(e) => setDefaultImportStage(e.target.value)}
+                          >
+                            <option value="">Auto / CSV specified</option>
+                            {stages.map((st) => (
+                              <option key={st.id} value={st.id}>
+                                {st.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="form-label" style={{ fontSize: '0.78125rem', marginBottom: '0.25rem' }}>
+                            Default Priority (Fallback)
+                          </label>
+                          <select
+                            className="form-control"
+                            style={{ fontSize: '0.8125rem', padding: '0.375rem 0.625rem' }}
+                            value={defaultImportPriority}
+                            onChange={(e) => setDefaultImportPriority(e.target.value)}
+                          >
+                            <option value="">MEDIUM (Default)</option>
+                            <option value="LOW">LOW</option>
+                            <option value="MEDIUM">MEDIUM</option>
+                            <option value="HIGH">HIGH</option>
+                            <option value="URGENT">URGENT</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Live Data Preview */}
+                      {csvPreviewRows.length > 0 && (
+                        <div className="import-card">
+                          <div className="import-card-header" style={{ marginBottom: '0.5rem' }}>
+                            <div className="import-card-title">
+                              <Table size={16} color="var(--primary)" />
+                              <span>Live Preview ({csvPreviewRows.length} sample rows)</span>
+                            </div>
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ fontSize: '0.75rem', padding: '0.25rem 0.5rem' }}
+                              onClick={() => setShowPreviewTable(!showPreviewTable)}
+                            >
+                              {showPreviewTable ? 'Collapse Preview' : 'Show Preview'}
+                            </button>
+                          </div>
+
+                          {showPreviewTable && (
+                            <div className="import-preview-wrapper">
+                              <table className="import-preview-table">
+                                <thead>
+                                  <tr>
+                                    {csvHeaders.map((header) => {
+                                      const target = columnMapping[header] || 'skip';
+                                      const isSkip = target === 'skip';
+                                      return (
+                                        <th key={header} style={{ opacity: isSkip ? 0.5 : 1 }}>
+                                          <div style={{ fontSize: '0.75rem', color: isSkip ? 'var(--text-dim)' : 'var(--primary)' }}>
+                                            {isSkip ? '🚫 Skip' : `→ ${target}`}
+                                          </div>
+                                          <div>{header}</div>
+                                        </th>
+                                      );
+                                    })}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {csvPreviewRows.map((row, idx) => (
+                                    <tr key={idx}>
+                                      {csvHeaders.map((header) => {
+                                        const isSkip = (columnMapping[header] || 'skip') === 'skip';
+                                        return (
+                                          <td
+                                            key={header}
+                                            style={{
+                                              opacity: isSkip ? 0.45 : 1,
+                                              textDecoration: isSkip ? 'line-through' : 'none',
+                                            }}
+                                          >
+                                            {row[header] || '—'}
+                                          </td>
+                                        );
+                                      })}
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Import Result / Error Warnings */}
+                      {importResult && (
+                        <div
+                          role="status"
+                          style={{
+                            padding: '0.875rem 1rem',
+                            borderRadius: 'var(--radius-md)',
+                            backgroundColor: 'var(--bg-surface-elevated)',
+                            border: `1px solid ${importResult.skipped > 0 ? 'var(--warning)' : 'var(--success)'}`,
+                            fontSize: '0.875rem',
+                            color: 'var(--text-main)',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600 }}>
+                            <CheckCircle2 size={16} color={importResult.skipped > 0 ? 'var(--warning)' : 'var(--success)'} />
+                            <span>
+                              Imported {importResult.imported} of {importResult.total} lead(s).
+                              {importResult.skipped > 0 && ` (${importResult.skipped} row(s) skipped)`}
+                            </span>
+                          </div>
+                          {importResult.errors?.length > 0 && (
+                            <ul style={{ margin: '0.5rem 0 0', paddingLeft: '1.25rem', color: 'var(--danger)', fontSize: '0.8125rem' }}>
+                              {importResult.errors.map((rowErr, i) => (
+                                <li key={`${rowErr.row}-${i}`}>
+                                  Row {rowErr.row}: {rowErr.message}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className="modal-footer" style={{ borderTop: '1px solid var(--border-subtle)', padding: '1rem 1.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => {
+                      setImportModalOpen(false);
+                      setSelectedFile(null);
+                      setCsvHeaders([]);
+                      setCsvPreviewRows([]);
+                      setColumnMapping({});
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary"
+                    disabled={importing || !selectedFile}
+                  >
+                    {importing ? (
+                      <>
+                        <RefreshCw size={14} className="spinning" />
+                        <span>Processing & Importing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <UploadCloud size={14} />
+                        <span>Upload & Import Leads</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            ) : (
+              /* Custom CSV Template Builder View */
+              <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+                <div className="import-modal-body">
+                  <div
+                    style={{
+                      padding: '0.875rem 1rem',
+                      background: 'var(--bg-surface-elevated)',
+                      border: '1px solid var(--border-subtle)',
+                      borderRadius: 'var(--radius-md)',
+                    }}
+                  >
+                    <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.9375rem', marginBottom: '0.25rem' }}>
+                      Tailor Your Leads CSV Template
+                    </div>
+                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-dim)' }}>
+                      Select which fields you want in the spreadsheet, edit column header titles to match your existing files, and download a ready-to-fill template.
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ fontSize: '0.78125rem', padding: '0.3125rem 0.625rem' }}
+                        onClick={() => handleSelectAllTemplateFields(true)}
+                      >
+                        Select All
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-secondary"
+                        style={{ fontSize: '0.78125rem', padding: '0.3125rem 0.625rem' }}
+                        onClick={() => handleSelectAllTemplateFields(false)}
+                      >
+                        Deselect All
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary"
+                        style={{ fontSize: '0.78125rem', padding: '0.3125rem 0.75rem' }}
+                        onClick={() => setShowAddFieldModal(!showAddFieldModal)}
+                      >
+                        <Plus size={13} />
+                        <span>Add CRM Field</span>
+                      </button>
+                    </div>
+
+                    <span style={{ fontSize: '0.8125rem', color: 'var(--text-dim)' }}>
+                      {templateFields.filter((f) => f.enabled).length} of {templateFields.length} fields active
+                    </span>
+                  </div>
+
+                  {showAddFieldModal && renderAddCrmFieldCard()}
+
+                  <div className="import-card" style={{ padding: 0, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '28px 1.1fr 1.2fr 1fr 36px',
+                        gap: '0.75rem',
+                        padding: '0.625rem 0.875rem',
+                        backgroundColor: 'var(--bg-surface)',
+                        borderBottom: '1px solid var(--border-subtle)',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        color: 'var(--text-dim)',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                      }}
+                    >
+                      <div></div>
+                      <div>CRM Field</div>
+                      <div>Custom Header in CSV</div>
+                      <div>Sample Value</div>
+                      <div></div>
+                    </div>
+
+                    {templateFields.map((f) => (
+                      <div key={f.key} className="import-template-builder-row">
+                        <input
+                          type="checkbox"
+                          checked={f.enabled}
+                          onChange={() => handleToggleTemplateField(f.key)}
+                          id={`tpl-field-${f.key}`}
+                          style={{ cursor: 'pointer', width: '16px', height: '16px' }}
+                        />
+                        <label
+                          htmlFor={`tpl-field-${f.key}`}
+                          style={{
+                            fontSize: '0.84375rem',
+                            fontWeight: 600,
+                            color: f.enabled ? 'var(--text-main)' : 'var(--text-dim)',
+                            cursor: 'pointer',
+                            margin: 0,
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.375rem',
+                          }}
+                        >
+                          <span>{f.label}</span>
+                          {f.isCustom && (
+                            <span
+                              style={{
+                                fontSize: '0.6875rem',
+                                padding: '0.0625rem 0.375rem',
+                                borderRadius: '4px',
+                                backgroundColor: 'var(--primary-subtle)',
+                                color: 'var(--primary)',
+                                fontWeight: 700,
+                              }}
+                            >
+                              Custom
+                            </span>
+                          )}
+                        </label>
+                        <div>
+                          <input
+                            type="text"
+                            className="form-control"
+                            style={{
+                              fontSize: '0.8125rem',
+                              padding: '0.3125rem 0.5rem',
+                              height: '32px',
+                              opacity: f.enabled ? 1 : 0.5,
+                            }}
+                            value={f.customHeader}
+                            disabled={!f.enabled}
+                            onChange={(e) => handleUpdateTemplateHeader(f.key, e.target.value)}
+                            placeholder="Header title in CSV"
+                          />
+                        </div>
+                        <div
+                          style={{
+                            fontSize: '0.78125rem',
+                            color: 'var(--text-dim)',
+                            whiteSpace: 'nowrap',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                          }}
+                        >
+                          "{f.sample}"
+                        </div>
+                        <div>
+                          {f.isCustom ? (
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCustomField(f.key)}
+                              title={`Remove custom field ${f.label}`}
+                              style={{
+                                color: 'var(--danger)',
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                padding: '0.25rem',
+                              }}
+                            >
+                              <Trash2 size={15} />
+                            </button>
+                          ) : (
+                            <div style={{ width: '20px' }}></div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+
+                    <div style={{ padding: '0.625rem 0.875rem', backgroundColor: 'var(--bg-surface)', borderTop: '1px solid var(--border-subtle)' }}>
+                      <button
+                        type="button"
+                        onClick={() => setShowAddFieldModal(true)}
+                        style={{
+                          width: '100%',
+                          padding: '0.5rem 0.75rem',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px dashed var(--border-strong)',
+                          background: 'transparent',
+                          color: 'var(--primary)',
+                          fontSize: '0.8125rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '0.375rem',
+                        }}
+                      >
+                        <Plus size={14} />
+                        <span>Add Another CRM Field to Template</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="modal-footer" style={{ borderTop: '1px solid var(--border-subtle)', padding: '1rem 1.5rem' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    onClick={() => setImportActiveTab('upload')}
+                  >
+                    Back to Upload
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleDownloadCustomBuilderTemplate}
+                    disabled={templateFields.filter((f) => f.enabled).length === 0}
+                  >
+                    <Download size={14} />
+                    <span>Download Tailored CSV Template</span>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

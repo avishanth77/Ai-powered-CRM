@@ -200,9 +200,14 @@ export const PldAssessmentTest = ({
               <p className="text-muted" style={{ marginBottom: '0.75rem' }}>
                 There are no active PLD problems configured for {currentStageObj?.name || 'this stage'} yet.
               </p>
-              <p className="text-dim font-sm">
+              <p className="text-dim font-sm" style={{ marginBottom: '1.25rem' }}>
                 Ask an Admin to configure {currentStageObj?.name || 'PLD'} problems in Settings → PLD Engine.
               </p>
+              <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                <a href="/settings" className="btn btn-secondary btn-sm" onClick={() => onClose()}>
+                  Open PLD Settings
+                </a>
+              </div>
             </div>
           </div>
         ) : result ? (
@@ -303,6 +308,15 @@ export const PldAssessmentTest = ({
               </button>
             </div>
           </form>
+        )}
+
+        {noProblems && (
+          <div className="modal-footer" style={{ justifyContent: 'flex-end' }}>
+            <button type="button" className="btn btn-secondary" onClick={onClose}>
+              <ArrowLeft size={15} />
+              <span>Close</span>
+            </button>
+          </div>
         )}
 
         {result && (

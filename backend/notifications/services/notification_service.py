@@ -505,18 +505,3 @@ class NotificationService:
                         actor=None,
                         allow_self=True
                     )
-
-        # 4. Fallback welcome notification if user has zero notifications
-        if not Notification.objects.filter(recipient=user).exists():
-            cls.create_notification(
-                recipient=user,
-                notification_type=Notification.NotificationType.SYSTEM,
-                title="Welcome to CRM Lite Notification Center",
-                message="Stay informed about lead assignments, scheduled calendar events, overdue tasks, and team mentions here.",
-                entity_type='system',
-                entity_id='welcome',
-                action_url='/notifications',
-                priority=Notification.Priority.NORMAL,
-                actor=None,
-                allow_self=True
-            )

@@ -103,11 +103,14 @@ export const Notifications = () => {
 
   const handleDelete = async (id) => {
     try {
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      setTotalCount((prev) => Math.max(0, prev - 1));
       await notificationApi.deleteNotification(id);
       showToast('Notification deleted', 'info');
       fetchNotifications();
     } catch (err) {
       showToast('Failed to delete notification', 'error');
+      fetchNotifications();
     }
   };
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { customerApi } from '../api/customerApi';
-import { formatDate } from '../utils/formatters';
+import { formatDate, formatCurrency } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
 import { useToast } from '../context/ToastContext';
 import { LoadingSpinner } from '../components/LoadingSpinner';
@@ -13,6 +13,8 @@ import {
   User,
   MapPin,
   ExternalLink,
+  Package,
+  CheckCircle2,
 } from 'lucide-react';
 
 export const CustomerDetails = () => {
@@ -151,6 +153,62 @@ export const CustomerDetails = () => {
             </div>
           )}
         </div>
+      </div>
+
+      {/* Purchased Products & Subscriptions */}
+      <div className="card" style={{ maxWidth: '720px', marginTop: '1.25rem' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '1rem' }}>
+          <h3 style={{ fontSize: '1.125rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <Package size={18} className="text-primary" />
+            <span>Purchased Products & Subscriptions</span>
+          </h3>
+          <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', borderRadius: '9999px', backgroundColor: 'rgba(99, 102, 241, 0.15)', color: 'var(--primary)', fontWeight: 600 }}>
+            {customer.products?.length || 0} Products
+          </span>
+        </div>
+
+        {customer.products && customer.products.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {customer.products.map((item, idx) => (
+              <div
+                key={item.id || idx}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  padding: '0.75rem 1rem',
+                  borderRadius: 'var(--radius-md)',
+                  backgroundColor: 'var(--bg-card-subtle)',
+                  border: '1px solid var(--border-subtle)',
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 600, color: 'var(--text-main)', fontSize: '0.95rem' }}>
+                    {item.name}
+                  </div>
+                  <div className="text-dim font-xs" style={{ display: 'flex', gap: '0.75rem', marginTop: '0.2rem' }}>
+                    <span>Code: {item.code}</span>
+                    {item.category && <span>• Category: {item.category}</span>}
+                    <span>• Qty: {item.quantity}</span>
+                  </div>
+                </div>
+
+                <div style={{ textAlign: 'right' }}>
+                  <div style={{ fontWeight: 700, fontSize: '1rem', color: 'var(--warning)', fontFamily: 'Outfit' }}>
+                    {formatCurrency(item.total_price || item.unit_price)}
+                  </div>
+                  <div className="text-dim font-xs">
+                    {formatCurrency(item.unit_price)} each
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="text-dim font-sm" style={{ fontStyle: 'italic', padding: '1rem 0', textAlign: 'center' }}>
+            No specific products recorded with this customer account.
+          </div>
+        )}
       </div>
     </div>
   );

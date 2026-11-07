@@ -18,76 +18,10 @@ def get_gate(stage):
 
 def check_gate(lead, stage):
     """
-    Return the list of unmet requirements for putting ``lead`` into ``stage``.
-
-    Each entry is ``{'code', 'message', ...}``. An empty list means the move is allowed.
+    Stage progression is governed by the Task-Based Progression System.
+    PLD problem assessments do not block stage transitions.
     """
-    gate = get_gate(stage)
-    if gate is None or not gate.has_requirements:
-        return []
-
-    # Moving to 'lost' is never blocked by PLD/ICP gates
-    if stage and (stage.slug == 'lost' or stage.name.lower() == 'lost'):
-        return []
-
-    from pld.models import PLDProblem
-
-    missing = []
-
-    if gate.require_icp_min_status:
-        current_rank = ICP_RANK.get(lead.icp_status, 0)
-        required_rank = ICP_RANK.get(gate.require_icp_min_status, 0)
-        if current_rank < required_rank:
-            required_label = ICP_LABELS.get(gate.require_icp_min_status, gate.require_icp_min_status)
-            missing.append({
-                'code': 'icp_status',
-                'message': f"ICP fit must be at least '{required_label}' (currently "
-                           f"'{lead.get_icp_status_display()}').",
-            })
-
-    has_stage_specific_problems = PLDProblem.objects.filter(is_active=True, stage=stage).exists()
-
-    if gate.require_pld_qualified:
-        stage_assessment = (
-            lead.pld_assessments.filter(stage=stage).order_by('-assessed_at', '-id').first()
-            if getattr(lead, 'pk', None) else None
-        )
-        is_qualified = False
-        if stage_assessment:
-            is_qualified = (stage_assessment.pld_status == PLDStatus.QUALIFIED_PLD)
-        elif not has_stage_specific_problems:
-            # Fallback to legacy/unassigned assessment if this stage has no dedicated questions
-            fallback = (
-                lead.pld_assessments.filter(stage__isnull=True).order_by('-assessed_at', '-id').first()
-                if getattr(lead, 'pk', None) else None
-            )
-            is_qualified = (fallback and fallback.pld_status == PLDStatus.QUALIFIED_PLD) or (lead.pld_status == PLDStatus.QUALIFIED_PLD)
-
-        if not is_qualified:
-            missing.append({
-                'code': 'pld_status',
-                'message': f"Lead must qualify the PLD assessment for '{stage.name}' before entering this stage.",
-                'stage_id': stage.id,
-                'stage_name': stage.name,
-            })
-
-    if gate.require_problems_assessed:
-        has_assessment = False
-        if getattr(lead, 'pk', None):
-            if lead.pld_assessments.filter(stage=stage).exists():
-                has_assessment = True
-            elif not has_stage_specific_problems:
-                has_assessment = lead.pld_assessments.exists()
-
-        if not has_assessment:
-            missing.append({
-                'code': 'pld_assessment',
-                'message': f"A PLD assessment for '{stage.name}' must be completed for this lead first.",
-                'stage_id': stage.id,
-                'stage_name': stage.name,
-            })
-
-    return missing
+    return []
 
 
 def _gate_dict(gate, lead=None):

@@ -139,3 +139,18 @@ export const PLD_ICP_MIN_OPTIONS = [
   { value: 'STRONG_ICP_FIT', label: 'Strong ICP Fit' },
 ];
 
+
+export const ASSIGNEE_STRATEGIES = [
+  { value: 'LEAD_OWNER', label: 'Lead Owner / Assigned Rep', description: 'Assign to the sales rep currently assigned to the lead' },
+  { value: 'SPECIFIC_USER', label: 'Specific User', description: 'Always assign to a designated team member' },
+  { value: 'ROUND_ROBIN', label: 'Round Robin Pool', description: 'Rotate assignments fairly across selected team members' },
+  { value: 'STAGE_MOVER', label: 'User Moving Stage', description: 'Assign to whichever user moved the lead into this stage' },
+  { value: 'LEAD_CREATOR', label: 'Lead Creator', description: 'Assign to the person who originally created the lead' },
+];
+
+export const DUE_OFFSET_UNITS = [
+  { value: 'MINUTES', label: 'Minutes' },
+  { value: 'HOURS', label: 'Hours' },
+  { value: 'DAYS', label: 'Days' },
+  { value: 'WEEKS', label: 'Weeks' },
+];

@@ -257,3 +257,4 @@ export const FormattedChatMessage = ({ content, inline = false }) => {
 };
 
 export default FormattedChatMessage;
+

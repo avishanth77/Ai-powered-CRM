@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'icp',
     'pld',
     'ai',
+    'products',
 ]
 
 MIDDLEWARE = [
@@ -158,8 +159,11 @@ REST_FRAMEWORK = {
 }
 
 # SimpleJWT Settings
-access_mins = int(os.getenv('JWT_ACCESS_LIFETIME_MINUTES', 60))
-refresh_days = int(os.getenv('JWT_REFRESH_LIFETIME_DAYS', 7))
+raw_access = os.getenv('JWT_ACCESS_LIFETIME_MINUTES')
+access_mins = int(raw_access) if raw_access and raw_access.strip().isdigit() else 60
+
+raw_refresh = os.getenv('JWT_REFRESH_LIFETIME_DAYS')
+refresh_days = int(raw_refresh) if raw_refresh and raw_refresh.strip().isdigit() else 7
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=access_mins),

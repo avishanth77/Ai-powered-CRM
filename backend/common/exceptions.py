@@ -16,7 +16,7 @@ def custom_exception_handler(exc, context):
             if 'detail' in response.data:
                 message = str(response.data['detail'])
                 # If there are other keys
-                errors = {k: v for k, v in response.data.items() if k != 'detail'}
+                errors = {k             : v for k, v in response.data.items() if k != 'detail'}
                 if not errors:
                     errors = {'detail': [message]}
             else:
@@ -40,6 +40,10 @@ def custom_exception_handler(exc, context):
             'message': message,
             'errors': errors
         }
+        if isinstance(response.data, dict):
+            for meta_key in ('missing', 'missing_tasks', 'missing_codes', 'missing_messages', 'missing_details', 'progression_blocked', 'current_stage_id', 'current_stage_name', 'target_stage_id', 'target_stage_name'):
+                if meta_key in response.data:
+                    custom_data[meta_key] = response.data[meta_key]
         response.data = custom_data
         return response
 

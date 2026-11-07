@@ -8,11 +8,16 @@ import { LEAD_STATUS_CONFIG } from '../utils/constants';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import { PriorityBadge } from '../components/PriorityBadge';
 import { LostReasonModal } from '../components/LostReasonModal';
-import { PldAssessmentTest } from '../components/PldAssessmentTest';
-import { Kanban, Plus, ChevronLeft, ChevronRight, LayoutGrid, GripVertical } from 'lucide-react';
+import StageTaskCheckpointModal from '../components/StageTaskCheckpointModal';
+import StageTransitionModal from '../components/StageTransitionModal';
+import WinProbabilityFunnel from '../components/WinProbabilityFunnel';
+import { productApi } from '../api/productApi';
+import { useAuth } from '../context/AuthContext';
+import { Kanban, Plus, ChevronLeft, ChevronRight, LayoutGrid, GripVertical, TrendingUp, Package, Filter } from 'lucide-react';
 
 export const Pipeline = () => {
   const { showToast } = useToast();
+  const { isManagerOrAdmin } = useAuth();
 
   const [pipelineData, setPipelineData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -20,7 +25,12 @@ export const Pipeline = () => {
   const [movingLeadId, setMovingLeadId] = useState(null);
   const [lostModalData, setLostModalData] = useState(null);
   const [lostSubmitting, setLostSubmitting] = useState(false);
-  const [pldModalData, setPldModalData] = useState(null);
+  const [checkpointModalData, setCheckpointModalData] = useState(null);
+  const [transitionModalData, setTransitionModalData] = useState(null);
+  const [transitionSubmitting, setTransitionSubmitting] = useState(false);
+  const [viewMode, setViewMode] = useState('board'); // 'board' | 'funnel'
+  const [productFilter, setProductFilter] = useState('');
+  const [availableProducts, setAvailableProducts] = useState([]);
 
   // Drag and Drop state & refs
   const [draggedLead, setDraggedLead] = useState(null);
@@ -50,11 +60,13 @@ export const Pipeline = () => {
       ? allStages.slice(midpoint)
       : allStages;
 
-  const fetchPipeline = async () => {
+  const fetchPipeline = async (prodId = productFilter) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await leadApi.getPipeline();
+      const params = {};
+      if (prodId) params.product = prodId;
+      const res = await leadApi.getPipeline(params);
       if (res.success && res.data) {
         setPipelineData(res.data);
         setColumnPages({});
@@ -70,14 +82,21 @@ export const Pipeline = () => {
   };
 
   useEffect(() => {
-    fetchPipeline();
+    productApi
+      .getSimpleProducts()
+      .then((data) => setAvailableProducts(Array.isArray(data) ? data : []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    fetchPipeline(productFilter);
     return () => {
       if (autoScrollRef.current) cancelAnimationFrame(autoScrollRef.current);
       if (pageFlipTimeoutRef.current) clearTimeout(pageFlipTimeoutRef.current);
     };
-  }, []);
+  }, [productFilter]);
 
-  const handleMoveStage = async (leadId, targetStage, sourceStage = null) => {
+  const handleMoveStage = (leadId, targetStage, sourceStage = null) => {
     if (!targetStage) return;
 
     // Find current stage if not provided
@@ -92,114 +111,140 @@ export const Pipeline = () => {
 
     if (sourceStage === targetStage) return;
 
+    let leadObj = null;
+    if (pipelineData) {
+      for (const col of Object.values(pipelineData)) {
+        const found = col.leads?.find((l) => l.id === leadId);
+        if (found) {
+          leadObj = found;
+          break;
+        }
+      }
+    }
+
     const targetStageObj = pipelineData ? pipelineData[targetStage] : null;
     const targetStageId = targetStageObj?.id;
+    const sourceStageObj = pipelineData && sourceStage ? pipelineData[sourceStage] : null;
+
     const isLost =
       targetStage === 'lost' ||
       targetStageObj?.label?.toLowerCase() === 'lost';
 
     if (isLost) {
-      let leadName = '';
-      if (pipelineData) {
-        for (const col of Object.values(pipelineData)) {
-          const found = col.leads?.find((l) => l.id === leadId);
-          if (found) {
-            leadName = found.name;
-            break;
-          }
-        }
-      }
-      setLostModalData({
-        leadId,
-        leadName,
-        targetStage,
-        targetStageId,
-        sourceStage,
+      // Mark as Lost directly opens transition modal with 0% win prob and lost reason
+      setTransitionModalData({
+        lead: leadObj || { id: leadId, name: `Lead #${leadId}` },
+        sourceStage: sourceStageObj?.label || sourceStage,
+        targetStage: {
+          id: targetStageId,
+          name: targetStageObj?.label || targetStage,
+          slug: targetStage,
+          color: targetStageObj?.color,
+          win_probability: 0,
+          win_probability_reason: '',
+        },
+        targetStageKey: targetStage,
+        sourceStageKey: sourceStage,
       });
       return;
     }
 
-    // Optimistic UI update for instant, responsive feel
-    const previousData = pipelineData ? JSON.parse(JSON.stringify(pipelineData)) : null;
-    if (pipelineData && sourceStage) {
-      const nextData = { ...pipelineData };
-      let movedLeadObj = null;
+    // Step 1: Open Stage Progression Checkpoint FIRST!
+    setCheckpointModalData({
+      lead: leadObj || { id: leadId, name: `Lead #${leadId}`, stage: { id: sourceStage, name: sourceStage } },
+      sourceStage: sourceStageObj?.label || sourceStage,
+      targetStage: {
+        id: targetStageId,
+        name: targetStageObj?.label || targetStage,
+        slug: targetStage,
+        color: targetStageObj?.color,
+        win_probability: targetStageObj?.win_probability,
+        win_probability_reason: targetStageObj?.win_probability_reason,
+      },
+      targetStageKey: targetStage,
+      sourceStageKey: sourceStage,
+    });
+  };
 
-      if (nextData[sourceStage]) {
-        const sourceLeads = [...nextData[sourceStage].leads];
-        const idx = sourceLeads.findIndex((l) => l.id === leadId);
-        if (idx !== -1) {
-          movedLeadObj = { ...sourceLeads[idx], status: targetStage };
-          sourceLeads.splice(idx, 1);
-          nextData[sourceStage] = {
-            ...nextData[sourceStage],
-            leads: sourceLeads,
-            count: Math.max(0, nextData[sourceStage].count - 1),
-          };
-        }
-      }
+  const handleProceedFromCheckpoint = ({ lead, targetStage, sourceStage }) => {
+    const targetStageKey = checkpointModalData?.targetStageKey || targetStage?.slug || targetStage?.name;
+    const sourceStageKey = checkpointModalData?.sourceStageKey || sourceStage;
+    setCheckpointModalData(null);
+    setTransitionModalData({
+      lead,
+      sourceStage: sourceStage || checkpointModalData?.sourceStage,
+      targetStage,
+      targetStageKey,
+      sourceStageKey,
+    });
+  };
 
-      if (movedLeadObj && nextData[targetStage]) {
-        const targetLeads = [movedLeadObj, ...nextData[targetStage].leads];
-        nextData[targetStage] = {
-          ...nextData[targetStage],
-          leads: targetLeads,
-          count: nextData[targetStage].count + 1,
-        };
-        setPipelineData(nextData);
-      }
-    }
+  const handleConfirmTransition = async ({ targetStage, winProbability, winProbabilityReason, lostReason }) => {
+    if (!transitionModalData) return;
+    const { lead, targetStageKey } = transitionModalData;
+    const leadId = lead.id;
+    const targetStageId = targetStage.id;
+    const isLost =
+      targetStageKey === 'lost' ||
+      targetStage.slug === 'lost' ||
+      targetStage.name?.toLowerCase() === 'lost';
 
+    setTransitionSubmitting(true);
     setMovingLeadId(leadId);
+
     try {
-      await leadApi.updateLead(leadId, {
+      const payload = {
         stage: targetStageId || undefined,
-        status: targetStage,
-      });
+        status: targetStageKey,
+        win_probability_override: winProbability,
+        win_probability_reason: winProbabilityReason,
+      };
+      if (isLost && lostReason) {
+        payload.lost_reason = lostReason;
+      }
+
+      const updateRes = await leadApi.updateLead(leadId, payload);
+      const autoCount = updateRes?.automated_tasks?.length || 0;
       showToast(
-        `Lead moved to ${targetStageObj?.label || targetStage}`,
+        `Lead moved to ${targetStage.name}${autoCount > 0 ? ` (${autoCount} automated task${autoCount > 1 ? 's' : ''} assigned)` : ''}`,
         'success'
       );
-      // Fetch latest data to synchronize counts and values
+      setTransitionModalData(null);
       fetchPipeline();
     } catch (err) {
-      // Revert optimistic update on failure
-      if (previousData) {
-        setPipelineData(previousData);
-      }
       const errData = err.response?.data;
-      const missingList = errData?.missing || errData?.missing_codes || [];
-      const hasPldMissing =
-        missingList.includes('pld_status') ||
-        missingList.includes('pld_assessment') ||
-        Boolean(errData?.missing_details?.some((m) => m.code === 'pld_status' || m.code === 'pld_assessment'));
+      const missingList =
+        errData?.missing ||
+        errData?.errors?.missing ||
+        errData?.missing_codes ||
+        errData?.errors?.missing_codes ||
+        [];
+      const errorMsg = String(errData?.message || errData?.errors?.stage || '');
+      const hasStageTasksMissing =
+        missingList.includes('mandatory_tasks') ||
+        Boolean(errData?.missing_tasks?.length) ||
+        errorMsg.toLowerCase().includes('mandatory task') ||
+        errorMsg.toLowerCase().includes('manager approval') ||
+        Boolean(errData?.manager_approval_required);
 
-      if (hasPldMissing) {
-        let leadObj = null;
-        if (pipelineData) {
-          for (const col of Object.values(pipelineData)) {
-            const found = col.leads?.find((l) => l.id === leadId);
-            if (found) {
-              leadObj = found;
-              break;
-            }
-          }
-        }
-        showToast(
-          `Stage "${targetStageObj?.label || targetStage}" requires qualifying its PLD assessment first. Please complete the assessment below.`,
-          'warning'
-        );
-        setPldModalData({
-          leadId,
-          leadName: leadObj?.name || `Lead #${leadId}`,
-          companyName: leadObj?.company_name || '',
-          stageId: targetStageId,
-          stageName: targetStageObj?.label || targetStage,
+      if (hasStageTasksMissing) {
+        setTransitionModalData(null);
+        setCheckpointModalData({
+          lead: lead,
+          targetStage: {
+            id: targetStageId,
+            name: targetStage.name,
+            win_probability: winProbability,
+            win_probability_reason: winProbabilityReason,
+          },
+          missingTasks: errData?.missing_tasks || [],
+          errorMessage: errorMsg,
         });
       } else {
         showToast(extractErrorMessage(err, 'Move failed'), 'error');
       }
     } finally {
+      setTransitionSubmitting(false);
       setMovingLeadId(null);
     }
   };
@@ -423,7 +468,67 @@ export const Pipeline = () => {
             Visualize and transition deal progress across all stages
           </p>
         </div>
-        <div className="page-actions">
+        <div className="page-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0.2rem 0.5rem' }}>
+            <Package size={14} className="text-primary" />
+            <select
+              value={productFilter}
+              onChange={(e) => setProductFilter(e.target.value)}
+              style={{
+                background: 'transparent',
+                border: 'none',
+                color: 'var(--text-main)',
+                fontSize: '0.8125rem',
+                outline: 'none',
+                cursor: 'pointer',
+              }}
+              aria-label="Filter pipeline by product"
+            >
+              <option value="">All Products ({availableProducts.length})</option>
+              {availableProducts.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.code})
+                </option>
+              ))}
+            </select>
+            {productFilter && (
+              <button
+                type="button"
+                onClick={() => setProductFilter('')}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-dim)',
+                  cursor: 'pointer',
+                  fontSize: '0.75rem',
+                  padding: '0 2px',
+                }}
+                title="Clear product filter"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          <div className="filter-pills-group" style={{ margin: 0 }}>
+            <button
+              type="button"
+              className={`filter-pill-btn ${viewMode === 'board' ? 'active' : ''}`}
+              onClick={() => setViewMode('board')}
+            >
+              <Kanban size={13} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />
+              Kanban Board
+            </button>
+            <button
+              type="button"
+              className={`filter-pill-btn ${viewMode === 'funnel' ? 'active' : ''}`}
+              onClick={() => setViewMode('funnel')}
+            >
+              <TrendingUp size={13} style={{ marginRight: '4px', verticalAlign: 'text-bottom' }} />
+              Win Probability Funnel
+            </button>
+          </div>
+
           <Link to="/leads/create" className="btn btn-primary">
             <Plus size={18} />
             <span>Add Lead</span>
@@ -431,6 +536,12 @@ export const Pipeline = () => {
         </div>
       </div>
 
+      {viewMode === 'funnel' ? (
+        <div style={{ marginTop: '1rem' }}>
+          <WinProbabilityFunnel />
+        </div>
+      ) : (
+        <>
       {/* Stage Controls & Pagination Bar */}
       <div className="pipeline-controls-bar">
         <div className="pipeline-stage-pager">
@@ -630,9 +741,21 @@ export const Pipeline = () => {
                   fontSize: '0.75rem',
                   color: 'var(--text-dim)',
                   borderBottom: '1px solid rgba(255,255,255,0.04)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                 }}
               >
-                Value: <span className="text-main font-semibold">{formatCurrency(totalValue)}</span>
+                <div>
+                  Value: <span className="text-main font-semibold">{formatCurrency(totalValue)}</span>
+                </div>
+                <div
+                  className="funnel-prob-chip"
+                  style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem', cursor: 'help' }}
+                  title={stageConfig.win_probability_reason ? `${stageConfig.win_probability_reason}` : `Win probability: ${stageConfig.win_probability ?? 10}%`}
+                >
+                  🎯 {stageConfig.win_probability ?? 10}%
+                </div>
               </div>
 
               <div className="pipeline-cards-container">
@@ -674,6 +797,48 @@ export const Pipeline = () => {
                               <div className="pipeline-lead-company">
                                 {lead.company_name || 'Individual'}
                               </div>
+                              {lead.products && lead.products.length > 0 && (
+                                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '3px', marginTop: '0.3rem' }}>
+                                  {lead.products.slice(0, 2).map((p) => (
+                                    <span
+                                      key={p.id}
+                                      style={{
+                                        display: 'inline-flex',
+                                        alignItems: 'center',
+                                        gap: '2px',
+                                        fontSize: '0.65rem',
+                                        padding: '0.1rem 0.35rem',
+                                        borderRadius: '4px',
+                                        backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                        color: 'var(--primary)',
+                                        border: '1px solid rgba(99, 102, 241, 0.25)',
+                                        maxWidth: '120px',
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                      title={`${p.name} (${p.code}) - ${formatCurrency(p.unit_price)}`}
+                                    >
+                                      <Package size={9} />
+                                      {p.name}
+                                    </span>
+                                  ))}
+                                  {lead.products.length > 2 && (
+                                    <span
+                                      style={{
+                                        fontSize: '0.65rem',
+                                        padding: '0.1rem 0.3rem',
+                                        borderRadius: '4px',
+                                        backgroundColor: 'var(--bg-card-subtle)',
+                                        color: 'var(--text-dim)',
+                                      }}
+                                      title={lead.products.slice(2).map((p) => p.name).join(', ')}
+                                    >
+                                      +{lead.products.length - 2}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           </div>
                           <PriorityBadge priority={lead.priority} />
@@ -713,6 +878,51 @@ export const Pipeline = () => {
                             </select>
                           </div>
                         </div>
+
+                        {lead.stage_task_summary && (
+                          <div
+                            style={{
+                              marginTop: '0.5rem',
+                              paddingTop: '0.4rem',
+                              borderTop: '1px solid rgba(255,255,255,0.06)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              fontSize: '0.6875rem'
+                            }}
+                          >
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.25rem',
+                                fontWeight: 600,
+                                padding: '0.125rem 0.4rem',
+                                borderRadius: '9999px',
+                                backgroundColor: lead.stage_task_summary.can_progress ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)',
+                                color: lead.stage_task_summary.can_progress ? '#10b981' : '#f59e0b',
+                                border: `1px solid ${lead.stage_task_summary.can_progress ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.3)'}`
+                              }}
+                            >
+                              {lead.stage_task_summary.can_progress ? '✓ Ready' : '⏳ Tasks Pending'}
+                            </span>
+                            <Link
+                              to={`/leads/${lead.id}?tab=stage-tasks`}
+                              onClick={(e) => e.stopPropagation()}
+                              style={{
+                                color: 'var(--primary)',
+                                textDecoration: 'none',
+                                fontWeight: 600,
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '2px',
+                              }}
+                              title="Click to view stage tasks for this deal"
+                            >
+                              {lead.stage_task_summary.completed_mandatory_tasks}/{lead.stage_task_summary.mandatory_tasks} Tasks →
+                            </Link>
+                          </div>
+                        )}
                       </div>
                     );
                   })
@@ -756,6 +966,8 @@ export const Pipeline = () => {
         })}
         </div>
       </div>
+        </>
+      )}
 
       {/* In-App Lost Reason Modal */}
       <LostReasonModal
@@ -766,34 +978,50 @@ export const Pipeline = () => {
         onCancel={handleCancelLost}
       />
 
-      {/* Stage-Specific PLD Assessment Modal */}
-      {pldModalData && (
-        <PldAssessmentTest
-          isOpen={Boolean(pldModalData)}
-          leadId={pldModalData.leadId}
-          leadName={pldModalData.leadName}
-          companyName={pldModalData.companyName}
-          initialStageId={pldModalData.stageId}
-          stages={Object.entries(pipelineData || {}).map(([key, col]) => ({
-            id: col.id,
-            name: col.label || key,
-            slug: key,
-          }))}
-          onClose={() => setPldModalData(null)}
-          onCompleted={() => {
+      {/* Step 1: Stage Task Checkpoint Modal */}
+      {checkpointModalData && (
+        <StageTaskCheckpointModal
+          isOpen={Boolean(checkpointModalData)}
+          onClose={() => setCheckpointModalData(null)}
+          lead={checkpointModalData.lead}
+          targetStage={checkpointModalData.targetStage}
+          sourceStage={checkpointModalData.sourceStage}
+          missingTasks={checkpointModalData.missingTasks}
+          errorMessage={checkpointModalData.errorMessage}
+          isManagerOrAdmin={isManagerOrAdmin}
+          onProceedToWinProbability={handleProceedFromCheckpoint}
+          onAdvanceSuccess={() => {
+            showToast(`Lead advanced to ${checkpointModalData.targetStage?.name || 'next stage'} successfully!`, 'success');
+            setCheckpointModalData(null);
             fetchPipeline();
           }}
-          onMoveStage={async (targetStageId) => {
-            const currentLeadId = pldModalData?.leadId;
-            setPldModalData(null);
-            if (!currentLeadId) return;
-            try {
-              await leadApi.updateLead(currentLeadId, { stage: targetStageId });
-              showToast('Lead qualified and moved to target stage!', 'success');
-              fetchPipeline();
-            } catch (e) {
-              showToast(extractErrorMessage(e, 'Stage move failed'), 'error');
+        />
+      )}
+
+      {/* Step 2: Stage Transition & Win Probability Modal */}
+      {transitionModalData && (
+        <StageTransitionModal
+          isOpen={Boolean(transitionModalData)}
+          lead={transitionModalData.lead}
+          sourceStage={transitionModalData.sourceStage}
+          targetStage={transitionModalData.targetStage}
+          loading={transitionSubmitting}
+          onConfirm={handleConfirmTransition}
+          onCancel={() => setTransitionModalData(null)}
+          onBack={() => {
+            if (transitionModalData.targetStageKey === 'lost') {
+              setTransitionModalData(null);
+              return;
             }
+            const prev = transitionModalData;
+            setTransitionModalData(null);
+            setCheckpointModalData({
+              lead: prev.lead,
+              targetStage: prev.targetStage,
+              sourceStage: prev.sourceStage,
+              targetStageKey: prev.targetStageKey,
+              sourceStageKey: prev.sourceStageKey,
+            });
           }}
         />
       )}

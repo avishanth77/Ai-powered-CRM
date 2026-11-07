@@ -44,6 +44,8 @@ import './styles/calendar.css';
 import './styles/ai.css';
 import './styles/icp.css';
 import './styles/pld.css';
+import './styles/stage_tasks.css';
+import './styles/funnel.css';
 
 
 const AppLayout = () => {

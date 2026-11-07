@@ -343,6 +343,19 @@ class PLDGateTests(PLDTestBase):
     def make_gate(self, stage, **kwargs):
         return PLDStageGate.objects.create(stage=stage, **kwargs)
 
+    def test_gate_allows_move_when_no_pld_problems_configured(self):
+        # When 0 active problems are configured in the system, stage moves must be allowed
+        self.make_gate(self.stage_contacted, require_pld_qualified=True, require_problems_assessed=True)
+        self.login(self.sales)
+
+        response = self.client.patch(
+            reverse('lead-detail', args=[self.lead.id]),
+            {'stage': self.stage_contacted.id}, format='json',
+        )
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.lead.refresh_from_db()
+        self.assertEqual(self.lead.stage_id, self.stage_contacted.id)
+
     def test_ungated_stage_moves_freely(self):
         self.login(self.sales)
         response = self.client.patch(
@@ -354,6 +367,7 @@ class PLDGateTests(PLDTestBase):
         self.assertEqual(self.lead.stage_id, self.stage_contacted.id)
 
     def test_gate_blocks_move_when_pld_not_qualified(self):
+        self.make_pool()
         self.make_gate(self.stage_contacted, require_pld_qualified=True)
         self.login(self.sales)
 
@@ -400,6 +414,7 @@ class PLDGateTests(PLDTestBase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_assessment_gate_blocks_when_never_assessed(self):
+        a, _, _ = self.make_pool()
         self.make_gate(self.stage_contacted, require_problems_assessed=True)
         self.login(self.sales)
 
@@ -410,7 +425,6 @@ class PLDGateTests(PLDTestBase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn('pld_assessment', response.data['errors']['missing'])
 
-        a, _, _ = self.make_pool()
         submit_assessment(self.lead, self.sales, [a.id])
         response = self.client.patch(
             reverse('lead-detail', args=[self.lead.id]),
@@ -431,6 +445,7 @@ class PLDGateTests(PLDTestBase):
         self.assertEqual(created.stage_id, self.stage_contacted.id)
 
     def test_gate_still_blocks_moving_existing_lead_into_gated_stage(self):
+        self.make_pool()
         self.make_gate(self.stage_contacted, require_pld_qualified=True)
         self.login(self.admin)
 
@@ -451,6 +466,7 @@ class PLDGateTests(PLDTestBase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_gate_check_endpoint_previews_missing_items(self):
+        self.make_pool()
         self.make_gate(self.stage_contacted, require_pld_qualified=True, notes='Score it first')
         self.login(self.sales)
 
@@ -476,6 +492,7 @@ class PLDGateTests(PLDTestBase):
         self.assertTrue(response.data['data']['satisfied'])
 
     def test_lead_pld_payload_lists_all_gates(self):
+        self.make_pool()
         self.make_gate(self.stage_contacted, require_pld_qualified=True)
         self.login(self.sales)
         response = self.client.get(reverse('lead-pld', args=[self.lead.id]))
