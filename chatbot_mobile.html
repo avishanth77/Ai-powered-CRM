@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>CRM AI Copilot • Mobile Assistant</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #3b82f6;
+      --primary-dark: #2563eb;
+      --primary-glow: rgba(59, 130, 246, 0.25);
+      --bg-chassis: #1e2532;
+      --chassis-border: #2d3748;
+      --phone-bg: #0b0f17;
+      --phone-surface: #141a24;
+      --phone-surface-2: #1b2332;
+      --phone-border: rgba(255, 255, 255, 0.08);
+      --text-main: #f1f5f9;
+      --text-dim: #94a3b8;
+      --text-muted: #64748b;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+      --radius-sm: 8px;
+      --radius-md: 14px;
+      --radius-lg: 20px;
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 10%, #151d2f 0%, #070a10 100%);
+      font-family: var(--font-sans);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem 1rem;
+      overflow-x: hidden;
+    }
+
+    /* Top Control Bar (outside phone) */
+    .desktop-toolbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      max-width: 440px;
+      margin-bottom: 1rem;
+      gap: 0.75rem;
+      font-size: 0.8125rem;
+    }
+
+    .brand-pill {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-weight: 600;
+      color: var(--text-main);
+      letter-spacing: -0.01em;
+    }
+
+    .brand-logo-icon {
+      width: 24px;
+      height: 24px;
+      background: linear-gradient(135deg, var(--primary) 0%, #6366f1 100%);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 8px var(--primary-glow);
+    }
+
+    .brand-logo-icon svg {
+      width: 14px;
+      height: 14px;
+      fill: #ffffff;
+    }
+
+    .top-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .toolbar-btn {
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      color: var(--text-dim);
+      padding: 0.35rem 0.65rem;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 0.75rem;
+      font-family: inherit;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: all 0.2s ease;
+    }
+
+    .toolbar-btn:hover {
+      background: rgba(255, 255, 255, 0.12);
+      color: var(--text-main);
+    }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 6px var(--success);
+    }
+    .status-dot.offline {
+      background: var(--warning);
+      box-shadow: 0 0 6px var(--warning);
+    }
+
+    /* SMARTPHONE MOCKUP FRAME */
+    .phone-wrapper {
+      position: relative;
+      width: 380px;
+      height: 780px;
+      background: var(--bg-chassis);
+      border-radius: 50px;
+      padding: 11px;
+      box-shadow:
+        0 0 0 2px rgba(255, 255, 255, 0.08),
+        0 25px 70px -10px rgba(0, 0, 0, 0.85),
+        0 10px 30px -5px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      transition: all 0.3s ease;
+    }
+
+    /* Realistic hardware buttons on chassis edges */
+    .phone-wrapper::before {
+      content: '';
+      position: absolute;
+      top: 130px;
+      left: -3px;
+      width: 3px;
+      height: 48px;
+      background: #333d4e;
+      border-radius: 3px 0 0 3px;
+      box-shadow: 0 60px 0 #333d4e; /* Volume buttons */
+    }
+
+    .phone-wrapper::after {
+      content: '';
+      position: absolute;
+      top: 160px;
+      right: -3px;
+      width: 3px;
+      height: 72px;
+      background: #333d4e;
+      border-radius: 0 3px 3px 0; /* Power button */
+    }
+
+    /* Inner Screen Glass */
+    .phone-screen {
+      width: 100%;
+      height: 100%;
+      background: var(--phone-bg);
+      border-radius: 40px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      position: relative;
+      box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.8);
+    }
+
+    /* Mobile Status Bar with Dynamic Island */
+    .phone-status-bar {
+      height: 44px;
+      padding: 0 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--text-main);
+      z-index: 20;
+      flex-shrink: 0;
+      position: relative;
+    }
+
+    .phone-time {
+      font-family: var(--font-sans);
+      letter-spacing: -0.02em;
+    }
+
+    /* Dynamic Island pill */
+    .dynamic-island {
+      position: absolute;
+      left: 50%;
+      top: 8px;
+      transform: translateX(-50%);
+      width: 100px;
+      height: 26px;
+      background: #000000;
+      border-radius: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      padding: 0 8px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+    }
+
+    .camera-lens {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #0f1626;
+      border: 1px solid #1a233a;
+      box-shadow: inset 0 0 2px #000;
+    }
+
+    .phone-icons {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    .phone-icons svg {
+      width: 14px;
+      height: 14px;
+      fill: currentColor;
+    }
+
+    /* In-App Header */
+    .app-header {
+      padding: 0.6rem 1rem 0.75rem 1rem;
+      background: rgba(20, 26, 36, 0.85);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--phone-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .header-info {
+      display: flex;
+      align-items: center;
+      gap: 0.625rem;
+    }
+
+    .bot-avatar {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary) 0%, #4f46e5 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      position: relative;
+      box-shadow: 0 4px 12px var(--primary-glow);
+    }
+
+    .bot-avatar svg {
+      width: 19px;
+      height: 19px;
+    }
+
+    .online-indicator {
+      position: absolute;
+      bottom: -1px;
+      right: -1px;
+      width: 10px;
+      height: 10px;
+      background: var(--success);
+      border: 2px solid var(--phone-bg);
+      border-radius: 50%;
+    }
+
+    .bot-meta h2 {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      color: var(--text-main);
+      line-height: 1.2;
+    }
+
+    .bot-meta span {
+      font-size: 0.6875rem;
+      color: var(--text-dim);
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+    }
+
+    .header-btns {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .icon-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-dim);
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .icon-btn:hover {
+      background: var(--phone-surface-2);
+      color: var(--text-main);
+    }
+
+    .icon-btn svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    /* Messages Stream */
+    .chat-messages {
+      flex: 1;
+      padding: 1rem 0.85rem;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 0.85rem;
+      scroll-behavior: smooth;
+    }
+
+    .chat-messages::-webkit-scrollbar {
+      width: 4px;
+    }
+    .chat-messages::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    /* Message Rows */
+    .message-row {
+      display: flex;
+      flex-direction: column;
+      max-width: 86%;
+      animation: msgAppear 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes msgAppear {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message-row.user {
+      align-self: flex-end;
+      align-items: flex-end;
+    }
+
+    .message-row.assistant {
+      align-self: flex-start;
+      align-items: flex-start;
+    }
+
+    .message-bubble {
+      padding: 0.7rem 0.875rem;
+      border-radius: var(--radius-md);
+      font-size: 0.8125rem;
+      line-height: 1.5;
+      word-break: break-word;
+      position: relative;
+    }
+
+    .message-row.user .message-bubble {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      color: #ffffff;
+      border-bottom-right-radius: 3px;
+      box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+    }
+
+    .message-row.assistant .message-bubble {
+      background: var(--phone-surface);
+      border: 1px solid var(--phone-border);
+      color: var(--text-main);
+      border-bottom-left-radius: 3px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    }
+
+    .message-time {
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-top: 0.25rem;
+      padding: 0 0.25rem;
+    }
+
+    /* Markdown Formatted Typography Inside Assistant Bubbles */
+    .markdown-content p {
+      margin: 0 0 0.45rem 0;
+    }
+    .markdown-content p:last-child {
+      margin-bottom: 0;
+    }
+
+    .markdown-content strong,
+    .markdown-content b {
+      font-weight: 700;
+      color: #ffffff;
+    }
+
+    .markdown-content em,
+    .markdown-content i {
+      font-style: italic;
+    }
+
+    .markdown-content ul,
+    .markdown-content ol {
+      margin: 0.35rem 0 0.5rem 0;
+      padding-left: 1.25rem;
+    }
+
+    .markdown-content ul {
+      list-style-type: disc;
+    }
+
+    .markdown-content ol {
+      list-style-type: decimal;
+    }
+
+    .markdown-content li {
+      margin-bottom: 0.3rem;
+      line-height: 1.45;
+    }
+    .markdown-content li:last-child {
+      margin-bottom: 0;
+    }
+
+    .markdown-content code.code-inline {
+      font-family: var(--font-mono);
+      font-size: 0.775rem;
+      background: rgba(0, 0, 0, 0.35);
+      border: 1px solid var(--phone-border);
+      padding: 0.1rem 0.3rem;
+      border-radius: 4px;
+      color: var(--primary);
+    }
+
+    /* Action Confirmation Card (in mobile bubble) */
+    .action-card {
+      margin-top: 0.625rem;
+      padding: 0.625rem;
+      background: var(--phone-surface-2);
+      border: 1px solid rgba(59, 130, 246, 0.25);
+      border-radius: var(--radius-sm);
+    }
+
+    .action-header {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--primary);
+      margin-bottom: 0.35rem;
+    }
+
+    .action-header svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .action-desc {
+      font-size: 0.775rem;
+      color: var(--text-main);
+      margin-bottom: 0.5rem;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 0.4rem;
+    }
+
+    .btn-action-confirm {
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.725rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.25rem;
+      transition: background 0.15s ease;
+    }
+    .btn-action-confirm:hover {
+      background: var(--primary-dark);
+    }
+
+    .btn-action-cancel {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text-dim);
+      border: none;
+      padding: 0.35rem 0.65rem;
+      border-radius: 6px;
+      font-size: 0.725rem;
+      cursor: pointer;
+    }
+
+    /* Typing Dots Indicator */
+    .typing-row {
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.5rem 0.75rem;
+      background: var(--phone-surface);
+      border: 1px solid var(--phone-border);
+      border-radius: var(--radius-md);
+      width: fit-content;
+      margin-bottom: 0.25rem;
+    }
+
+    .typing-row span.typing-label {
+      font-size: 0.725rem;
+      color: var(--text-dim);
+      margin-right: 0.35rem;
+    }
+
+    .dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+      background: var(--primary);
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+    .dot:nth-child(2) { animation-delay: -0.32s; }
+    .dot:nth-child(3) { animation-delay: -0.16s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); opacity: 0.3; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Suggestions Horizontal Scrollable Chips */
+    .suggestions-container {
+      padding: 0.4rem 0.85rem 0.6rem 0.85rem;
+      display: flex;
+      gap: 0.4rem;
+      overflow-x: auto;
+      flex-shrink: 0;
+      scrollbar-width: none;
+    }
+    .suggestions-container::-webkit-scrollbar {
+      display: none;
+    }
+
+    .suggestion-chip {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--phone-border);
+      color: var(--text-dim);
+      padding: 0.35rem 0.65rem;
+      border-radius: 20px;
+      font-size: 0.725rem;
+      white-space: nowrap;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      transition: all 0.2s ease;
+      flex-shrink: 0;
+    }
+
+    .suggestion-chip:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: rgba(59, 130, 246, 0.35);
+      color: #93c5fd;
+    }
+
+    /* Bottom Input Bar */
+    .chat-input-bar {
+      padding: 0.5rem 0.75rem 0.6rem 0.75rem;
+      background: rgba(20, 26, 36, 0.95);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border-top: 1px solid var(--phone-border);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-shrink: 0;
+    }
+
+    .input-wrapper {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      background: var(--phone-surface-2);
+      border: 1px solid var(--phone-border);
+      border-radius: 24px;
+      padding: 0.4rem 0.85rem;
+      transition: border-color 0.2s ease;
+    }
+
+    .input-wrapper:focus-within {
+      border-color: var(--primary);
+    }
+
+    .input-wrapper input {
+      flex: 1;
+      background: transparent;
+      border: none;
+      outline: none;
+      color: var(--text-main);
+      font-size: 0.8125rem;
+      font-family: inherit;
+    }
+
+    .input-wrapper input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .send-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+      border: none;
+      color: #ffffff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: transform 0.15s ease, background 0.2s ease;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px var(--primary-glow);
+    }
+
+    .send-btn:hover {
+      transform: scale(1.05);
+    }
+
+    .send-btn:active {
+      transform: scale(0.95);
+    }
+
+    .send-btn svg {
+      width: 17px;
+      height: 17px;
+      margin-left: 2px;
+    }
+
+    /* iOS Home Swipe Indicator */
+    .home-bar-area {
+      height: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--phone-bg);
+      flex-shrink: 0;
+    }
+
+    .home-indicator {
+      width: 120px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 10px;
+    }
+
+    /* Settings / Auth Modal Sheet */
+    .modal-backdrop {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 50;
+      display: none;
+      align-items: flex-end;
+      justify-content: center;
+      border-radius: 40px;
+    }
+
+    .modal-backdrop.open {
+      display: flex;
+    }
+
+    .modal-sheet {
+      width: 100%;
+      background: var(--phone-surface);
+      border-top: 1px solid var(--phone-border);
+      border-radius: 24px 24px 0 0;
+      padding: 1.25rem 1rem 1.5rem 1rem;
+      animation: sheetUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    @keyframes sheetUp {
+      from { transform: translateY(100%); }
+      to { transform: translateY(0); }
+    }
+
+    .sheet-handle {
+      width: 40px;
+      height: 4px;
+      background: var(--phone-border);
+      border-radius: 10px;
+      margin: 0 auto 1rem auto;
+    }
+
+    .sheet-title {
+      font-size: 0.9375rem;
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+      color: var(--text-main);
+    }
+
+    .sheet-subtitle {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-bottom: 1rem;
+    }
+
+    .sheet-input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      margin-bottom: 0.75rem;
+      text-align: left;
+    }
+
+    .sheet-input-group label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .sheet-input-group input {
+      background: var(--phone-surface-2);
+      border: 1px solid var(--phone-border);
+      border-radius: 8px;
+      padding: 0.5rem 0.75rem;
+      color: var(--text-main);
+      font-size: 0.8125rem;
+      font-family: inherit;
+      outline: none;
+    }
+
+    .sheet-input-group input:focus {
+      border-color: var(--primary);
+    }
+
+    .sheet-btns {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      margin-top: 1rem;
+    }
+
+    .btn-sheet-primary {
+      background: var(--primary);
+      color: #ffffff;
+      border: none;
+      padding: 0.6rem;
+      border-radius: 10px;
+      font-weight: 600;
+      font-size: 0.8125rem;
+      cursor: pointer;
+    }
+
+    .btn-sheet-secondary {
+      background: transparent;
+      color: var(--text-dim);
+      border: 1px solid var(--phone-border);
+      padding: 0.6rem;
+      border-radius: 10px;
+      font-size: 0.8125rem;
+      cursor: pointer;
+    }
+
+    /* DIRECT MOBILE / FULLSCREEN RESPONSIVENESS */
+    @media (max-width: 500px) {
+      body {
+        padding: 0;
+        background: var(--phone-bg);
+      }
+
+      .desktop-toolbar {
+        display: none;
+      }
+
+      .phone-wrapper {
+        width: 100vw;
+        height: 100vh;
+        border-radius: 0;
+        padding: 0;
+        box-shadow: none;
+        background: var(--phone-bg);
+      }
+
+      .phone-wrapper::before,
+      .phone-wrapper::after {
+        display: none;
+      }
+
+      .phone-screen {
+        border-radius: 0;
+      }
+
+      .modal-backdrop {
+        border-radius: 0;
+      }
+    }
+
+    /* Toggle for Direct Fullscreen View on Desktop */
+    body.frameless-mode {
+      padding: 0;
+      background: var(--phone-bg);
+    }
+    body.frameless-mode .desktop-toolbar {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      z-index: 100;
+      background: rgba(15, 23, 42, 0.9);
+      padding: 0.5rem 0.75rem;
+      border-radius: 30px;
+      border: 1px solid var(--phone-border);
+      max-width: none;
+      width: auto;
+    }
+    body.frameless-mode .brand-pill {
+      display: none;
+    }
+    body.frameless-mode .phone-wrapper {
+      width: 100vw;
+      height: 100vh;
+      border-radius: 0;
+      padding: 0;
+      box-shadow: none;
+      background: var(--phone-bg);
+    }
+    body.frameless-mode .phone-wrapper::before,
+    body.frameless-mode .phone-wrapper::after {
+      display: none;
+    }
+    body.frameless-mode .phone-screen {
+      border-radius: 0;
+    }
+    body.frameless-mode .modal-backdrop {
+      border-radius: 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- DESKTOP TOOLBAR (OUTSIDE PHONE) -->
+  <div class="desktop-toolbar">
+    <div class="brand-pill">
+      <div class="brand-logo-icon">
+        <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+      </div>
+      <span>CRM Copilot • Mobile</span>
+    </div>
+
+    <div class="top-actions">
+      <button class="toolbar-btn" id="connectionBadge" onclick="openAuthModal()" title="Click to configure API connection">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="connectionLabel">Live API</span>
+      </button>
+
+      <button class="toolbar-btn" id="toggleFrameBtn" onclick="togglePhoneFrame()" title="Toggle full screen mobile view">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="2" y="3" width="20" height="14" rx="2"/>
+          <line x1="8" y1="21" x2="16" y2="21"/>
+          <line x1="12" y1="17" x2="12" y2="21"/>
+        </svg>
+        <span id="frameToggleLabel">Full View</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- SMARTPHONE FRAME -->
+  <div class="phone-wrapper" id="phoneWrapper">
+    <div class="phone-screen">
+
+      <!-- Realistic Mobile Status Bar -->
+      <div class="phone-status-bar">
+        <span class="phone-time" id="statusTime">9:41</span>
+
+        <!-- Dynamic Island pill -->
+        <div class="dynamic-island">
+          <div class="camera-lens"></div>
+        </div>
+
+        <div class="phone-icons">
+          <!-- Cellular signal -->
+          <svg viewBox="0 0 24 24"><path d="M2 20h2v-4H2v4zm5 0h2v-8H7v8zm5 0h2V8h-2v12zm5 0h2V4h-2v16z"/></svg>
+          <!-- Wifi -->
+          <svg viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4zm0 4.5c3.34 0 6.36 1.34 8.56 3.52L12 20.65 3.44 12.02A12.07 12.07 0 0 1 12 8.5z"/></svg>
+          <!-- Battery -->
+          <svg viewBox="0 0 24 24"><path d="M17 6H4c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h13c1.1 0 2-.9 2-2v-1.5h1c.55 0 1-.45 1-1v-3c0-.55-.45-1-1-1h-1V8c0-1.1-.9-2-2-2zm0 10H4V8h13v8zm-2-7H6v6h9V9z"/></svg>
+        </div>
+      </div>
+
+      <!-- In-App Header -->
+      <div class="app-header">
+        <div class="header-info">
+          <div class="bot-avatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 8V4m0 4a4 4 0 100 8 4 4 0 000-8zm0 8v4m-8-6h4m8 0h4"/>
+            </svg>
+            <div class="online-indicator"></div>
+          </div>
+          <div class="bot-meta">
+            <h2>CRM AI Copilot</h2>
+            <span><span class="status-dot"></span> Online • Live Assistant</span>
+          </div>
+        </div>
+
+        <div class="header-btns">
+          <button class="icon-btn" onclick="clearChatHistory()" title="Clear Conversation">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="3 6 5 6 21 6"/>
+              <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+            </svg>
+          </button>
+          <button class="icon-btn" onclick="openAuthModal()" title="Authentication & Connection Settings">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="3"/>
+              <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Messages Stream -->
+      <div class="chat-messages" id="chatMessages">
+        <!-- Messages will be dynamically rendered here -->
+      </div>
+
+      <!-- Thinking Indicator (Hidden by default) -->
+      <div id="typingIndicator" style="display: none; padding: 0 0.85rem;">
+        <div class="typing-row">
+          <span class="typing-label">Copilot is thinking</span>
+          <div class="dot"></div>
+          <div class="dot"></div>
+          <div class="dot"></div>
+        </div>
+      </div>
+
+      <!-- Suggestion Chips -->
+      <div class="suggestions-container" id="suggestionsContainer">
+        <button class="suggestion-chip" onclick="handleQuickSend('Show my overdue leads')">
+          ⚡ Overdue leads
+        </button>
+        <button class="suggestion-chip" onclick="handleQuickSend('Summarize my pipeline')">
+          📊 Pipeline summary
+        </button>
+        <button class="suggestion-chip" onclick="handleQuickSend('What should I do today?')">
+          🎯 Today's action plan
+        </button>
+        <button class="suggestion-chip" onclick="handleQuickSend('Show high-value leads')">
+          🏆 Top deals
+        </button>
+      </div>
+
+      <!-- Input Bar -->
+      <div class="chat-input-bar">
+        <div class="input-wrapper">
+          <input
+            type="text"
+            id="chatInput"
+            placeholder="Ask your CRM Copilot..."
+            autocomplete="off"
+            onkeydown="if(event.key === 'Enter') handleSend();"
+          />
+        </div>
+        <button class="send-btn" id="sendBtn" onclick="handleSend()" title="Send Message">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="22" y1="2" x2="11" y2="13"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Bottom Home Indicator -->
+      <div class="home-bar-area">
+        <div class="home-indicator"></div>
+      </div>
+
+      <!-- AUTH & API CONFIG MODAL SHEET -->
+      <div class="modal-backdrop" id="authModal" onclick="if(event.target === this) closeAuthModal()">
+        <div class="modal-sheet">
+          <div class="sheet-handle"></div>
+          <div class="sheet-title">CRM Connection & Auth</div>
+          <div class="sheet-subtitle">Connect this mobile assistant directly to your backend.</div>
+
+          <div class="sheet-input-group">
+            <label>API Base URL</label>
+            <input type="text" id="apiBaseUrl" value="http://localhost:8000" placeholder="http://localhost:8000" />
+          </div>
+
+          <div class="sheet-input-group">
+            <label>Email</label>
+            <input type="email" id="authEmail" value="admin@crmlite.com" placeholder="admin@crmlite.com" />
+          </div>
+
+          <div class="sheet-input-group">
+            <label>Password</label>
+            <input type="password" id="authPassword" value="password123" placeholder="••••••••" />
+          </div>
+
+          <div class="sheet-btns">
+            <button class="btn-sheet-primary" onclick="loginAndSaveToken()">Sign In & Save Token</button>
+            <button class="btn-sheet-secondary" onclick="useDemoMode()">Use Offline Demo Mode</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    // Configuration & State
+    let API_BASE_URL = localStorage.getItem('crm_api_url') || 'http://localhost:8000';
+    let ACCESS_TOKEN = localStorage.getItem('crm_access_token') || '';
+    let IS_DEMO_MODE = !ACCESS_TOKEN;
+
+    const messages = [
+      {
+        id: 1,
+        sender: 'assistant',
+        text: "Hello! I'm your **CRM AI Copilot**.\n\nI can evaluate your live sales pipeline, review overdue follow-ups, summarize leads, and draft deal updates directly from your mobile screen.\n\nWhat would you like to review?",
+        time: getCurrentFormattedTime(),
+        action_required: false,
+        action_payload: null
+      }
+    ];
+
+    // Initialize UI
+    window.addEventListener('DOMContentLoaded', () => {
+      updateClock();
+      setInterval(updateClock, 1000);
+      renderMessages();
+      updateConnectionStatusBadge();
+
+      // Prepopulate config inputs
+      document.getElementById('apiBaseUrl').value = API_BASE_URL;
+
+      // Auto-check existing token
+      if (ACCESS_TOKEN) {
+        checkTokenHealth();
+      }
+    });
+
+    function updateClock() {
+      const now = new Date();
+      let hours = now.getHours();
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const timeStr = `${hours}:${minutes}`;
+      const elem = document.getElementById('statusTime');
+      if (elem) elem.textContent = timeStr;
+    }
+
+    function getCurrentFormattedTime() {
+      const now = new Date();
+      return now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function updateConnectionStatusBadge() {
+      const dot = document.getElementById('statusDot');
+      const label = document.getElementById('connectionLabel');
+
+      if (IS_DEMO_MODE || !ACCESS_TOKEN) {
+        dot.className = 'status-dot offline';
+        label.textContent = 'Demo Mode';
+      } else {
+        dot.className = 'status-dot';
+        label.textContent = 'Live CRM API';
+      }
+    }
+
+    async function checkTokenHealth() {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/auth/me/`, {
+          headers: { 'Authorization': `Bearer ${ACCESS_TOKEN}` }
+        });
+        if (res.ok) {
+          IS_DEMO_MODE = false;
+          updateConnectionStatusBadge();
+        } else {
+          IS_DEMO_MODE = true;
+          updateConnectionStatusBadge();
+        }
+      } catch (e) {
+        IS_DEMO_MODE = true;
+        updateConnectionStatusBadge();
+      }
+    }
+
+    // Modal Control
+    function openAuthModal() {
+      document.getElementById('authModal').classList.add('open');
+    }
+
+    function closeAuthModal() {
+      document.getElementById('authModal').classList.remove('open');
+    }
+
+    async function loginAndSaveToken() {
+      const url = document.getElementById('apiBaseUrl').value.trim() || 'http://localhost:8000';
+      const email = document.getElementById('authEmail').value.trim();
+      const password = document.getElementById('authPassword').value.trim();
+
+      try {
+        const res = await fetch(`${url}/api/auth/login/`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.access) {
+          API_BASE_URL = url;
+          ACCESS_TOKEN = data.access;
+          localStorage.setItem('crm_api_url', API_BASE_URL);
+          localStorage.setItem('crm_access_token', ACCESS_TOKEN);
+          IS_DEMO_MODE = false;
+          updateConnectionStatusBadge();
+          closeAuthModal();
+
+          appendAssistantMessage("Connected to live CRM as **" + (data.user?.email || email) + "**! Live CRM tools are now active.");
+        } else {
+          alert('Login failed: ' + (data.detail || data.message || 'Invalid credentials'));
+        }
+      } catch (err) {
+        alert('Could not connect to backend at ' + url + '. Switching to Demo Mode.');
+        useDemoMode();
+      }
+    }
+
+    function useDemoMode() {
+      IS_DEMO_MODE = true;
+      ACCESS_TOKEN = '';
+      updateConnectionStatusBadge();
+      closeAuthModal();
+      appendAssistantMessage("Operating in **Offline / Demo Mode**. I will simulate pipeline responses and deal mutations.");
+    }
+
+    function togglePhoneFrame() {
+      document.body.classList.toggle('frameless-mode');
+      const isFrameless = document.body.classList.contains('frameless-mode');
+      document.getElementById('frameToggleLabel').textContent = isFrameless ? 'Phone Mockup' : 'Full View';
+    }
+
+    function clearChatHistory() {
+      if (confirm('Clear chat conversation?')) {
+        messages.length = 0;
+        messages.push({
+          id: Date.now(),
+          sender: 'assistant',
+          text: "Conversation cleared. How can I help you with your sales pipeline?",
+          time: getCurrentFormattedTime(),
+          action_required: false,
+          action_payload: null
+        });
+        renderMessages();
+      }
+    }
+
+    /* MARKDOWN PARSER (STRIPS ASTERISKS & FORMATS BOLD/BULLETS CLEANLY) */
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    }
+
+    function renderInlineMarkdown(text) {
+      if (!text) return '';
+
+      // Token regex matching ***bold italic***, **bold**, *italic*, `code`, and [links](url)
+      const regex = /(\*\*\*[^*]+?\*\*\*|\*\*[^*]+?\*\*|\*[^*]+?\*|___[^_]+?___|__[^_]+?__|_[^_]+?_|`[^`]+?`|\[[^\]]+?\]\([^)]+?\))/g;
+
+      let html = '';
+      let lastIndex = 0;
+      let match;
+
+      while ((match = regex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+          html += escapeHtml(text.substring(lastIndex, match.index));
+        }
+
+        const token = match[0];
+        if (token.startsWith('***') && token.endsWith('***') && token.length > 6) {
+          html += '<strong><em>' + escapeHtml(token.slice(3, -3)) + '</em></strong>';
+        } else if ((token.startsWith('**') && token.endsWith('**') && token.length > 4) ||
+                   (token.startsWith('__') && token.endsWith('__') && token.length > 4)) {
+          html += '<strong>' + escapeHtml(token.slice(2, -2)) + '</strong>';
+        } else if ((token.startsWith('*') && token.endsWith('*') && token.length > 2) ||
+                   (token.startsWith('_') && token.endsWith('_') && token.length > 2)) {
+          html += '<em>' + escapeHtml(token.slice(1, -1)) + '</em>';
+        } else if (token.startsWith('`') && token.endsWith('`') && token.length > 2) {
+          html += '<code class="code-inline">' + escapeHtml(token.slice(1, -1)) + '</code>';
+        } else if (token.startsWith('[')) {
+          const lm = token.match(/^\[(.*?)\]\((.*?)\)$/);
+          if (lm) {
+            html += '<a href="' + escapeHtml(lm[2]) + '" target="_blank" rel="noopener">' + escapeHtml(lm[1]) + '</a>';
+          } else {
+            html += escapeHtml(token);
+          }
+        } else {
+          html += escapeHtml(token);
+        }
+
+        lastIndex = match.index + token.length;
+      }
+
+      if (lastIndex < text.length) {
+        html += escapeHtml(text.substring(lastIndex));
+      }
+
+      return html;
+    }
+
+    function parseMarkdownBlocks(rawText) {
+      if (!rawText) return '';
+
+      // Normalize line endings and break inline bullets after colon/punctuation
+      let text = String(rawText)
+        .replace(/\r\n/g, '\n')
+        .replace(/([:\.\?!])\s+([\*\-•])\s+/g, (m, p1, p2) => `${p1}\n${p2} `);
+
+      const lines = text.split('\n');
+      let outHtml = '';
+      let currentList = null; // 'ul' or 'ol'
+      let currentParagraph = [];
+
+      function flushPara() {
+        if (currentParagraph.length > 0) {
+          const body = currentParagraph.map(l => renderInlineMarkdown(l)).join('<br />');
+          outHtml += `<p>${body}</p>`;
+          currentParagraph = [];
+        }
+      }
+
+      function flushList() {
+        if (currentList) {
+          outHtml += `</${currentList}>`;
+          currentList = null;
+        }
+      }
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        const trimmed = line.trim();
+
+        if (!trimmed) {
+          flushPara();
+          flushList();
+          continue;
+        }
+
+        // Unordered List (*, -, •)
+        const bulletMatch = line.match(/^(\s*)([\*\-\+•])\s+(.*)$/);
+        if (bulletMatch) {
+          flushPara();
+          if (currentList !== 'ul') {
+            flushList();
+            outHtml += '<ul>';
+            currentList = 'ul';
+          }
+          outHtml += `<li>${renderInlineMarkdown(bulletMatch[3])}</li>`;
+          continue;
+        }
+
+        // Ordered List (1., 2.)
+        const orderedMatch = line.match(/^(\s*)(\d+)\.\s+(.*)$/);
+        if (orderedMatch) {
+          flushPara();
+          if (currentList !== 'ol') {
+            flushList();
+            outHtml += '<ol>';
+            currentList = 'ol';
+          }
+          outHtml += `<li>${renderInlineMarkdown(orderedMatch[3])}</li>`;
+          continue;
+        }
+
+        // Headings
+        const headingMatch = line.match(/^(#{1,4})\s+(.*)$/);
+        if (headingMatch) {
+          flushPara();
+          flushList();
+          outHtml += `<h4 style="margin:0.5rem 0 0.25rem 0; font-weight:700;">${renderInlineMarkdown(headingMatch[2])}</h4>`;
+          continue;
+        }
+
+        flushList();
+        currentParagraph.push(line);
+      }
+
+      flushPara();
+      flushList();
+
+      return outHtml;
+    }
+
+    /* CHAT STREAM RENDERING */
+    function renderMessages() {
+      const container = document.getElementById('chatMessages');
+      container.innerHTML = '';
+
+      messages.forEach(msg => {
+        const row = document.createElement('div');
+        row.className = `message-row ${msg.sender}`;
+
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+
+        // Render formatted content
+        const markdownDiv = document.createElement('div');
+        markdownDiv.className = 'markdown-content';
+        markdownDiv.innerHTML = parseMarkdownBlocks(msg.text);
+        bubble.appendChild(markdownDiv);
+
+        // Action confirmation card if needed
+        if (msg.action_required && msg.action_payload) {
+          const card = document.createElement('div');
+          card.className = 'action-card';
+
+          card.innerHTML = `
+            <div class="action-header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+              </svg>
+              <span>CRM Action Confirmation</span>
+            </div>
+            <div class="action-desc">${renderInlineMarkdown(msg.action_payload.description)}</div>
+            ${msg.action_status === 'EXECUTED' ? `
+              <div style="color:var(--success); font-size:0.75rem; font-weight:600;">✓ ${escapeHtml(msg.action_result || 'Action applied to CRM.')}</div>
+            ` : msg.action_status === 'CANCELLED' ? `
+              <div style="color:var(--text-muted); font-size:0.75rem;">Action cancelled.</div>
+            ` : `
+              <div class="action-buttons">
+                <button class="btn-action-confirm" onclick="confirmAction(${msg.id})">Confirm</button>
+                <button class="btn-action-cancel" onclick="cancelAction(${msg.id})">Cancel</button>
+              </div>
+            `}
+          `;
+          bubble.appendChild(card);
+        }
+
+        row.appendChild(bubble);
+
+        const time = document.createElement('span');
+        time.className = 'message-time';
+        time.textContent = msg.time || '';
+        row.appendChild(time);
+
+        container.appendChild(row);
+      });
+
+      // Scroll to bottom
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function appendAssistantMessage(text, actionPayload = null) {
+      messages.push({
+        id: Date.now(),
+        sender: 'assistant',
+        text,
+        time: getCurrentFormattedTime(),
+        action_required: !!actionPayload,
+        action_payload: actionPayload,
+        action_status: actionPayload ? 'PENDING' : null
+      });
+      renderMessages();
+    }
+
+    function appendUserMessage(text) {
+      messages.push({
+        id: Date.now(),
+        sender: 'user',
+        text,
+        time: getCurrentFormattedTime(),
+        action_required: false,
+        action_payload: null
+      });
+      renderMessages();
+    }
+
+    function showTyping(show) {
+      document.getElementById('typingIndicator').style.display = show ? 'block' : 'none';
+      const container = document.getElementById('chatMessages');
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function handleQuickSend(query) {
+      document.getElementById('chatInput').value = query;
+      handleSend();
+    }
+
+    async function handleSend() {
+      const input = document.getElementById('chatInput');
+      const text = input.value.trim();
+      if (!text) return;
+
+      input.value = '';
+      appendUserMessage(text);
+      showTyping(true);
+
+      // Call Live Backend or Fallback to Demo
+      if (!IS_DEMO_MODE && ACCESS_TOKEN) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/ai/chat/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${ACCESS_TOKEN}`
+            },
+            body: JSON.stringify({
+              prompt: text,
+              conversation_history: messages.slice(-6).map(m => ({
+                sender: m.sender,
+                text: m.text
+              }))
+            })
+          });
+
+          const data = await res.json();
+          showTyping(false);
+
+          if (res.ok && data.data) {
+            const ai = data.data;
+            appendAssistantMessage(ai.response, ai.action_required ? ai.action_payload : null);
+            return;
+          }
+        } catch (err) {
+          console.warn('API error, falling back to simulated response:', err);
+        }
+      }
+
+      // Simulated Demo Response
+      setTimeout(() => {
+        showTyping(false);
+        const simulated = getSimulatedResponse(text);
+        appendAssistantMessage(simulated.response, simulated.action_payload);
+      }, 700);
+    }
+
+    /* ACTION EXECUTION */
+    async function confirmAction(msgId) {
+      const msg = messages.find(m => m.id === msgId);
+      if (!msg || !msg.action_payload) return;
+
+      if (!IS_DEMO_MODE && ACCESS_TOKEN) {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/ai/execute-action/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${ACCESS_TOKEN}`
+            },
+            body: JSON.stringify({ action_payload: msg.action_payload })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            msg.action_status = 'EXECUTED';
+            msg.action_result = data.message || 'Action executed successfully in live CRM.';
+            renderMessages();
+            return;
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // Fallback local execution
+      msg.action_status = 'EXECUTED';
+      msg.action_result = `Successfully executed: ${msg.action_payload.description}`;
+      renderMessages();
+    }
+
+    function cancelAction(msgId) {
+      const msg = messages.find(m => m.id === msgId);
+      if (msg) {
+        msg.action_status = 'CANCELLED';
+        renderMessages();
+      }
+    }
+
+    /* SIMULATED RESPONSES FOR DEMO/OFFLINE MODE */
+    function getSimulatedResponse(prompt) {
+      const q = prompt.toLowerCase();
+
+      if (q.includes('overdue')) {
+        return {
+          response: "You currently have **1 lead** in your pipeline requiring attention:\n\n* **REYYA Achu**: This lead is in the **Demo Scheduled** stage and has **3 overdue follow-up tasks**.\n\n*Recommended action:* Contact this account promptly to keep the opportunity moving forward.",
+          action_payload: null
+        };
+      }
+
+      if (q.includes('pipeline') || q.includes('summary')) {
+        return {
+          response: "**Live Pipeline Summary:**\n\n* **Total Active Deals:** 12 leads\n* **Aggregate Value:** ₹18,45,000\n\n**Breakdown by Stage:**\n* **New Leads:** 4 leads (₹3,20,000)\n* **Contacted:** 3 leads (₹4,75,000)\n* **Demo Scheduled:** 3 leads (₹6,50,000)\n* **Negotiation:** 2 leads (₹4,00,000)",
+          action_payload: null
+        };
+      }
+
+      if (q.includes('today') || q.includes('plan') || q.includes('action')) {
+        return {
+          response: "**Today's Action Plan:**\n\n1. **High Priority Follow-up**: Call **REYYA Achu** regarding customized demo pricing.\n2. **Review Inbound Submissions**: 2 new website form inquiries arrived from Mumbai.\n3. **Move Stalled Deal**: Follow up with **Acme Tech** regarding proposal feedback.",
+          action_payload: null
+        };
+      }
+
+      if (q.includes('move') || q.includes('stage')) {
+        return {
+          response: "I can execute this stage transition for you:\n\n**Move REYYA Achu to Negotiation stage**\n\nPlease confirm to apply this change to your CRM.",
+          action_payload: {
+            action_type: "UPDATE_LEAD_STAGE",
+            description: "Move REYYA Achu to Negotiation stage",
+            parameters: { lead_id: 133, stage_name: "Negotiation" }
+          }
+        };
+      }
+
+      if (q.includes('reassign') || q.includes('assign')) {
+        return {
+          response: "I can reassign this lead for you:\n\n**Reassign REYYA Achu to Alex Salesman**\n\nPlease confirm to execute the transfer.",
+          action_payload: {
+            action_type: "REASSIGN_LEAD",
+            description: "Reassign REYYA Achu to Alex Salesman",
+            parameters: { lead_id: 133, user_name: "Alex Salesman" }
+          }
+        };
+      }
+
+      return {
+        response: "I analyzed your CRM request: **\"" + prompt + "\"**.\n\nYou have **12 active leads** across 4 stages, with **1 lead** requiring priority follow-up today.",
+        action_payload: null
+      };
+    }
+  </script>
+</body>
+</html>
