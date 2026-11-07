@@ -12,6 +12,7 @@ from .crm_tools import CRMTools
 from .ai_provider import get_ai_provider, AIProviderException
 from accounts.models import User
 from leads.models import Lead, LeadStage
+from leads.services import execute_stage_task_automations
 from followups.models import FollowUp
 from activity.services import log_activity
 from activity.models import ActivityLog
@@ -372,9 +373,18 @@ class ChatbotService:
             if not stage:
                 raise ValueError("Target lead stage was not found.")
 
+            old_stage = lead.stage
             old_stage_name = lead.stage.name if lead.stage else getattr(lead, 'status', 'New')
             lead.stage = stage
             lead.save(update_fields=['stage', 'updated_at'])
+
+            # Trigger automated customizable task assignments on stage move
+            execute_stage_task_automations(
+                lead=lead,
+                new_stage=stage,
+                old_stage=old_stage,
+                actor=user
+            )
 
             # Log activity
             log_activity(

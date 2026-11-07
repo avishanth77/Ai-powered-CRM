@@ -320,7 +320,7 @@ class GeminiProvider(BaseAIProvider):
             f"User Question: {message}\n\n"
             f"Respond with a JSON object with this exact structure:\n"
             f"{{\n"
-            f'  "response": "Helpful markdown-formatted answer answering the question concisely with facts from CRM context.",\n'
+            f'  "response": "Helpful markdown-formatted answer answering the question concisely with facts from CRM context. Format lists with each bullet on a separate new line and bold key lead names and metrics cleanly.",\n'
             f'  "intent": "OVERDUE_LEADS | LEAD_SUMMARY | DAILY_AGENDA | PIPELINE_SUMMARY | HIGH_VALUE_LEADS | RECENT_ACTIVITY | ACTION_CONFIRMATION | GENERAL",\n'
             f'  "suggestions": ["Follow-up question 1", "Follow-up question 2"],\n'
             f'  "action_required": false,\n'

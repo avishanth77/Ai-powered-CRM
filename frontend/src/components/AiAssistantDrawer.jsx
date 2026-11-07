@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Bot, Send, X, Trash2, Sparkles, AlertCircle, CheckCircle2, ShieldCheck, Check, CornerDownLeft } from 'lucide-react';
 import { aiApi } from '../api/aiApi';
 import { formatTime } from '../utils/formatters';
+import { FormattedChatMessage } from './FormattedChatMessage';
 
 const DEFAULT_SUGGESTIONS = [
   'Show my overdue leads',
@@ -231,7 +232,7 @@ export const AiAssistantDrawer = ({ isOpen, onClose }) => {
         {messages.map((msg) => (
           <div key={msg.id} className={`chat-message-row ${msg.sender}`}>
             <div className="message-bubble">
-              <div style={{ whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>{msg.text}</div>
+              <FormattedChatMessage content={msg.text} />
 
               {/* ACTION CONFIRMATION CARD */}
               {msg.action_required && msg.action_payload && (
@@ -250,7 +251,7 @@ export const AiAssistantDrawer = ({ isOpen, onClose }) => {
                   </div>
 
                   <div style={{ fontSize: '0.8125rem', color: 'var(--text-main)', marginBottom: '0.625rem' }}>
-                    {msg.action_payload.description}
+                    <FormattedChatMessage content={msg.action_payload.description} inline />
                   </div>
 
                   {msg.action_status === 'PENDING' && (
@@ -280,7 +281,7 @@ export const AiAssistantDrawer = ({ isOpen, onClose }) => {
                   {msg.action_status === 'EXECUTED' && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', color: 'var(--success)', fontSize: '0.8125rem', fontWeight: 600 }}>
                       <CheckCircle2 size={15} />
-                      <span>{msg.action_result || 'Action applied to CRM.'}</span>
+                      <FormattedChatMessage content={msg.action_result || 'Action applied to CRM.'} inline />
                     </div>
                   )}
 
