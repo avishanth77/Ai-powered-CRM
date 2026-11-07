@@ -66,6 +66,11 @@ export const Settings = () => {
     }
   }, [tabParam]);
 
+  const handleTabChange = (tabKey) => {
+    setActiveTab(tabKey);
+    setSearchParams({ tab: tabKey });
+  };
+
   // Profile Form
   const [profileData, setProfileData] = useState({
     first_name: user?.first_name || '',
@@ -419,7 +424,7 @@ export const Settings = () => {
             role="tab"
             aria-selected={activeTab === 'stages'}
             className={`tab-btn ${activeTab === 'stages' ? 'tab-btn-active' : ''}`}
-            onClick={() => setActiveTab('stages')}
+            onClick={() => handleTabChange('stages')}
           >
             <Kanban size={16} />
             <span>Lead Stage Management</span>
@@ -432,7 +437,7 @@ export const Settings = () => {
           role="tab"
           aria-selected={activeTab === 'profile'}
           className={`tab-btn ${activeTab === 'profile' ? 'tab-btn-active' : ''}`}
-          onClick={() => setActiveTab('profile')}
+          onClick={() => handleTabChange('profile')}
         >
           <Shield size={16} />
           <span>Profile & Security</span>
@@ -444,7 +449,7 @@ export const Settings = () => {
             role="tab"
             aria-selected={activeTab === 'sources'}
             className={`tab-btn ${activeTab === 'sources' ? 'tab-btn-active' : ''}`}
-            onClick={() => setActiveTab('sources')}
+            onClick={() => handleTabChange('sources')}
           >
             <Layers size={16} />
             <span>Lead Sources</span>
@@ -458,7 +463,7 @@ export const Settings = () => {
             role="tab"
             aria-selected={activeTab === 'icp'}
             className={`tab-btn ${activeTab === 'icp' ? 'tab-btn-active' : ''}`}
-            onClick={() => setActiveTab('icp')}
+            onClick={() => handleTabChange('icp')}
           >
             <ListChecks size={16} />
             <span>ICP Questions</span>
@@ -473,7 +478,7 @@ export const Settings = () => {
             role="tab"
             aria-selected={activeTab === 'tasks' || activeTab === 'pld'}
             className={`tab-btn ${activeTab === 'tasks' || activeTab === 'pld' ? 'tab-btn-active' : ''}`}
-            onClick={() => setActiveTab('tasks')}
+            onClick={() => handleTabChange('tasks')}
           >
             <Sparkles size={16} />
             <span>Stage Tasks & Progression Rules</span>

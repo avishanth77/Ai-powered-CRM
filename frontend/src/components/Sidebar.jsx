@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard,
@@ -15,14 +15,49 @@ import {
   Calendar,
   Bell,
   Bot,
+  Package,
+  ChevronDown,
+  Shield,
+  Layers,
+  ListChecks,
+  Sparkles,
+  Globe,
+  UserCheck,
 } from 'lucide-react';
 
 export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
-  const { user, isAdmin, isManager, isExecutive } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const {
+    user,
+    isAdmin,
+    isManager,
+    isExecutive,
+    canManageStages,
+    canManageSources,
+    canManageIcp,
+    canManagePld,
+    canManageTaskRules,
+  } = useAuth();
+
   const asideRef = useRef(null);
   const [isMobileViewport, setIsMobileViewport] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
   );
+
+  const isSettingsActive = location.pathname.startsWith('/settings');
+  const searchParams = new URLSearchParams(location.search);
+  const activeTabParam = searchParams.get('tab');
+  const defaultSettingsTab = canManageStages ? 'stages' : 'profile';
+
+  // Open settings dropdown automatically if user is on any /settings URL
+  const [settingsOpen, setSettingsOpen] = useState(isSettingsActive);
+
+  useEffect(() => {
+    if (isSettingsActive) {
+      setSettingsOpen(true);
+    }
+  }, [isSettingsActive]);
 
   useEffect(() => {
     const mq = window.matchMedia('(max-width: 768px)');
@@ -108,13 +143,72 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
       icon: Bot,
       show: true,
     },
+  ];
+
+  const settingsSubItems = [
     {
-      label: 'Settings',
-      path: '/settings',
-      icon: Settings,
+      label: 'Lead Stage Management',
+      tab: 'stages',
+      icon: Kanban,
+      show: canManageStages || isAdmin,
+    },
+    {
+      label: 'Profile & Security',
+      tab: 'profile',
+      icon: Shield,
       show: true,
     },
+    {
+      label: 'Lead Sources',
+      tab: 'sources',
+      icon: Layers,
+      show: canManageSources || isAdmin,
+    },
+    {
+      label: 'ICP Questions',
+      tab: 'icp',
+      icon: ListChecks,
+      show: canManageIcp || isAdmin,
+    },
+    {
+      label: 'Stage Tasks & Rules',
+      tab: 'tasks',
+      icon: Sparkles,
+      show: canManageTaskRules || canManagePld || isAdmin || isManager,
+    },
+    {
+      label: 'Web-to-Lead API',
+      tab: 'web-to-lead',
+      icon: Globe,
+      show: canManageSources || canManageStages || isAdmin || isManager,
+    },
+    {
+      label: 'Products Catalog',
+      tab: 'products',
+      icon: Package,
+      show: isAdmin || isManager,
+    },
+    {
+      label: 'Lead Auto-Assignment',
+      tab: 'assignment',
+      icon: UserCheck,
+      show: isAdmin || isManager,
+    },
   ];
+
+  const visibleSettingsSubItems = settingsSubItems.filter((i) => i.show);
+
+  const handleToggleSettings = () => {
+    if (!settingsOpen) {
+      setSettingsOpen(true);
+      if (!isSettingsActive) {
+        navigate(`/settings?tab=${defaultSettingsTab}`);
+        if (isMobileViewport) onCloseMobile();
+      }
+    } else {
+      setSettingsOpen(false);
+    }
+  };
 
   return (
     <>
@@ -158,6 +252,59 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
                 </NavLink>
               );
             })}
+
+          {/* Settings Section Header */}
+          <div className="sidebar-section-title" style={{ marginTop: '0.75rem' }}>Configuration</div>
+
+          {/* Settings Dropdown Accordion */}
+          <div className="sidebar-dropdown-group">
+            <button
+              type="button"
+              className={`sidebar-link sidebar-dropdown-toggle ${isSettingsActive ? 'sidebar-link-active' : ''}`}
+              onClick={handleToggleSettings}
+              aria-expanded={settingsOpen}
+              aria-controls="sidebar-settings-submenu"
+              title="Settings & Configuration"
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <Settings size={19} className="nav-icon" />
+                <span>Settings</span>
+              </div>
+              <ChevronDown
+                size={16}
+                className="chevron-icon"
+                style={{
+                  transform: settingsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                  transition: 'transform 0.2s ease',
+                }}
+              />
+            </button>
+
+            {settingsOpen && (
+              <div id="sidebar-settings-submenu" className="sidebar-submenu" role="menu">
+                {visibleSettingsSubItems.map((subItem) => {
+                  const SubIcon = subItem.icon;
+                  const isSubActive =
+                    isSettingsActive &&
+                    (activeTabParam === subItem.tab ||
+                      (!activeTabParam && subItem.tab === defaultSettingsTab));
+
+                  return (
+                    <NavLink
+                      key={subItem.tab}
+                      to={`/settings?tab=${subItem.tab}`}
+                      className={`sidebar-sublink ${isSubActive ? 'sidebar-sublink-active' : ''}`}
+                      onClick={onCloseMobile}
+                      role="menuitem"
+                    >
+                      <SubIcon size={14} className="sublink-icon" />
+                      <span>{subItem.label}</span>
+                    </NavLink>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </nav>
 
         <div className="sidebar-footer">
@@ -174,3 +321,5 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
     </>
   );
 };
+
+export default Sidebar;
