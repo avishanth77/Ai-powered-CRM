@@ -1,0 +1,1818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+  <title>Telegram • CRM Sales Copilot Simulator (@mycrm_sales_copilot_bot)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --tg-bg: #0e1621;
+      --tg-pattern-tint: rgba(14, 22, 33, 0.94);
+      --tg-header-bg: #17212b;
+      --tg-header-border: #0e1621;
+      --tg-surface: #182533;
+      --tg-msg-in: #182533;
+      --tg-msg-in-border: rgba(255, 255, 255, 0.05);
+      --tg-msg-out: #2b5278;
+      --tg-msg-out-border: rgba(92, 152, 214, 0.3);
+      --tg-primary: #2481cc;
+      --tg-primary-hover: #2da1e7;
+      --tg-accent: #5288c1;
+      --tg-btn-bg: #202b36;
+      --tg-btn-hover: #2b394a;
+      --tg-btn-text: #64b5f6;
+      --tg-btn-border: rgba(255, 255, 255, 0.07);
+      --tg-text: #f5f5f5;
+      --tg-text-muted: #7e8b9b;
+      --tg-text-dim: #5a6675;
+      --tg-link: #6ab2f2;
+      --tg-code-bg: #10161e;
+      --tg-code-border: rgba(255, 255, 255, 0.1);
+      --tg-time: #6c7883;
+      --tg-time-out: #8aa3be;
+      --tg-ticks: #5c98d6;
+      --tg-toast-bg: rgba(23, 33, 43, 0.96);
+      --chassis-bg: #1e2532;
+      --chassis-border: #2e3846;
+      --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      --font-mono: 'JetBrains Mono', monospace;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      height: 100%;
+      height: 100dvh;
+      overflow: hidden;
+      margin: 0;
+      padding: 0;
+      background: #090d14 radial-gradient(circle at 50% 10%, #151d2c 0%, #06090e 100%);
+      font-family: var(--font-sans);
+      color: var(--tg-text);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* DESKTOP PHONE CHASSIS */
+    .phone-container {
+      position: relative;
+      height: min(840px, calc(100dvh - 1.5rem));
+      max-height: calc(100dvh - 1.5rem);
+      aspect-ratio: 390 / 810;
+      width: auto;
+      max-width: min(420px, calc(100vw - 1rem));
+      background: var(--chassis-bg);
+      border-radius: clamp(32px, 5vh, 48px);
+      padding: 10px;
+      box-shadow:
+        0 0 0 2px rgba(255, 255, 255, 0.08),
+        0 24px 70px -10px rgba(0, 0, 0, 0.85),
+        0 10px 25px -5px rgba(0, 0, 0, 0.6);
+      display: flex;
+      flex-direction: column;
+      user-select: none;
+      transition: all 0.3s ease;
+      flex-shrink: 1;
+      min-height: 0;
+    }
+
+    /* Screen display viewport */
+    .phone-screen {
+      position: relative;
+      width: 100%;
+      height: 100%;
+      background-color: var(--tg-bg);
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(36, 129, 204, 0.04) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(99, 102, 241, 0.03) 0%, transparent 40%);
+      border-radius: clamp(24px, 4vh, 38px);
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    /* Dynamic Island / Camera Notch */
+    .dynamic-island {
+      position: absolute;
+      top: 9px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 108px;
+      height: 25px;
+      background: #000;
+      border-radius: 20px;
+      z-index: 50;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 9px;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.6);
+      pointer-events: none;
+    }
+    .island-camera {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #0d121c;
+      border: 1px solid #1c2738;
+      box-shadow: inset 0 0 3px #0466c8;
+    }
+    .island-sensor {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #0b0f16;
+    }
+
+    /* Mobile Status Bar */
+    .status-bar {
+      height: 38px;
+      padding: 8px 18px 0 22px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 13px;
+      font-weight: 600;
+      color: #e6edf3;
+      z-index: 40;
+      letter-spacing: -0.2px;
+    }
+    .status-icons {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .status-icon-svg {
+      width: 15px;
+      height: 15px;
+      fill: currentColor;
+    }
+
+    /* Telegram App Header */
+    .tg-header {
+      height: 54px;
+      background: var(--tg-header-bg);
+      border-bottom: 1px solid var(--tg-header-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 12px;
+      z-index: 30;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+    }
+    .tg-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      min-width: 0;
+      flex: 1;
+    }
+    .tg-back-btn {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--tg-accent);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+    .tg-back-btn:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .tg-avatar-wrap {
+      position: relative;
+      flex-shrink: 0;
+    }
+    .tg-avatar {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #229ED9 0%, #0088cc 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-weight: 700;
+      box-shadow: 0 2px 8px rgba(0, 136, 204, 0.35);
+    }
+    .tg-online-badge {
+      position: absolute;
+      bottom: -1px;
+      right: -1px;
+      width: 11px;
+      height: 11px;
+      border-radius: 50%;
+      background: #10b981;
+      border: 2px solid var(--tg-header-bg);
+    }
+    .tg-online-badge.offline {
+      background: #f59e0b;
+    }
+
+    .tg-bot-info {
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .tg-bot-title {
+      font-size: 14.5px;
+      font-weight: 700;
+      color: var(--tg-text);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .tg-verified-icon {
+      width: 14px;
+      height: 14px;
+      fill: #229ED9;
+      flex-shrink: 0;
+    }
+    .tg-bot-sub {
+      font-size: 11.5px;
+      color: var(--tg-accent);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .tg-header-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tg-action-btn {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--tg-text-muted);
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+    }
+    .tg-action-btn:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--tg-text);
+    }
+
+    /* Connection Banner */
+    .tg-connect-banner {
+      background: #162434;
+      border-bottom: 1px solid rgba(82, 136, 193, 0.2);
+      padding: 7px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11.5px;
+      color: #9ab4cf;
+      z-index: 25;
+      animation: fadeIn 0.3s ease;
+    }
+    .tg-connect-banner strong {
+      color: #64b5f6;
+    }
+    .tg-banner-btn {
+      background: #2481cc;
+      color: #fff;
+      border: none;
+      padding: 3px 9px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tg-banner-btn:hover {
+      background: #2da1e7;
+    }
+
+    /* Chat Messages Stream */
+    .tg-chat-stream {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 12px 10px 8px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scroll-behavior: smooth;
+    }
+    .tg-chat-stream::-webkit-scrollbar {
+      width: 4px;
+    }
+    .tg-chat-stream::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+
+    /* Day Separator Pill */
+    .tg-date-pill {
+      align-self: center;
+      background: rgba(0, 0, 0, 0.35);
+      backdrop-filter: blur(4px);
+      padding: 3px 12px;
+      border-radius: 14px;
+      font-size: 11px;
+      font-weight: 600;
+      color: #9ab0c4;
+      margin: 4px 0 6px 0;
+      user-select: none;
+    }
+
+    /* Message Bubbles */
+    .tg-msg {
+      max-width: 86%;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      animation: slideUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+      word-break: break-word;
+    }
+    .tg-msg.incoming {
+      align-self: flex-start;
+    }
+    .tg-msg.outgoing {
+      align-self: flex-end;
+    }
+
+    .tg-msg-bubble {
+      padding: 8px 12px 6px 12px;
+      border-radius: 14px;
+      font-size: 13.5px;
+      line-height: 1.42;
+      position: relative;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+    }
+    .tg-msg.incoming .tg-msg-bubble {
+      background: var(--tg-msg-in);
+      color: var(--tg-text);
+      border: 1px solid var(--tg-msg-in-border);
+      border-bottom-left-radius: 4px;
+    }
+    .tg-msg.outgoing .tg-msg-bubble {
+      background: var(--tg-msg-out);
+      color: #fff;
+      border: 1px solid var(--tg-msg-out-border);
+      border-bottom-right-radius: 4px;
+    }
+
+    /* Message Content Formatting */
+    .tg-msg-bubble b, .tg-msg-bubble strong {
+      font-weight: 700;
+      color: #fff;
+    }
+    .tg-msg-bubble i, .tg-msg-bubble em {
+      font-style: italic;
+      color: #cad8e6;
+    }
+    .tg-msg-bubble code {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      background: var(--tg-code-bg);
+      border: 1px solid var(--tg-code-border);
+      padding: 1px 5px;
+      border-radius: 5px;
+      color: #79c0ff;
+    }
+    .tg-msg-bubble pre {
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      background: var(--tg-code-bg);
+      border: 1px solid var(--tg-code-border);
+      padding: 8px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 6px 0;
+      color: #a5d6ff;
+    }
+    .tg-msg-bubble a {
+      color: var(--tg-link);
+      text-decoration: underline;
+    }
+
+    /* Metadata Footer (Timestamp & Checkmarks) */
+    .tg-msg-footer {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 3px;
+      font-size: 10.5px;
+      margin-top: 3px;
+      user-select: none;
+    }
+    .tg-msg.incoming .tg-msg-footer {
+      color: var(--tg-time);
+    }
+    .tg-msg.outgoing .tg-msg-footer {
+      color: var(--tg-time-out);
+    }
+    .tg-checks {
+      display: inline-flex;
+      color: var(--tg-ticks);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: -2px;
+    }
+
+    /* Telegram Inline Keyboard Buttons */
+    .tg-keyboard {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-top: 5px;
+      width: 100%;
+    }
+    .tg-btn-row {
+      display: flex;
+      gap: 4px;
+      width: 100%;
+    }
+    .tg-btn {
+      flex: 1;
+      min-width: 0;
+      background: var(--tg-btn-bg);
+      color: var(--tg-btn-text);
+      border: 1px solid var(--tg-btn-border);
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      transition: background 0.15s, transform 0.05s, border-color 0.15s;
+      user-select: none;
+      word-break: break-word;
+    }
+    .tg-btn:hover {
+      background: var(--tg-btn-hover);
+      border-color: rgba(100, 181, 246, 0.3);
+    }
+    .tg-btn:active {
+      transform: scale(0.98);
+      background: #1b2633;
+    }
+    .tg-btn.loading {
+      opacity: 0.7;
+      pointer-events: none;
+    }
+    .tg-btn.btn-confirm {
+      color: #4ade80;
+      border-color: rgba(74, 222, 128, 0.25);
+      background: rgba(74, 222, 128, 0.08);
+    }
+    .tg-btn.btn-cancel {
+      color: #f87171;
+      border-color: rgba(248, 113, 113, 0.25);
+      background: rgba(248, 113, 113, 0.08);
+    }
+
+    /* Typing Indicator Bubble */
+    .tg-typing-bubble {
+      display: none;
+      align-self: flex-start;
+      background: var(--tg-msg-in);
+      border: 1px solid var(--tg-msg-in-border);
+      border-radius: 14px;
+      border-bottom-left-radius: 4px;
+      padding: 10px 14px;
+      align-items: center;
+      gap: 5px;
+      animation: fadeIn 0.2s ease;
+    }
+    .tg-typing-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--tg-accent);
+      animation: pulseDot 1.2s infinite ease-in-out;
+    }
+    .tg-typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .tg-typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    /* Quick Prompt Chips Carousel */
+    .tg-chips-scroll {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding: 6px 10px;
+      background: #121b24;
+      border-top: 1px solid rgba(255, 255, 255, 0.04);
+      scrollbar-width: none;
+      flex-shrink: 0;
+    }
+    .tg-chips-scroll::-webkit-scrollbar {
+      display: none;
+    }
+    .tg-chip {
+      background: #1a2430;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      color: #a4b7cc;
+      border-radius: 14px;
+      padding: 4px 11px;
+      font-size: 11.5px;
+      font-weight: 500;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tg-chip:hover {
+      background: #233140;
+      color: #fff;
+      border-color: rgba(100, 181, 246, 0.35);
+    }
+    .tg-chip.highlight {
+      background: rgba(36, 129, 204, 0.18);
+      color: #64b5f6;
+      border-color: rgba(36, 129, 204, 0.4);
+    }
+
+    /* Message Input Bar */
+    .tg-input-bar {
+      min-height: 52px;
+      background: var(--tg-header-bg);
+      border-top: 1px solid var(--tg-header-border);
+      display: flex;
+      align-items: center;
+      padding: 6px 8px;
+      gap: 6px;
+      position: relative;
+      z-index: 30;
+    }
+    .tg-input-icon-btn {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: transparent;
+      border: none;
+      color: var(--tg-text-muted);
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      flex-shrink: 0;
+    }
+    .tg-input-icon-btn:hover {
+      background: rgba(255, 255, 255, 0.06);
+      color: var(--tg-text);
+    }
+    .tg-cmd-btn {
+      color: #64b5f6;
+      font-weight: 700;
+      font-size: 15px;
+      font-family: var(--font-mono);
+    }
+
+    .tg-input-box {
+      flex: 1;
+      background: #0e1621;
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 20px;
+      padding: 7px 14px;
+      color: var(--tg-text);
+      font-size: 13.5px;
+      font-family: inherit;
+      outline: none;
+      max-height: 90px;
+      resize: none;
+      transition: border-color 0.2s;
+    }
+    .tg-input-box:focus {
+      border-color: var(--tg-primary);
+    }
+    .tg-input-box::placeholder {
+      color: var(--tg-text-dim);
+    }
+
+    .tg-send-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: var(--tg-primary);
+      border: none;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(36, 129, 204, 0.4);
+      transition: transform 0.1s, background 0.15s;
+      flex-shrink: 0;
+    }
+    .tg-send-btn:hover {
+      background: var(--tg-primary-hover);
+    }
+    .tg-send-btn:active {
+      transform: scale(0.92);
+    }
+
+    /* Slash Commands Menu Modal / Bottom Sheet */
+    .tg-cmd-sheet {
+      position: absolute;
+      bottom: 58px;
+      left: 10px;
+      right: 10px;
+      background: #17212b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.6);
+      z-index: 60;
+      display: none;
+      flex-direction: column;
+      overflow: hidden;
+      animation: sheetUp 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .tg-cmd-sheet-header {
+      padding: 10px 14px;
+      background: #131c25;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 12px;
+      font-weight: 700;
+      color: #64b5f6;
+    }
+    .tg-cmd-list {
+      max-height: 240px;
+      overflow-y: auto;
+      padding: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .tg-cmd-item {
+      padding: 8px 10px;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      transition: background 0.15s;
+    }
+    .tg-cmd-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .tg-cmd-name {
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      font-weight: 700;
+      color: #64b5f6;
+      min-width: 82px;
+    }
+    .tg-cmd-desc {
+      font-size: 11.5px;
+      color: #9cb2c9;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* 3-Dots Dropdown Sheet */
+    .tg-dropdown-menu {
+      position: absolute;
+      top: 60px;
+      right: 12px;
+      width: 220px;
+      background: #17212b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+      z-index: 70;
+      display: none;
+      flex-direction: column;
+      padding: 6px;
+      animation: fadeIn 0.15s ease;
+    }
+    .tg-menu-item {
+      padding: 9px 12px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      color: var(--tg-text);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .tg-menu-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+    }
+    .tg-menu-item.danger {
+      color: #f87171;
+    }
+    .tg-menu-item.danger:hover {
+      background: rgba(248, 113, 113, 0.1);
+    }
+    .tg-menu-divider {
+      height: 1px;
+      background: rgba(255, 255, 255, 0.06);
+      margin: 4px 0;
+    }
+
+    /* Toast Notification Overlay */
+    .tg-toast {
+      position: absolute;
+      top: 50px;
+      left: 50%;
+      transform: translateX(-50%) translateY(-20px);
+      background: var(--tg-toast-bg);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #fff;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 12.5px;
+      font-weight: 500;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+      z-index: 80;
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      max-width: 90%;
+      text-align: center;
+    }
+    .tg-toast.show {
+      opacity: 1;
+      transform: translateX(-50%) translateY(0);
+      pointer-events: auto;
+    }
+
+    /* Link PIN Modal Dialog */
+    .tg-modal-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.7);
+      backdrop-filter: blur(4px);
+      z-index: 90;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      animation: fadeIn 0.2s ease;
+    }
+    .tg-modal-card {
+      background: #17212b;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 16px;
+      padding: 20px;
+      width: 100%;
+      max-width: 320px;
+      box-shadow: 0 16px 40px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .tg-modal-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .tg-modal-desc {
+      font-size: 12px;
+      color: #9ab4cf;
+      line-height: 1.4;
+    }
+    .tg-pin-input {
+      background: #0e1621;
+      border: 1px solid rgba(100, 181, 246, 0.3);
+      border-radius: 8px;
+      padding: 10px;
+      font-family: var(--font-mono);
+      font-size: 20px;
+      font-weight: 700;
+      text-align: center;
+      letter-spacing: 6px;
+      color: #64b5f6;
+      outline: none;
+    }
+    .tg-modal-actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 6px;
+    }
+    .tg-modal-btn {
+      flex: 1;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s;
+    }
+    .tg-modal-btn.primary {
+      background: var(--tg-primary);
+      color: #fff;
+    }
+    .tg-modal-btn.secondary {
+      background: rgba(255, 255, 255, 0.08);
+      color: #cad8e6;
+    }
+
+    /* Keyframe Animations */
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes sheetUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes pulseDot {
+      0%, 80%, 100% { transform: scale(0.6); opacity: 0.4; }
+      40% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Fullscreen adapt on small screens */
+    @media (max-width: 480px) {
+      body {
+        padding: 0;
+        background: var(--tg-bg);
+      }
+      .phone-container {
+        width: 100%;
+        height: 100%;
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 0;
+        padding: 0;
+        box-shadow: none;
+      }
+      .phone-screen {
+        border-radius: 0;
+        border: none;
+      }
+      .dynamic-island {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- PHONE CHASSIS WRAPPER -->
+  <div class="phone-container">
+    <div class="phone-screen">
+
+      <!-- Dynamic Island / Top Notch -->
+      <div class="dynamic-island">
+        <div class="island-sensor"></div>
+        <div class="island-camera"></div>
+      </div>
+
+      <!-- Top Status Bar -->
+      <div class="status-bar">
+        <span id="statusBarTime">09:41</span>
+        <div class="status-icons">
+          <!-- 5G / Signal Bars SVG -->
+          <svg class="status-icon-svg" viewBox="0 0 24 24">
+            <path d="M2 19h3v-4H2v4zm5 0h3v-7H7v7zm5 0h3V8h-3v11zm5 0h3V3h-3v16z"/>
+          </svg>
+          <!-- Wi-Fi SVG -->
+          <svg class="status-icon-svg" viewBox="0 0 24 24">
+            <path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98C20.93 5.9 16.69 4 12 4zm0 3.5c3.75 0 7.15 1.5 9.68 3.94L12 19.38 2.32 11.44C4.85 9 8.25 7.5 12 7.5z"/>
+          </svg>
+          <!-- Battery SVG -->
+          <svg class="status-icon-svg" style="width: 18px;" viewBox="0 0 24 24">
+            <path d="M16 4h-2V2h-4v2H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H8V6h8v14z"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- Telegram Header -->
+      <div class="tg-header">
+        <div class="tg-header-left" id="headerBotProfile" title="Bot Profile">
+          <button class="tg-back-btn" id="btnBack">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+            </svg>
+          </button>
+          <div class="tg-avatar-wrap">
+            <div class="tg-avatar">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
+                <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+              </svg>
+            </div>
+            <div class="tg-online-badge" id="onlineBadge"></div>
+          </div>
+          <div class="tg-bot-info">
+            <div class="tg-bot-title">
+              CRM Sales Copilot
+              <svg class="tg-verified-icon" viewBox="0 0 24 24">
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+              </svg>
+            </div>
+            <div class="tg-bot-sub" id="botSubtext">bot • @mycrm_sales_copilot_bot</div>
+          </div>
+        </div>
+
+        <div class="tg-header-actions">
+          <button class="tg-action-btn" id="btnSoundToggle" title="Toggle Sound">
+            <span id="soundIcon">🔔</span>
+          </button>
+          <button class="tg-action-btn" id="btnMenuDots" title="More Options">
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Telegram Status Banner (Unlinked or Linked state) -->
+      <div class="tg-connect-banner" id="connectBanner">
+        <span id="bannerText">🔑 <strong>Not Connected:</strong> Enter PIN to link CRM profile</span>
+        <button class="tg-banner-btn" id="bannerActionBtn">Link PIN</button>
+      </div>
+
+      <!-- Messages Stream -->
+      <div class="tg-chat-stream" id="chatStream">
+        <div class="tg-date-pill">Today</div>
+
+        <!-- Initial Greeting Message -->
+        <div class="tg-msg incoming" id="msg-init">
+          <div class="tg-msg-bubble">
+            👋 <b>Welcome to CRM Lite Copilot!</b><br><br>
+            I'm your official Telegram Sales Copilot bot (<code>@mycrm_sales_copilot_bot</code>).<br><br>
+            To link this chat with your CRM profile:<br>
+            1. Open CRM Web &gt; <b>Settings &gt; Telegram Bot</b><br>
+            2. Generate your 6-digit connection PIN<br>
+            3. Send: <code>/connect &lt;PIN&gt;</code> here.<br><br>
+            <i>Or tap the button below to quick-connect as Admin:</i>
+            <div class="tg-keyboard">
+              <div class="tg-btn-row">
+                <button class="tg-btn btn-confirm" onclick="quickConnectAdmin()">⚡ Quick Connect Admin</button>
+                <button class="tg-btn" onclick="openLinkPinModal()">🔑 Enter 6-Digit PIN</button>
+              </div>
+            </div>
+            <div class="tg-msg-footer">
+              <span class="tg-time">09:41</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Typing Indicator -->
+      <div class="tg-typing-bubble" id="typingBubble">
+        <div class="tg-typing-dot"></div>
+        <div class="tg-typing-dot"></div>
+        <div class="tg-typing-dot"></div>
+      </div>
+
+      <!-- Quick Prompt Suggestion Chips -->
+      <div class="tg-chips-scroll">
+        <div class="tg-chip highlight" onclick="submitText('Create lead Rahul Sharma, phone 9876543210, company TechNova')">
+          ➕ Create Lead (Rahul Sharma)
+        </div>
+        <div class="tg-chip" onclick="submitText('/pipeline')">📊 /pipeline</div>
+        <div class="tg-chip" onclick="submitText('/tasks')">📝 /tasks</div>
+        <div class="tg-chip" onclick="submitText('/leads')">📋 /leads</div>
+        <div class="tg-chip" onclick="submitText('/today')">⏰ /today</div>
+        <div class="tg-chip" onclick="submitText('/status')">👤 /status</div>
+        <div class="tg-chip" onclick="submitText('/help')">❓ /help</div>
+      </div>
+
+      <!-- Message Input Bar -->
+      <div class="tg-input-bar">
+        <button class="tg-input-icon-btn tg-cmd-btn" id="btnCmdMenu" title="Slash Commands">
+          /
+        </button>
+        <button class="tg-input-icon-btn" id="btnAttach" title="Attach file">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor">
+            <path d="M16.5 6v11.5c0 2.21-1.79 4-4 4s-4-1.79-4-4V5a2.5 2.5 0 0 1 5 0v10.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5V6H9v9.5a3 3 0 0 0 6 0V5c0-2.21-1.79-4-4-4S7 2.79 7 5v12.5c0 3.04 2.46 5.5 5.5 5.5s5.5-2.46 5.5-5.5V6h-1.5z"/>
+          </svg>
+        </button>
+        <input
+          type="text"
+          class="tg-input-box"
+          id="messageInput"
+          placeholder="Message or /command..."
+          autocomplete="off"
+        />
+        <button class="tg-send-btn" id="btnSend" title="Send Message">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="margin-left: 2px;">
+            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Slash Commands Bottom Sheet -->
+      <div class="tg-cmd-sheet" id="cmdSheet">
+        <div class="tg-cmd-sheet-header">
+          <span>COMMANDS</span>
+          <span style="cursor: pointer;" onclick="toggleCmdSheet(false)">✕</span>
+        </div>
+        <div class="tg-cmd-list">
+          <div class="tg-cmd-item" onclick="execCmd('/pipeline')">
+            <span class="tg-cmd-name">/pipeline</span>
+            <span class="tg-cmd-desc">Visual deals funnel &amp; stage metrics</span>
+          </div>
+          <div class="tg-cmd-item" onclick="execCmd('/leads')">
+            <span class="tg-cmd-name">/leads</span>
+            <span class="tg-cmd-desc">View top active leads &amp; quick actions</span>
+          </div>
+          <div class="tg-cmd-item" onclick="execCmd('/tasks')">
+            <span class="tg-cmd-name">/tasks</span>
+            <span class="tg-cmd-desc">View staff tasks &amp; 1-tap completions</span>
+          </div>
+          <div class="tg-cmd-item" onclick="execCmd('/today')">
+            <span class="tg-cmd-name">/today</span>
+            <span class="tg-cmd-desc">Today's follow-up agenda &amp; overdue tasks</span>
+          </div>
+          <div class="tg-cmd-item" onclick="execCmd('/status')">
+            <span class="tg-cmd-name">/status</span>
+            <span class="tg-cmd-desc">Connected account status &amp; notification prefs</span>
+          </div>
+          <div class="tg-cmd-item" onclick="execCmd('/help')">
+            <span class="tg-cmd-name">/help</span>
+            <span class="tg-cmd-desc">Full command cheat sheet &amp; AI prompt guide</span>
+          </div>
+          <div class="tg-cmd-item" onclick="execCmd('/disconnect')">
+            <span class="tg-cmd-name">/disconnect</span>
+            <span class="tg-cmd-desc">Unlink your Telegram session</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3-Dots Dropdown Menu -->
+      <div class="tg-dropdown-menu" id="dropdownMenu">
+        <div class="tg-menu-item" onclick="openLinkPinModal()">
+          <span>🔑</span> Link with 6-Digit PIN
+        </div>
+        <div class="tg-menu-item" onclick="quickConnectAdmin()">
+          <span>⚡</span> Quick Connect (Admin)
+        </div>
+        <div class="tg-menu-item" onclick="testConnectionStatus()">
+          <span>🔄</span> Refresh Status
+        </div>
+        <div class="tg-menu-divider"></div>
+        <div class="tg-menu-item" onclick="clearChat()">
+          <span>🗑</span> Clear Chat
+        </div>
+        <div class="tg-menu-item danger" onclick="disconnectSim()">
+          <span>🔌</span> Disconnect / Unlink
+        </div>
+      </div>
+
+      <!-- Toast Overlay -->
+      <div class="tg-toast" id="toastPill">Alert Toast</div>
+
+      <!-- Link PIN Modal Dialog -->
+      <div class="tg-modal-overlay" id="pinModal">
+        <div class="tg-modal-card">
+          <div class="tg-modal-title">
+            <span>🔑</span> Link Telegram Account
+          </div>
+          <div class="tg-modal-desc">
+            Enter the 6-digit PIN generated from your CRM Web app (<strong>Settings &gt; Telegram Bot</strong>):
+          </div>
+          <input
+            type="text"
+            id="pinInput"
+            class="tg-pin-input"
+            maxlength="6"
+            placeholder="000000"
+            inputmode="numeric"
+          />
+          <div class="tg-modal-actions">
+            <button class="tg-modal-btn secondary" onclick="closePinModal()">Cancel</button>
+            <button class="tg-modal-btn primary" onclick="submitPin()">Connect</button>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SIMULATOR CONTROLLER JAVASCRIPT -->
+  <script>
+    // Configuration
+    const CONFIG = {
+      API_BASE: window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+        ? (window.location.port === '5173' ? 'http://localhost:8000' : '')
+        : '',
+      SIM_ENDPOINT: '/api/telegram/simulate/',
+      STORAGE_KEY_CHAT_ID: 'crm_tg_sim_chat_id',
+      STORAGE_KEY_SOUND: 'crm_tg_sim_sound',
+      BOT_HANDLE: '@mycrm_sales_copilot_bot',
+    };
+
+    // State
+    const state = {
+      chatId: parseInt(localStorage.getItem(CONFIG.STORAGE_KEY_CHAT_ID)) || (Math.floor(100000000 + Math.random() * 900000000)),
+      username: 'sales_rep_alex',
+      firstName: 'Alex',
+      lastName: 'Rivera',
+      isVerified: false,
+      crmUser: null,
+      soundEnabled: localStorage.getItem(CONFIG.STORAGE_KEY_SOUND) !== 'false',
+      messageCount: 1,
+      isProcessing: false,
+      isOnline: true
+    };
+    localStorage.setItem(CONFIG.STORAGE_KEY_CHAT_ID, state.chatId);
+
+    // Audio SFX Synthesis (Web Audio API - No external files needed)
+    let audioCtx = null;
+    function getAudioCtx() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      return audioCtx;
+    }
+
+    function playSound(type) {
+      if (!state.soundEnabled) return;
+      try {
+        const ctx = getAudioCtx();
+        if (ctx.state === 'suspended') ctx.resume();
+
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+
+        const now = ctx.currentTime;
+        if (type === 'send') {
+          // Telegram send pop
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(580, now);
+          osc.frequency.exponentialRampToValueAtTime(780, now + 0.08);
+          gain.gain.setValueAtTime(0.12, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+          osc.start(now);
+          osc.stop(now + 0.08);
+        } else if (type === 'receive') {
+          // Telegram receive chime
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(840, now);
+          osc.frequency.exponentialRampToValueAtTime(1080, now + 0.12);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
+          osc.start(now);
+          osc.stop(now + 0.15);
+        } else if (type === 'click') {
+          // Button tap click
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(400, now);
+          gain.gain.setValueAtTime(0.08, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+          osc.start(now);
+          osc.stop(now + 0.04);
+        }
+      } catch (e) {
+        console.warn('Audio not allowed yet or not supported', e);
+      }
+    }
+
+    // Time ticker
+    function updateClock() {
+      const now = new Date();
+      const hrs = String(now.getHours()).padStart(2, '0');
+      const mins = String(now.getMinutes()).padStart(2, '0');
+      const timeStr = `${hrs}:${mins}`;
+      const el = document.getElementById('statusBarTime');
+      if (el) el.textContent = timeStr;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    function formatCurrentTime() {
+      const now = new Date();
+      return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    }
+
+    // Toast Alert
+    function showToast(text, isAlert = false) {
+      const toast = document.getElementById('toastPill');
+      toast.textContent = text;
+      toast.style.borderColor = isAlert ? 'rgba(239, 68, 68, 0.4)' : 'rgba(255, 255, 255, 0.15)';
+      toast.classList.add('show');
+      setTimeout(() => {
+        toast.classList.remove('show');
+      }, 3200);
+    }
+
+    // Banner & Status UI
+    function updateConnectionUI(isVerified, crmUser) {
+      state.isVerified = isVerified;
+      state.crmUser = crmUser;
+
+      const banner = document.getElementById('connectBanner');
+      const bannerText = document.getElementById('bannerText');
+      const bannerBtn = document.getElementById('bannerActionBtn');
+      const botSub = document.getElementById('botSubtext');
+      const badge = document.getElementById('onlineBadge');
+
+      if (isVerified && crmUser) {
+        banner.style.background = 'rgba(16, 185, 129, 0.12)';
+        banner.style.borderBottomColor = 'rgba(16, 185, 129, 0.3)';
+        bannerText.innerHTML = `✅ <strong>Linked:</strong> ${crmUser.name || crmUser.email} (<code>${crmUser.role}</code>)`;
+        bannerBtn.textContent = 'Status';
+        bannerBtn.onclick = () => submitText('/status');
+        botSub.textContent = `bot • Connected as ${crmUser.name?.split(' ')[0] || 'User'}`;
+        badge.classList.remove('offline');
+      } else {
+        banner.style.background = '#162434';
+        banner.style.borderBottomColor = 'rgba(82, 136, 193, 0.2)';
+        bannerText.innerHTML = `🔑 <strong>Not Connected:</strong> Enter PIN to link CRM profile`;
+        bannerBtn.textContent = 'Link PIN';
+        bannerBtn.onclick = openLinkPinModal;
+        botSub.textContent = `bot • @mycrm_sales_copilot_bot`;
+        badge.classList.add('offline');
+      }
+    }
+
+    // API Simulation Dispatcher
+    async function callBackendSimulate(payload) {
+      const url = `${CONFIG.API_BASE}${CONFIG.SIM_ENDPOINT}`;
+      payload.chat_id = state.chatId;
+      payload.username = state.username;
+      payload.first_name = state.firstName;
+      payload.last_name = state.lastName;
+
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json'
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const errData = await res.json().catch(() => ({}));
+          throw new Error(errData.message || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        state.isOnline = true;
+        return data;
+      } catch (err) {
+        console.warn('Backend simulate error:', err);
+        state.isOnline = false;
+        // Fallback to offline mock generator
+        return generateOfflineResponse(payload);
+      }
+    }
+
+    // Check existing connection on startup
+    async function testConnectionStatus() {
+      try {
+        const url = `${CONFIG.API_BASE}${CONFIG.SIM_ENDPOINT}?chat_id=${state.chatId}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          updateConnectionUI(data.is_verified, data.crm_user);
+          showToast(data.is_verified ? `Linked to ${data.crm_user.email}` : 'Telegram chat ready to link');
+        }
+      } catch (e) {
+        console.log('Backend not reachable yet (running in standalone mode)');
+      }
+    }
+
+    // DOM Rendering Helpers
+    function appendUserMessage(text) {
+      state.messageCount++;
+      const chatStream = document.getElementById('chatStream');
+      const timeStr = formatCurrentTime();
+
+      const msgEl = document.createElement('div');
+      msgEl.className = 'tg-msg outgoing';
+      msgEl.innerHTML = `
+        <div class="tg-msg-bubble">
+          ${escapeHtml(text)}
+          <div class="tg-msg-footer">
+            <span class="tg-time">${timeStr}</span>
+            <span class="tg-checks">✓✓</span>
+          </div>
+        </div>
+      `;
+      chatStream.appendChild(msgEl);
+      chatStream.scrollTop = chatStream.scrollHeight;
+      playSound('send');
+    }
+
+    function renderBotMessage(event) {
+      state.messageCount++;
+      const chatStream = document.getElementById('chatStream');
+      const timeStr = formatCurrentTime();
+      const msgId = event.message_id || `msg-${state.messageCount}`;
+
+      const msgEl = document.createElement('div');
+      msgEl.className = 'tg-msg incoming';
+      msgEl.id = `msg-${msgId}`;
+
+      let keyboardHtml = '';
+      if (event.reply_markup && event.reply_markup.inline_keyboard) {
+        keyboardHtml = renderKeyboardHtml(event.reply_markup.inline_keyboard, msgId);
+      }
+
+      msgEl.innerHTML = `
+        <div class="tg-msg-bubble">
+          ${formatTelegramHtml(event.text)}
+          ${keyboardHtml}
+          <div class="tg-msg-footer">
+            <span class="tg-time">${timeStr}</span>
+          </div>
+        </div>
+      `;
+      chatStream.appendChild(msgEl);
+      chatStream.scrollTop = chatStream.scrollHeight;
+      playSound('receive');
+    }
+
+    function renderMessageEdit(event) {
+      const msgId = event.message_id;
+      const existingEl = document.getElementById(`msg-${msgId}`);
+      const timeStr = formatCurrentTime();
+
+      let keyboardHtml = '';
+      if (event.reply_markup && event.reply_markup.inline_keyboard) {
+        keyboardHtml = renderKeyboardHtml(event.reply_markup.inline_keyboard, msgId);
+      }
+
+      const updatedBubbleHtml = `
+        <div class="tg-msg-bubble">
+          ${formatTelegramHtml(event.text)}
+          ${keyboardHtml}
+          <div class="tg-msg-footer">
+            <span class="tg-time">${timeStr} (edited)</span>
+          </div>
+        </div>
+      `;
+
+      if (existingEl) {
+        existingEl.innerHTML = updatedBubbleHtml;
+      } else {
+        // Fallback: render as new incoming message if original wasn't found
+        renderBotMessage(event);
+      }
+      playSound('receive');
+    }
+
+    function renderKeyboardHtml(rows, msgId) {
+      if (!rows || !rows.length) return '';
+      let html = '<div class="tg-keyboard">';
+      rows.forEach(row => {
+        html += '<div class="tg-btn-row">';
+        row.forEach(btn => {
+          const isConfirm = btn.text.includes('Confirm') || btn.text.includes('Create') || btn.text.includes('Yes');
+          const isCancel = btn.text.includes('Cancel') || btn.text.includes('No');
+          const extraClass = isConfirm ? 'btn-confirm' : (isCancel ? 'btn-cancel' : '');
+          const cbDataEsc = escapeHtml(btn.callback_data || '');
+          html += `
+            <button
+              class="tg-btn ${extraClass}"
+              onclick="onInlineBtnClick(this, '${cbDataEsc}', ${msgId})"
+            >
+              ${escapeHtml(btn.text)}
+            </button>
+          `;
+        });
+        html += '</div>';
+      });
+      html += '</div>';
+      return html;
+    }
+
+    // Formatting Telegram text (HTML parse_mode conversion)
+    function formatTelegramHtml(raw) {
+      if (!raw) return '';
+      // Raw string might already contain <b>, <code>, etc. We safely preserve known tags
+      let s = raw
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+      // Restore allowed Telegram HTML tags:
+      s = s
+        .replace(/&lt;b&gt;/gi, '<b>').replace(/&lt;\/b&gt;/gi, '</b>')
+        .replace(/&lt;strong&gt;/gi, '<strong>').replace(/&lt;\/strong&gt;/gi, '</strong>')
+        .replace(/&lt;i&gt;/gi, '<i>').replace(/&lt;\/i&gt;/gi, '</i>')
+        .replace(/&lt;em&gt;/gi, '<em>').replace(/&lt;\/em&gt;/gi, '</em>')
+        .replace(/&lt;code&gt;/gi, '<code>').replace(/&lt;\/code&gt;/gi, '</code>')
+        .replace(/&lt;pre&gt;/gi, '<pre>').replace(/&lt;\/pre&gt;/gi, '</pre>')
+        .replace(/&lt;a href="([^"]+)"&gt;/gi, '<a href="$1" target="_blank">').replace(/&lt;\/a&gt;/gi, '</a>');
+
+      // Convert newlines to <br>
+      s = s.replace(/\n/g, '<br>');
+      return s;
+    }
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    // Message Submission Flow
+    async function submitText(text) {
+      if (!text || !text.trim() || state.isProcessing) return;
+      const cleanText = text.trim();
+
+      // UI: render user message bubble
+      appendUserMessage(cleanText);
+
+      // Clear input
+      const input = document.getElementById('messageInput');
+      input.value = '';
+      toggleCmdSheet(false);
+
+      // Typing animation
+      setTyping(true);
+      state.isProcessing = true;
+
+      try {
+        const res = await callBackendSimulate({
+          text: cleanText,
+          message_id: state.messageCount
+        });
+
+        setTyping(false);
+
+        if (res.toast) {
+          showToast(res.toast.text, res.toast.show_alert);
+        }
+
+        updateConnectionUI(res.is_verified, res.crm_user);
+
+        // Process recorded bot events
+        if (res.events && res.events.length) {
+          res.events.forEach(evt => {
+            if (evt.type === 'edit') {
+              renderMessageEdit(evt);
+            } else {
+              renderBotMessage(evt);
+            }
+          });
+        }
+      } catch (err) {
+        setTyping(false);
+        showToast(`Error: ${err.message}`, true);
+      } finally {
+        state.isProcessing = false;
+      }
+    }
+
+    // Inline Button Tap Handler
+    async function onInlineBtnClick(btnEl, callbackData, messageId) {
+      if (state.isProcessing) return;
+      playSound('click');
+
+      btnEl.classList.add('loading');
+      btnEl.textContent = '⏳ ' + btnEl.textContent;
+      state.isProcessing = true;
+
+      try {
+        const res = await callBackendSimulate({
+          callback_data: callbackData,
+          message_id: messageId
+        });
+
+        if (res.toast) {
+          showToast(res.toast.text, res.toast.show_alert);
+        }
+
+        updateConnectionUI(res.is_verified, res.crm_user);
+
+        if (res.events && res.events.length) {
+          res.events.forEach(evt => {
+            if (evt.type === 'edit') {
+              renderMessageEdit(evt);
+            } else {
+              renderBotMessage(evt);
+            }
+          });
+        }
+      } catch (err) {
+        showToast(`Failed: ${err.message}`, true);
+      } finally {
+        btnEl.classList.remove('loading');
+        state.isProcessing = false;
+      }
+    }
+
+    function setTyping(isTyping) {
+      const bubble = document.getElementById('typingBubble');
+      const chatStream = document.getElementById('chatStream');
+      bubble.style.display = isTyping ? 'flex' : 'none';
+      if (isTyping) {
+        chatStream.scrollTop = chatStream.scrollHeight;
+      }
+    }
+
+    // Slash Commands Handling
+    function toggleCmdSheet(show) {
+      const sheet = document.getElementById('cmdSheet');
+      sheet.style.display = (show !== undefined ? show : sheet.style.display !== 'flex') ? 'flex' : 'none';
+      toggleDropdown(false);
+    }
+
+    function execCmd(cmd) {
+      toggleCmdSheet(false);
+      submitText(cmd);
+    }
+
+    // Dropdown 3-dots Menu
+    function toggleDropdown(show) {
+      const menu = document.getElementById('dropdownMenu');
+      menu.style.display = (show !== undefined ? show : menu.style.display !== 'flex') ? 'flex' : 'none';
+    }
+
+    // Quick Connect Admin
+    async function quickConnectAdmin() {
+      toggleDropdown(false);
+      setTyping(true);
+      try {
+        const res = await callBackendSimulate({
+          action: 'connect_admin',
+          username: 'admin',
+          first_name: 'CRM',
+          last_name: 'Administrator'
+        });
+        setTyping(false);
+        updateConnectionUI(res.is_verified, res.crm_user);
+        showToast('⚡ Linked as CRM Administrator!');
+        if (res.events && res.events.length) {
+          res.events.forEach(renderBotMessage);
+        } else {
+          submitText('/pipeline');
+        }
+      } catch (e) {
+        setTyping(false);
+        showToast('Failed to connect as admin: ' + e.message, true);
+      }
+    }
+
+    // Disconnect
+    async function disconnectSim() {
+      toggleDropdown(false);
+      try {
+        await callBackendSimulate({ action: 'reset' });
+        updateConnectionUI(false, null);
+        showToast('Telegram session disconnected.');
+        appendUserMessage('/disconnect');
+        renderBotMessage({
+          text: '👋 <b>Your Telegram account has been disconnected from CRM Lite.</b>\n\nTo reconnect, enter your 6-digit PIN using <code>/connect &lt;PIN&gt;</code>.'
+        });
+      } catch (e) {
+        showToast('Disconnect failed', true);
+      }
+    }
+
+    function clearChat() {
+      toggleDropdown(false);
+      const chatStream = document.getElementById('chatStream');
+      chatStream.innerHTML = '<div class="tg-date-pill">Today</div>';
+      showToast('Chat cleared');
+    }
+
+    // PIN Link Modal
+    function openLinkPinModal() {
+      toggleDropdown(false);
+      const modal = document.getElementById('pinModal');
+      const input = document.getElementById('pinInput');
+      input.value = '';
+      modal.style.display = 'flex';
+      input.focus();
+    }
+
+    function closePinModal() {
+      document.getElementById('pinModal').style.display = 'none';
+    }
+
+    function submitPin() {
+      const pin = document.getElementById('pinInput').value.trim();
+      if (!pin || pin.length !== 6 || !/^\d{6}$/.test(pin)) {
+        showToast('Please enter a valid 6-digit PIN', true);
+        return;
+      }
+      closePinModal();
+      submitText(`/connect ${pin}`);
+    }
+
+    // Offline Mock Generator (Guarantees UI functions even if backend server is not running)
+    function generateOfflineResponse(payload) {
+      const txt = (payload.text || '').trim();
+      const cb = payload.callback_data || '';
+
+      if (txt.startsWith('/connect') || payload.pin) {
+        const pin = payload.pin || txt.split(' ')[1] || '123456';
+        return {
+          success: true,
+          chat_id: state.chatId,
+          is_verified: true,
+          crm_user: {
+            email: 'admin@crmlite.com',
+            name: 'Alex Rivera (Demo)',
+            role: 'EXECUTIVE'
+          },
+          events: [{
+            type: 'message',
+            message_id: 3001,
+            text: `🎉 <b>Account Successfully Linked! (Demo Mode)</b>\n\n👤 <b>Name:</b> Alex Rivera\n🏷 <b>Role:</b> <code>EXECUTIVE</code>\n💼 <b>Status:</b> Active\n\nYou can now manage your leads, pipeline, and staff tasks directly here!`,
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '📊 Pipeline Deals', callback_data: 'cmd_pipeline' }, { text: '📋 My Leads', callback_data: 'cmd_leads' }],
+                [{ text: '📝 Staff Tasks', callback_data: 'cmd_tasks' }, { text: '⏰ Today Agenda', callback_data: 'cmd_today' }]
+              ]
+            }
+          }]
+        };
+      }
+
+      if (txt === '/pipeline' || cb === 'cmd_pipeline') {
+        return {
+          success: true,
+          is_verified: true,
+          crm_user: state.crmUser || { email: 'admin@crmlite.com', name: 'Demo User', role: 'ADMIN' },
+          events: [{
+            type: 'message',
+            message_id: 3002,
+            text: `📊 <b>CRM Pipeline Snapshot</b>\n💼 Total Active Deals: <b>14</b>\n💰 Pipeline Value: <b>$284,500</b>\n\n<b>New</b> (4) — $48,000\n🟦🟦🟦🟦\n\n<b>Contacted</b> (3) — $62,500\n🟦🟦🟦\n\n<b>Qualified</b> (5) — $134,000\n🟦🟦🟦🟦🟦\n\n<b>Proposal</b> (2) — $40,000\n🟦🟦`,
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '📋 View My Leads', callback_data: 'cmd_leads' }],
+                [{ text: '📝 Staff Tasks', callback_data: 'cmd_tasks' }, { text: '⏰ Today Agenda', callback_data: 'cmd_today' }]
+              ]
+            }
+          }]
+        };
+      }
+
+      if (txt === '/tasks' || cb === 'cmd_tasks') {
+        return {
+          success: true,
+          is_verified: true,
+          crm_user: state.crmUser,
+          events: [{
+            type: 'message',
+            message_id: 3003,
+            text: `📝 <b>Staff Tasks Overview (Team)</b>\nTotal Pending: <b>3</b>\n\n1. 🔴 <b>Schedule Security Review</b> [⚠️ Mandatory]\n   🏢 Lead: <i>Apex Systems</i> | 👨‍💼 <i>Alex Rivera</i>\n   ⏰ Due: <code>Tomorrow, 17:00</code>\n\n2. 🟡 <b>Send Product Pricing Tier</b>\n   🏢 Lead: <i>Acme Corp</i> | 👨‍💼 <i>Alex Rivera</i>\n   ⏰ Due: <code>Friday, 12:00</code>`,
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '✅ Complete: Security Review', callback_data: 'stagetask_done_101' }],
+                [{ text: '⚠️ Mandatory (1)', callback_data: 'tasks_filter_mandatory' }, { text: '🚨 Overdue (0)', callback_data: 'tasks_filter_overdue' }]
+              ]
+            }
+          }]
+        };
+      }
+
+      if (txt.toLowerCase().includes('create lead') || txt.toLowerCase().includes('rahul sharma')) {
+        return {
+          success: true,
+          is_verified: true,
+          crm_user: state.crmUser,
+          events: [{
+            type: 'message',
+            message_id: 3004,
+            text: `📝 <b>Confirm Create Lead</b>\n\n• <b>Name:</b> Rahul Sharma\n• <b>Phone:</b> <code>9876543210</code>\n• <b>Company:</b> TechNova\n• <b>Stage:</b> New Lead\n\nPlease confirm to create this lead in your CRM:`,
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '✅ Confirm Create', callback_data: 'act_confirm_demo' }, { text: '❌ Cancel', callback_data: 'act_cancel_demo' }]
+              ]
+            }
+          }]
+        };
+      }
+
+      if (cb === 'act_confirm_demo') {
+        return {
+          success: true,
+          is_verified: true,
+          toast: { text: 'Lead created successfully!', show_alert: false },
+          events: [{
+            type: 'edit',
+            message_id: payload.message_id,
+            text: `🎉 <b>Lead Created Successfully!</b>\n\n• <b>Name:</b> Rahul Sharma\n• <b>Company:</b> TechNova\n• <b>Phone:</b> <code>9876543210</code>\n• <b>Stage:</b> New Lead\n• <b>Assigned To:</b> Alex Rivera\n\nWhat would you like to do next?`,
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: '📋 View Leads', callback_data: 'cmd_leads' }, { text: '⚡ Move Stage', callback_data: 'lead_move_99' }]
+              ]
+            }
+          }]
+        };
+      }
+
+      // Default mock answer
+      return {
+        success: true,
+        is_verified: state.isVerified,
+        crm_user: state.crmUser,
+        events: [{
+          type: 'message',
+          message_id: 3009,
+          text: `🤖 <b>Sales Copilot:</b> I processed your request:\n<i>"${escapeHtml(txt || cb)}"</i>\n\nType <code>/help</code> or tap <b>[/]</b> to see all available pipeline commands.`
+        }]
+      };
+    }
+
+    // Initialization & Event Listeners
+    window.addEventListener('DOMContentLoaded', () => {
+      // Event: Send button
+      document.getElementById('btnSend').addEventListener('click', () => {
+        submitText(document.getElementById('messageInput').value);
+      });
+
+      // Event: Input Enter key
+      document.getElementById('messageInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          submitText(e.target.value);
+        }
+      });
+
+      // Event: Slash command button
+      document.getElementById('btnCmdMenu').addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleCmdSheet();
+      });
+
+      // Event: 3-dots Menu
+      document.getElementById('btnMenuDots').addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleDropdown();
+      });
+
+      // Event: Sound toggle button
+      document.getElementById('btnSoundToggle').addEventListener('click', () => {
+        state.soundEnabled = !state.soundEnabled;
+        localStorage.setItem(CONFIG.STORAGE_KEY_SOUND, state.soundEnabled);
+        document.getElementById('soundIcon').textContent = state.soundEnabled ? '🔔' : '🔕';
+        showToast(state.soundEnabled ? 'Sound Enabled' : 'Sound Muted');
+      });
+
+      // Dismiss sheets on outside click
+      document.addEventListener('click', (e) => {
+        if (!e.target.closest('#cmdSheet') && !e.target.closest('#btnCmdMenu')) {
+          toggleCmdSheet(false);
+        }
+        if (!e.target.closest('#dropdownMenu') && !e.target.closest('#btnMenuDots')) {
+          toggleDropdown(false);
+        }
+      });
+
+      // Check URL parameters (e.g. ?pin=373190 from CRM web settings)
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlPin = urlParams.get('pin');
+      if (urlPin && /^\d{6}$/.test(urlPin)) {
+        setTimeout(() => {
+          submitText(`/connect ${urlPin}`);
+        }, 600);
+      } else {
+        testConnectionStatus();
+      }
+    });
+  </script>
+</body>
+</html>

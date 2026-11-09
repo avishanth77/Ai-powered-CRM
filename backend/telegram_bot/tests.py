@@ -509,3 +509,47 @@ class TelegramBotIntegrationTestCase(TestCase):
         mock_answer.assert_called_with('cq_confirm_create', 'Action executed successfully!')
         mock_edit_text.assert_called_once()
         self.assertIn('Rahul Sharma', mock_edit_text.call_args[0][2])
+
+    def test_simulation_endpoint_connect_and_query(self):
+        """Tests POST /api/telegram/simulate/ for end-to-end mobile UI simulation."""
+        # Setup pending profile with PIN 555666
+        profile, _ = TelegramProfile.objects.get_or_create(user=self.user)
+        profile.verification_code = '555666'
+        profile.code_expires_at = timezone.now() + timedelta(minutes=15)
+        profile.is_verified = False
+        profile.save()
+
+        sim_chat_id = 999888777
+
+        # 1. Simulate user sending /connect 555666
+        res = self.client.post('/api/telegram/simulate/', {
+            'chat_id': sim_chat_id,
+            'text': '/connect 555666',
+            'username': 'sim_tester'
+        }, format='json')
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.data['is_verified'])
+        self.assertEqual(res.data['crm_user']['email'], self.user.email)
+        self.assertTrue(len(res.data['events']) > 0)
+        self.assertIn('Successfully Linked', res.data['events'][0]['text'])
+
+        # 2. Simulate user sending /pipeline command
+        res_pipeline = self.client.post('/api/telegram/simulate/', {
+            'chat_id': sim_chat_id,
+            'text': '/pipeline',
+        }, format='json')
+        self.assertEqual(res_pipeline.status_code, status.HTTP_200_OK)
+        self.assertTrue(len(res_pipeline.data['events']) > 0)
+        self.assertIn('Pipeline Snapshot', res_pipeline.data['events'][0]['text'])
+        self.assertIn('inline_keyboard', res_pipeline.data['events'][0]['reply_markup'])
+
+        # 3. Simulate tapping inline callback button 'cmd_tasks'
+        res_cb = self.client.post('/api/telegram/simulate/', {
+            'chat_id': sim_chat_id,
+            'callback_data': 'cmd_tasks',
+            'message_id': 2005
+        }, format='json')
+        self.assertEqual(res_cb.status_code, status.HTTP_200_OK)
+        self.assertTrue(len(res_cb.data['events']) > 0)
+        self.assertIn('Stage Tasks', res_cb.data['events'][0]['text'])

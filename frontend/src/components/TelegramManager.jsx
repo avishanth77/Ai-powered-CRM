@@ -17,6 +17,7 @@ import {
   MessageSquare,
   ShieldCheck,
   Terminal,
+  Smartphone,
 } from 'lucide-react';
 
 export const TelegramManager = () => {
@@ -167,6 +168,17 @@ export const TelegramManager = () => {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <a
+              href="/telegram_mobile.html"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-secondary btn-sm"
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', textDecoration: 'none' }}
+              title="Open Web-based Telegram Mobile Bot Simulator"
+            >
+              <Smartphone size={14} />
+              <span>Mobile Simulator</span>
+            </a>
             <button className="btn btn-secondary btn-sm" onClick={fetchStatus} title="Refresh Status">
               <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
               <span>Refresh</span>
@@ -319,7 +331,7 @@ export const TelegramManager = () => {
                       </span>
                     </div>
 
-                    <div style={{ margin: '0.25rem 0 0.5rem 1.85rem' }}>
+                    <div style={{ margin: '0.25rem 0 0.5rem 1.85rem', display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
                       <a
                         href={codeData.deep_link}
                         target="_blank"
@@ -329,6 +341,17 @@ export const TelegramManager = () => {
                       >
                         <ExternalLink size={15} />
                         <span>Open Bot &amp; Auto-Connect (1-Click)</span>
+                      </a>
+                      <a
+                        href={`/telegram_mobile.html?pin=${codeData.code}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-secondary"
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', textDecoration: 'none' }}
+                        title="Open Telegram Mobile Simulator with this PIN preloaded"
+                      >
+                        <Smartphone size={15} />
+                        <span>Open Mobile Simulator (1-Click)</span>
                       </a>
                     </div>
 

@@ -6,6 +6,7 @@ from .views import (
     TelegramUpdatePreferencesView,
     TelegramDisconnectView,
     TelegramSendTestMessageView,
+    TelegramSimulateView,
 )
 
 app_name = 'telegram_bot'
@@ -13,6 +14,9 @@ app_name = 'telegram_bot'
 urlpatterns = [
     # Webhook endpoint called by Telegram server
     path('webhook/', TelegramWebhookView.as_view(), name='telegram-webhook'),
+
+    # Mobile UI Simulator endpoint
+    path('simulate/', TelegramSimulateView.as_view(), name='telegram-simulate'),
 
     # CRM Authenticated API endpoints for frontend
     path('status/', TelegramStatusView.as_view(), name='telegram-status'),
