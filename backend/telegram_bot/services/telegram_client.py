@@ -146,6 +146,10 @@ class TelegramClient:
         """Removes the webhook to enable getUpdates polling."""
         return self._make_request('deleteWebhook', {'drop_pending_updates': False})
 
+    def get_webhook_info(self) -> Dict[str, Any]:
+        """Retrieves current Telegram webhook status."""
+        return self._make_request('getWebhookInfo')
+
     def get_updates(self, offset: Optional[int] = None, limit: int = 50, timeout: int = 25) -> Dict[str, Any]:
         """Fetches incoming updates for local development polling."""
         payload: Dict[str, Any] = {
