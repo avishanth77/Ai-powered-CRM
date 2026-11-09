@@ -440,23 +440,70 @@ class TelegramUpdateHandler:
             lead = Lead.objects.filter(pk=lead_id).select_related('stage', 'assigned_to').first()
             if lead:
                 self.client.answer_callback_query(cq_id)
+                deal_val = f"${lead.expected_value:,.2f}" if lead.expected_value is not None else "$0.00"
+                win_prob = lead.effective_win_probability if hasattr(lead, 'effective_win_probability') else (lead.stage.win_probability if lead.stage else 0)
+                
+                # Check task progression status
+                task_status_text = ""
+                try:
+                    summary = lead.get_stage_task_summary()
+                    m_tot = summary.get('mandatory_total', 0)
+                    m_comp = summary.get('mandatory_completed', 0)
+                    if m_tot > 0:
+                        task_status_text = f"\n📋 Stage Tasks: <b>{m_comp}/{m_tot} Mandatory Done</b>"
+                        if summary.get('progression_blocked'):
+                            task_status_text += " <i>(Advancement Locked 🔒)</i>"
+                except Exception:
+                    pass
+
                 info = (
                     f"👤 <b>{lead.name}</b>\n"
                     f"🏢 Company: <b>{lead.company_name or 'N/A'}</b>\n"
                     f"📧 Email: <code>{lead.email or 'N/A'}</code>\n"
                     f"📞 Phone: <code>{lead.phone or 'N/A'}</code>\n"
-                    f"📍 Stage: <code>{lead.stage.name if lead.stage else 'New'}</code>\n"
-                    f"💰 Deal Value: <b>${lead.expected_value:,.2f}</b>\n"
-                    f"🎯 Win Probability: <b>{lead.win_probability}%</b>\n"
+                    f"📍 Stage: <code>{lead.stage.name if lead.stage else 'New'}</code>{task_status_text}\n"
+                    f"💰 Deal Value: <b>{deal_val}</b>\n"
+                    f"🎯 Win Probability: <b>{win_prob}%</b>\n"
                     f"👨‍💼 Assigned To: <b>{lead.assigned_to.get_full_name() if lead.assigned_to else 'Unassigned'}</b>"
                 )
-                stages = LeadStage.objects.all().order_by('display_order')[:4]
+                stages = LeadStage.objects.filter(is_active=True).order_by('display_order')[:4]
                 stage_btns = [
                     {'text': f"➡️ {st.name}", 'callback_data': f"setstage_{lead.id}_{st.id}"}
                     for st in stages if not lead.stage or st.id != lead.stage.id
                 ]
-                keyboard = [stage_btns, [{'text': '⬅️ Back to Leads', 'callback_data': 'cmd_leads'}]]
+                keyboard = [stage_btns, [{'text': '📋 Back to Leads', 'callback_data': 'cmd_leads'}]]
                 self.client.send_inline_keyboard(chat_id, info, keyboard)
+            else:
+                self.client.answer_callback_query(cq_id, "Lead not found.", show_alert=True)
+
+        # 4b. Lead Stage Selection: lead_move_<id>
+        elif data.startswith('lead_move_'):
+            lead_id = data.replace('lead_move_', '')
+            lead = Lead.objects.filter(pk=lead_id).select_related('stage').first()
+            if lead:
+                self.client.answer_callback_query(cq_id)
+                stages = LeadStage.objects.filter(is_active=True).order_by('display_order')
+                stage_rows = []
+                current_row = []
+                for st in stages:
+                    if not lead.stage or st.id != lead.stage.id:
+                        current_row.append({'text': f"➡️ {st.name}", 'callback_data': f"setstage_{lead.id}_{st.id}"})
+                        if len(current_row) == 2:
+                            stage_rows.append(current_row)
+                            current_row = []
+                if current_row:
+                    stage_rows.append(current_row)
+                stage_rows.append([
+                    {'text': '👤 View Lead', 'callback_data': f"lead_detail_{lead.id}"},
+                    {'text': '📋 Back to Leads', 'callback_data': 'cmd_leads'}
+                ])
+                text = (
+                    f"⚡ <b>Select Target Stage for Lead:</b>\n"
+                    f"👤 <b>{lead.name}</b>\n"
+                    f"📍 Current Stage: <code>{lead.stage.name if lead.stage else 'New'}</code>\n\n"
+                    f"<i>Select a stage below to advance:</i>"
+                )
+                self.client.send_inline_keyboard(chat_id, text, stage_rows)
             else:
                 self.client.answer_callback_query(cq_id, "Lead not found.", show_alert=True)
 
