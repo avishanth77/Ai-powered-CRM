@@ -77,6 +77,7 @@ urlpatterns = [
     path('api/icp/', include('icp.urls')),
     path('api/pld/', include('pld.urls')),
     path('api/', include('ai.urls')),
+    path('api/telegram/', include('telegram_bot.urls')),
 
     # Email Testing Endpoint
     path('api/email/test/', EmailTestView.as_view(), name='email-test'),

@@ -13,6 +13,7 @@ import WinProbabilityFunnel from '../components/WinProbabilityFunnel';
 import { WebToLeadManager } from '../components/WebToLeadManager';
 import ProductsManager from '../components/ProductsManager';
 import { LeadAssignmentManager } from '../components/LeadAssignmentManager';
+import { TelegramManager } from '../components/TelegramManager';
 import {
   Settings as SettingsIcon,
   Plus,
@@ -37,6 +38,7 @@ import {
   Globe,
   Package,
   UserCheck,
+  Send,
 } from 'lucide-react';
 
 export const Settings = () => {
@@ -532,6 +534,20 @@ export const Settings = () => {
             <span>Lead Auto-Assignment</span>
           </button>
         )}
+
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === 'telegram'}
+          className={`tab-btn ${activeTab === 'telegram' ? 'tab-btn-active' : ''}`}
+          onClick={() => {
+            setActiveTab('telegram');
+            setSearchParams({ tab: 'telegram' });
+          }}
+        >
+          <Send size={16} />
+          <span>Telegram Bot</span>
+        </button>
       </div>
 
       {/* TAB 1: LEAD STAGES MANAGEMENT (Admin Only) */}
@@ -1441,6 +1457,11 @@ export const Settings = () => {
 
       {activeTab === 'assignment' && (isAdmin || isManager) && (
         <LeadAssignmentManager />
+      )}
+
+      {/* TAB: TELEGRAM BOT INTEGRATION */}
+      {activeTab === 'telegram' && (
+        <TelegramManager />
       )}
     </div>
   );

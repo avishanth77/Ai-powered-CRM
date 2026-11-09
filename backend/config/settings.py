@@ -46,6 +46,7 @@ INSTALLED_APPS = [
     'pld',
     'ai',
     'products',
+    'telegram_bot',
 ]
 
 MIDDLEWARE = [
@@ -233,4 +234,11 @@ AI_PROVIDER = os.getenv('AI_PROVIDER', 'gemini').lower()
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY', os.getenv('GOOGLE_API_KEY', ''))
 GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash')
 OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
+
+# ==============================================================================
+# TELEGRAM BOT INTEGRATION
+# ==============================================================================
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
+TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', 'CrmLiteCopilotBot').lstrip('@')
+TELEGRAM_WEBHOOK_SECRET = os.getenv('TELEGRAM_WEBHOOK_SECRET', 'crm_lite_telegram_secret_2026')
 

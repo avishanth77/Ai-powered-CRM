@@ -55,6 +55,14 @@ class NotificationService:
                 action_url=action_url,
                 priority=priority,
             )
+
+            # Proactively dispatch alert to Telegram if recipient has linked account
+            try:
+                from telegram_bot.services.telegram_dispatcher import TelegramNotificationDispatcher
+                TelegramNotificationDispatcher.dispatch(notification)
+            except Exception as te:
+                logger.debug(f"[NotificationService] Telegram dispatch skipped: {te}")
+
             return notification
         except Exception as e:
             logger.error(f"[NotificationService] Failed to create notification for {recipient.email}: {e}", exc_info=True)
