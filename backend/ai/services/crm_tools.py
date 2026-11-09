@@ -261,3 +261,104 @@ class CRMTools:
             }
             for u in users
         ]
+
+    @staticmethod
+    def get_scoped_tasks(user, staff_id: Optional[int] = None, staff_query: Optional[str] = None, mandatory_only: bool = False, overdue_only: bool = False, limit: int = 15) -> Dict[str, Any]:
+        """
+        Retrieves stage tasks scoped to the user's role or filtered by staff member.
+        - Managers/Admins can query any staff member or view team-wide tasks.
+        - Regular users can query their own assigned tasks or tasks on their leads.
+        """
+        from leads.models import LeadStageTask
+        from accounts.models import User
+
+        qs = LeadStageTask.objects.select_related('lead', 'stage', 'assigned_to').filter(
+            status=LeadStageTask.Status.PENDING
+        )
+
+        is_mgr = CRMTools._is_privileged(user)
+        target_user = None
+
+        if is_mgr and staff_id:
+            target_user = User.objects.filter(pk=staff_id, is_active=True).first()
+        elif is_mgr and staff_query:
+            sq = str(staff_query).strip().lstrip('@')
+            target_user = User.objects.filter(
+                Q(email__icontains=sq) | Q(first_name__icontains=sq) | Q(last_name__icontains=sq),
+                is_active=True
+            ).first()
+
+        if target_user:
+            qs = qs.filter(assigned_to=target_user)
+        elif not is_mgr:
+            qs = qs.filter(Q(assigned_to=user) | Q(lead__assigned_to=user))
+
+        if mandatory_only:
+            qs = qs.filter(is_mandatory=True)
+
+        now = timezone.now()
+        if overdue_only:
+            qs = qs.filter(due_date__lt=now)
+
+        total_count = qs.count()
+        tasks = qs.order_by('-is_mandatory', 'due_date')[:limit]
+
+        items = []
+        for t in tasks:
+            items.append({
+                'id': t.id,
+                'title': t.title,
+                'purpose': t.purpose,
+                'priority': t.priority,
+                'is_mandatory': t.is_mandatory,
+                'is_overdue': t.due_date < now if t.due_date else False,
+                'due_date': t.due_date.strftime('%Y-%m-%d %H:%M') if t.due_date else '',
+                'lead_id': t.lead_id,
+                'lead_name': t.lead.name if t.lead else 'Unknown',
+                'stage_id': t.stage_id,
+                'stage_name': t.stage.name if t.stage else '',
+                'assigned_to_id': t.assigned_to_id,
+                'assigned_to_name': t.assigned_to.get_full_name() or t.assigned_to.email if t.assigned_to else 'Unassigned',
+            })
+
+        return {
+            'total_count': total_count,
+            'target_staff': target_user.get_full_name() or target_user.email if target_user else None,
+            'target_staff_id': target_user.id if target_user else None,
+            'tasks': items,
+        }
+
+    @staticmethod
+    def get_staff_tasks_breakdown(user) -> List[Dict[str, Any]]:
+        """
+        Retrieves a summary of pending and mandatory tasks grouped by staff member.
+        Available to Admin and Manager roles.
+        """
+        from leads.models import LeadStageTask
+        from accounts.models import User
+
+        if not CRMTools._is_privileged(user):
+            return []
+
+        staff_list = User.objects.filter(is_active=True).order_by('first_name', 'email')
+        breakdown = []
+        now = timezone.now()
+
+        for staff in staff_list:
+            staff_qs = LeadStageTask.objects.filter(assigned_to=staff, status=LeadStageTask.Status.PENDING)
+            pending_count = staff_qs.count()
+            mandatory_count = staff_qs.filter(is_mandatory=True).count()
+            overdue_count = staff_qs.filter(due_date__lt=now).count()
+
+            if pending_count > 0 or staff.role in [User.Role.EXECUTIVE, User.Role.MANAGER]:
+                breakdown.append({
+                    'staff_id': staff.id,
+                    'name': staff.get_full_name() or staff.email,
+                    'email': staff.email,
+                    'role': staff.role,
+                    'pending_tasks': pending_count,
+                    'mandatory_tasks': mandatory_count,
+                    'overdue_tasks': overdue_count,
+                })
+
+        return breakdown

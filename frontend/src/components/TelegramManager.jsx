@@ -482,6 +482,16 @@ export const TelegramManager = () => {
 
           <div style={{ background: 'var(--surface-raised, rgba(255, 255, 255, 0.02))', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
+              <CheckSquare size={16} className="text-primary" />
+              <code>/tasks</code>
+            </div>
+            <p className="text-dim" style={{ fontSize: '0.825rem', margin: 0 }}>
+              View tasks assigned to staff and reps, filter by team member, and 1-tap complete mandatory stage tasks.
+            </p>
+          </div>
+
+          <div style={{ background: 'var(--surface-raised, rgba(255, 255, 255, 0.02))', padding: '1rem', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 600, fontSize: '0.9rem', marginBottom: '0.35rem' }}>
               <MessageSquare size={16} className="text-primary" />
               <span>Natural Language AI</span>
             </div>

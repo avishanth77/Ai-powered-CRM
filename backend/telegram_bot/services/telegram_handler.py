@@ -92,6 +92,10 @@ class TelegramUpdateHandler:
             self._send_pipeline_summary(chat_id, user)
         elif cmd in ['/leads', '/my_leads']:
             self._send_my_leads(chat_id, user)
+        elif cmd in ['/tasks', '/mytasks', '/staff_tasks', '/stage_tasks']:
+            parts = text.split(maxsplit=1)
+            query_filter = parts[1].strip() if len(parts) > 1 else None
+            self._send_tasks_overview(chat_id, user, staff_query=query_filter)
         elif cmd in ['/agenda', '/today', '/followups']:
             self._send_today_agenda(chat_id, user)
         elif cmd == '/status':
@@ -180,11 +184,15 @@ class TelegramUpdateHandler:
             "<b>Quick Commands:</b>\n"
             "• /pipeline — Visual pipeline deals &amp; value summary\n"
             "• /leads — View your top active leads with 1-click actions\n"
+            "• /tasks — View tasks assigned to staff with 1-tap completion\n"
+            "• /tasks &lt;name&gt; — Filter tasks for a specific staff member\n"
             "• /today — Today's follow-up agenda &amp; overdue tasks\n"
             "• /status — Connection details and notification preferences\n"
             "• /disconnect — Unlink your Telegram account\n\n"
             "<b>Natural Language AI Queries:</b>\n"
             "You can type naturally as if talking to a sales assistant:\n"
+            "• <i>\"Show tasks assigned to Alex\"</i>\n"
+            "• <i>\"Show my pending mandatory tasks\"</i>\n"
             "• <i>\"Show my overdue leads\"</i>\n"
             "• <i>\"Summarize lead Apex Logistics\"</i>\n"
             "• <i>\"Move Acme Corp to Qualified stage\"</i>\n"
@@ -216,6 +224,7 @@ class TelegramUpdateHandler:
         keyboard = [
             [
                 {'text': '📋 View My Leads', 'callback_data': 'cmd_leads'},
+                {'text': '📝 Staff Tasks', 'callback_data': 'cmd_tasks'},
                 {'text': '⏰ Today Agenda', 'callback_data': 'cmd_today'}
             ]
         ]
@@ -243,6 +252,11 @@ class TelegramUpdateHandler:
                 {'text': f"🔍 Details: {lead.name[:16]}", 'callback_data': f"lead_detail_{lead.id}"},
                 {'text': "⚡ Move", 'callback_data': f"lead_move_{lead.id}"}
             ])
+
+        buttons.append([
+            {'text': '📝 Staff Tasks', 'callback_data': 'cmd_tasks'},
+            {'text': '⏰ Today Agenda', 'callback_data': 'cmd_today'}
+        ])
 
         self.client.send_inline_keyboard(chat_id, "\n\n".join(lines), buttons)
 
@@ -280,10 +294,140 @@ class TelegramUpdateHandler:
         else:
             lines.append("✨ No further scheduled follow-ups for today!")
 
-        if buttons:
-            self.client.send_inline_keyboard(chat_id, "\n".join(lines), buttons)
+        buttons.append([
+            {'text': '📋 View Leads', 'callback_data': 'cmd_leads'},
+            {'text': '📝 Staff Tasks', 'callback_data': 'cmd_tasks'}
+        ])
+        self.client.send_inline_keyboard(chat_id, "\n".join(lines), buttons)
+
+    def _send_tasks_overview(self, chat_id: int, user: User, staff_query: Optional[str] = None, staff_id: Optional[int] = None, filter_mode: str = 'all'):
+        """
+        Renders the staff tasks dashboard in Telegram:
+        - Lists pending stage tasks with mandatory badges, priorities, leads, due dates.
+        - Provides 1-tap inline buttons to complete tasks on the spot.
+        - Offers breakdown by staff member for Managers & Admins.
+        - Filter tabs: [All Tasks], [⚠️ Mandatory], [🚨 Overdue], [👥 By Staff].
+        """
+        is_mgr = CRMTools._is_privileged(user)
+        mandatory_only = (filter_mode == 'mandatory')
+        overdue_only = (filter_mode == 'overdue')
+
+        res = CRMTools.get_scoped_tasks(
+            user=user,
+            staff_id=staff_id,
+            staff_query=staff_query,
+            mandatory_only=mandatory_only,
+            overdue_only=overdue_only,
+            limit=6
+        )
+        tasks = res.get('tasks', [])
+        total_count = res.get('total_count', 0)
+        target_staff = res.get('target_staff')
+        target_staff_id = res.get('target_staff_id')
+
+        # Header Title
+        if target_staff:
+            header = f"📝 <b>Tasks Assigned to {target_staff}</b>"
+        elif is_mgr and filter_mode not in ['my']:
+            header = "👥 <b>Staff Tasks Overview (Team)</b>"
         else:
-            self.client.send_message(chat_id, "\n".join(lines))
+            header = "📝 <b>Your Assigned Stage Tasks</b>"
+
+        filter_label = ""
+        if mandatory_only:
+            filter_label = " <i>[Filter: Mandatory Only]</i>"
+        elif overdue_only:
+            filter_label = " <i>[Filter: Overdue Only]</i>"
+
+        lines = [
+            f"{header}\nTotal Pending: <b>{total_count}</b>{filter_label}\n"
+        ]
+
+        buttons = []
+
+        if not tasks:
+            lines.append("✨ <i>No pending tasks found for this view!</i>")
+        else:
+            for idx, t in enumerate(tasks, 1):
+                p_icon = "🔴" if t['priority'] in ['HIGH', 'URGENT'] else ("🟡" if t['priority'] == 'MEDIUM' else "🔵")
+                m_badge = " [⚠️ Mandatory]" if t['is_mandatory'] else ""
+                od_badge = " <b>[🚨 OVERDUE]</b>" if t['is_overdue'] else ""
+                due_str = f"⏰ Due: <code>{t['due_date']}</code>" if t['due_date'] else ""
+                assignee_str = f" | 👨‍💼 <i>{t['assigned_to_name']}</i>" if is_mgr and not target_staff else ""
+
+                lines.append(
+                    f"{idx}. {p_icon} <b>{t['title']}</b>{m_badge}{od_badge}\n"
+                    f"   👤 Lead: <b>{t['lead_name']}</b> (<code>{t['stage_name']}</code>){assignee_str}\n"
+                    f"   {due_str}"
+                )
+
+                # Button to mark done and view lead
+                buttons.append([
+                    {'text': f"✅ Complete: {t['title'][:18]}", 'callback_data': f"stagetask_done_{t['id']}_{t['lead_id']}_{t['stage_id']}"},
+                    {'text': f"🔍 Lead", 'callback_data': f"lead_detail_{t['lead_id']}"}
+                ])
+
+        # Filter tabs
+        target_id_str = str(target_staff_id) if target_staff_id else '0'
+        tab_row = [
+            {'text': '• All •' if filter_mode == 'all' else '📌 All', 'callback_data': f"tasks_view_all_{target_id_str}"},
+            {'text': '• Mandatory •' if filter_mode == 'mandatory' else '⚠️ Mandatory', 'callback_data': f"tasks_view_mandatory_{target_id_str}"},
+            {'text': '• Overdue •' if filter_mode == 'overdue' else '🚨 Overdue', 'callback_data': f"tasks_view_overdue_{target_id_str}"},
+        ]
+        buttons.append(tab_row)
+
+        # Navigation row
+        bottom_row = []
+        if is_mgr:
+            bottom_row.append({'text': '👥 By Staff', 'callback_data': 'tasks_staff_breakdown'})
+        bottom_row.append({'text': '📋 Leads', 'callback_data': 'cmd_leads'})
+        bottom_row.append({'text': '⏰ Today', 'callback_data': 'cmd_today'})
+        buttons.append(bottom_row)
+
+        self.client.send_inline_keyboard(chat_id, "\n\n".join(lines), buttons)
+
+    def _send_staff_breakdown(self, chat_id: int, user: User):
+        """
+        Renders a team-wide breakdown of tasks by staff member with 1-click filter buttons.
+        """
+        breakdown = CRMTools.get_staff_tasks_breakdown(user)
+        if not breakdown:
+            self.client.send_message(chat_id, "ℹ️ No staff task breakdown available for your role.")
+            return
+
+        lines = [
+            "👥 <b>Team Staff Tasks Breakdown</b>\n"
+            "Tap any staff member below to inspect their assigned tasks:\n"
+        ]
+        buttons = []
+        row = []
+
+        for staff in breakdown:
+            p_cnt = staff['pending_tasks']
+            m_cnt = staff['mandatory_tasks']
+            od_cnt = staff['overdue_tasks']
+            od_badge = f" 🚨 {od_cnt} overdue" if od_cnt > 0 else ""
+
+            lines.append(
+                f"• <b>{staff['name']}</b> (<code>{staff['role']}</code>)\n"
+                f"   Tasks: <b>{p_cnt}</b> pending | <b>{m_cnt}</b> mandatory{od_badge}"
+            )
+
+            btn_text = f"👤 {staff['name'][:14]} ({p_cnt})"
+            row.append({'text': btn_text, 'callback_data': f"tasks_view_all_{staff['staff_id']}"})
+            if len(row) == 2:
+                buttons.append(row)
+                row = []
+
+        if row:
+            buttons.append(row)
+
+        buttons.append([
+            {'text': '📝 All Team Tasks', 'callback_data': 'tasks_view_all_0'},
+            {'text': '📋 Back to Leads', 'callback_data': 'cmd_leads'}
+        ])
+
+        self.client.send_inline_keyboard(chat_id, "\n\n".join(lines), buttons)
 
     def _send_account_status(self, chat_id: int, profile: TelegramProfile):
         u = profile.user
@@ -611,14 +755,16 @@ class TelegramUpdateHandler:
         # 5b. Complete Stage Task: stagetask_done_<task_id>_<lead_id>_<target_stage_id>
         elif data.startswith('stagetask_done_'):
             parts = data.split('_')
-            if len(parts) >= 5:
-                t_id, l_id, s_id = parts[2], parts[3], parts[4]
+            if len(parts) >= 3:
+                t_id = parts[2]
+                l_id = parts[3] if len(parts) > 3 else None
+                s_id = parts[4] if len(parts) > 4 else None
                 from leads.models import LeadStageTask
                 from leads.services import complete_stage_task, check_stage_progression
 
                 task = LeadStageTask.objects.filter(pk=t_id).first()
-                lead = Lead.objects.filter(pk=l_id).first()
-                target_stage = LeadStage.objects.filter(pk=s_id).first()
+                lead = Lead.objects.filter(pk=l_id).first() if l_id else None
+                target_stage = LeadStage.objects.filter(pk=s_id).first() if s_id else None
 
                 if task:
                     complete_stage_task(task, actor=user, outcome_notes="Completed via Telegram Bot")
@@ -626,7 +772,7 @@ class TelegramUpdateHandler:
                 else:
                     self.client.answer_callback_query(cq_id, "Task not found.")
 
-                if lead and target_stage:
+                if lead and target_stage and lead.stage and lead.stage.id != target_stage.id:
                     can_progress, missing_tasks, _ = check_stage_progression(lead, target_stage, actor=user)
                     if can_progress:
                         text = (
@@ -655,13 +801,40 @@ class TelegramUpdateHandler:
                             {'text': '⬅️ Back to Lead', 'callback_data': f"lead_detail_{lead.id}"}
                         ])
                     self.client.edit_message_text(chat_id, message_id, text, reply_markup={'inline_keyboard': keyboard})
+                else:
+                    task_name = task.title if task else "Task"
+                    self.client.edit_message_text(
+                        chat_id,
+                        message_id,
+                        f"✅ <b>Task Completed!</b>\n\n"
+                        f"<b>{task_name}</b> has been marked as completed.\n\n"
+                        f"<i>Updated live in CRM database.</i>",
+                        reply_markup={'inline_keyboard': [
+                            [{'text': '📝 Back to Staff Tasks', 'callback_data': 'cmd_tasks'}],
+                            [{'text': '📋 View Leads', 'callback_data': 'cmd_leads'}]
+                        ]}
+                    )
 
-        # 6. Navigation Commands from buttons: cmd_leads, cmd_today
+        # 6. Navigation Commands from buttons: cmd_leads, cmd_today, cmd_tasks
         elif data == 'cmd_leads':
             self.client.answer_callback_query(cq_id)
             self._send_my_leads(chat_id, user)
         elif data == 'cmd_today':
             self.client.answer_callback_query(cq_id)
             self._send_today_agenda(chat_id, user)
+        elif data == 'cmd_tasks':
+            self.client.answer_callback_query(cq_id)
+            self._send_tasks_overview(chat_id, user)
+        elif data == 'tasks_staff_breakdown':
+            self.client.answer_callback_query(cq_id)
+            self._send_staff_breakdown(chat_id, user)
+        elif data.startswith('tasks_view_'):
+            parts = data.split('_')
+            # tasks_view_<filter_mode>_<staff_id>
+            if len(parts) >= 4:
+                filter_mode = parts[2]
+                staff_id = int(parts[3]) if parts[3].isdigit() and int(parts[3]) > 0 else None
+                self.client.answer_callback_query(cq_id)
+                self._send_tasks_overview(chat_id, user, staff_id=staff_id, filter_mode=filter_mode)
         else:
             self.client.answer_callback_query(cq_id)

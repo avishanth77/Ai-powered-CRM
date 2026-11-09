@@ -351,3 +351,99 @@ class TelegramBotIntegrationTestCase(TestCase):
         dispatched = TelegramNotificationDispatcher.dispatch(notif)
         self.assertTrue(dispatched)
         mock_send_keyboard.assert_called_once()
+
+    # --------------------------------------------------------------------------
+    # 6. STAFF TASKS DASHBOARD & COMMANDS
+    # --------------------------------------------------------------------------
+
+    @patch('telegram_bot.services.telegram_client.TelegramClient.send_inline_keyboard')
+    def test_tasks_command_displays_assigned_tasks(self, mock_send_keyboard):
+        """Slash command /tasks lists pending tasks assigned to the user with complete buttons."""
+        task = LeadStageTask.objects.create(
+            lead=self.lead,
+            stage=self.stage_new,
+            title='Prepare Custom Quotation',
+            is_mandatory=True,
+            status=LeadStageTask.Status.PENDING,
+            due_date=timezone.now() + timedelta(days=1),
+            assigned_to=self.user
+        )
+
+        handler = TelegramUpdateHandler()
+        update = {
+            'update_id': 111,
+            'message': {
+                'chat': {'id': self.profile.chat_id},
+                'from': {'username': 'alex_rivera_crm'},
+                'text': '/tasks'
+            }
+        }
+        handler.handle_update(update)
+
+        mock_send_keyboard.assert_called_once()
+        sent_text = mock_send_keyboard.call_args[0][1]
+        sent_keyboard = mock_send_keyboard.call_args[0][2]
+
+        self.assertIn('Prepare Custom Quotation', sent_text)
+        self.assertIn('Mandatory', sent_text)
+        # Check inline complete button present
+        flat_callbacks = [btn['callback_data'] for row in sent_keyboard for btn in row]
+        self.assertTrue(any(cb.startswith(f"stagetask_done_{task.id}") for cb in flat_callbacks))
+
+    @patch('telegram_bot.services.telegram_client.TelegramClient.send_inline_keyboard')
+    def test_tasks_staff_breakdown_and_filter(self, mock_send_keyboard):
+        """Admins can view team staff tasks breakdown and filter by staff member."""
+        self.user.role = User.Role.ADMIN
+        self.user.save(update_fields=['role'])
+
+        rep = User.objects.create_user(
+            email='rep_sarah@crm.com',
+            password='Password@123',
+            first_name='Sarah',
+            last_name='Connor',
+            role=User.Role.EXECUTIVE
+        )
+        task = LeadStageTask.objects.create(
+            lead=self.lead,
+            stage=self.stage_new,
+            title='Send Product Proposal',
+            is_mandatory=True,
+            status=LeadStageTask.Status.PENDING,
+            due_date=timezone.now() + timedelta(days=2),
+            assigned_to=rep
+        )
+
+        handler = TelegramUpdateHandler()
+
+        # 1. Test /tasks sarah
+        filter_update = {
+            'update_id': 112,
+            'message': {
+                'chat': {'id': self.profile.chat_id},
+                'from': {'username': 'alex_rivera_crm'},
+                'text': '/tasks sarah'
+            }
+        }
+        handler.handle_update(filter_update)
+        sent_text = mock_send_keyboard.call_args[0][1]
+        self.assertIn('Send Product Proposal', sent_text)
+        self.assertIn('Sarah', sent_text)
+
+        # 2. Test staff breakdown callback
+        mock_send_keyboard.reset_mock()
+        cb_update = {
+            'update_id': 113,
+            'callback_query': {
+                'id': 'cq_staff_breakdown',
+                'data': 'tasks_staff_breakdown',
+                'message': {
+                    'chat': {'id': self.profile.chat_id},
+                    'message_id': 888
+                }
+            }
+        }
+        handler.handle_update(cb_update)
+        mock_send_keyboard.assert_called_once()
+        breakdown_text = mock_send_keyboard.call_args[0][1]
+        self.assertIn('Team Staff Tasks Breakdown', breakdown_text)
+        self.assertIn('Sarah Connor', breakdown_text)

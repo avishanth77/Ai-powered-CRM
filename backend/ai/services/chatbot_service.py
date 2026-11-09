@@ -136,6 +136,12 @@ class ChatbotService:
         if any(w in prompt_lower for w in ['today', 'agenda', 'schedule', 'task', 'call']):
             crm_context["today_followups"] = CRMTools.get_today_followups(user)
 
+        # 3b. Staff stage tasks & progression tasks
+        if any(w in prompt_lower for w in ['task', 'tasks', 'staff', 'assigned to', 'stage task', 'mandatory']):
+            crm_context["staff_tasks"] = CRMTools.get_scoped_tasks(user, limit=10)
+            if CRMTools._is_privileged(user):
+                crm_context["staff_tasks_breakdown"] = CRMTools.get_staff_tasks_breakdown(user)
+
         # 4. Team members for assignment context
         if any(w in prompt_lower for w in ['reassign', 'assign', 'team', 'rep', 'executive', 'manager', 'owner', 'member', 'who']):
             crm_context["team_members"] = CRMTools.get_team_members()
