@@ -39,7 +39,23 @@ class UserSerializer(serializers.ModelSerializer):
             'id', 'email', 'first_name', 'last_name', 'full_name',
             'phone', 'role', 'is_active', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'email', 'role', 'is_active', 'created_at', 'updated_at']
+
+
+class CurrentUserProfileSerializer(serializers.ModelSerializer):
+    """
+    Self-profile update serializer. Explicitly prevents privilege escalation
+    and role/status manipulation (CWE-269 / CWE-915).
+    """
+    full_name = serializers.CharField(source='get_full_name', read_only=True)
+
+    class Meta:
+        model = User
+        fields = [
+            'id', 'email', 'first_name', 'last_name', 'full_name',
+            'phone', 'role', 'is_active', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['id', 'email', 'role', 'is_active', 'created_at', 'updated_at']
 
 
 class UserCreateSerializer(serializers.ModelSerializer):

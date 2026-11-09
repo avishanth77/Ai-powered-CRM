@@ -107,3 +107,4 @@ export const SkeletonCardList = ({ count = 3 }) => {
     </div>
   );
 };
+

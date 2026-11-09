@@ -8,10 +8,11 @@ from rest_framework import serializers
 
 class EmailTestView(APIView):
     """
-    Test endpoint for learning and testing Django email sending.
+    Diagnostic endpoint for testing Django email sending.
     POST /api/email/test/
+    Restricted to authenticated staff/admins only to prevent open email relay / spam abuse.
     """
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated, permissions.IsAdminUser]
 
     @extend_schema(
         summary="Send a test email using Django email subsystem",

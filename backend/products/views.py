@@ -1,6 +1,6 @@
 from decimal import Decimal
 from django.db.models import Count, Sum, Q
-from rest_framework import viewsets, permissions, status, filters
+from rest_framework import viewsets, permissions, status, filters, exceptions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -95,24 +95,49 @@ class ProductViewSet(viewsets.ModelViewSet):
         })
 
 
+class IsLeadProductAuthorized(permissions.BasePermission):
+    """
+    Ensure Sales Executives can only view, attach, or edit products on
+    leads assigned to them or created by them (prevents IDOR).
+    """
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated)
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        if user.role in ['ADMIN', 'MANAGER'] or user.is_superuser:
+            return True
+        return obj.lead.assigned_to_id == user.id or obj.lead.created_by_id == user.id
+
+
 class LeadProductViewSet(viewsets.ModelViewSet):
     """
     Manage products attached to specific leads/deals.
     Supports adding products, updating quantities/prices, and recalculating deal value.
+    Scoped to assigned leads for Sales Executives to prevent IDOR.
     """
     queryset = LeadProduct.objects.all().select_related('lead', 'product')
     serializer_class = LeadProductSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsLeadProductAuthorized]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['lead', 'product']
 
     def get_queryset(self):
+        user = self.request.user
+        qs = self.queryset
+        if user.is_authenticated and user.role not in ['ADMIN', 'MANAGER'] and not user.is_superuser:
+            qs = qs.filter(Q(lead__assigned_to=user) | Q(lead__created_by=user))
         lead_id = self.request.query_params.get('lead')
         if lead_id:
-            return self.queryset.filter(lead_id=lead_id)
-        return self.queryset
+            return qs.filter(lead_id=lead_id)
+        return qs
 
     def perform_create(self, serializer):
+        lead = serializer.validated_data.get('lead')
+        user = self.request.user
+        if user.role not in ['ADMIN', 'MANAGER'] and not user.is_superuser:
+            if lead and lead.assigned_to_id != user.id and lead.created_by_id != user.id:
+                raise exceptions.PermissionDenied("You do not have permission to attach products to this lead.")
         item = serializer.save()
         # Optionally update lead expected value based on total products
         self._update_lead_deal_value(item.lead)

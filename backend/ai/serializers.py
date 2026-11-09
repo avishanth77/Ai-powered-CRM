@@ -61,12 +61,29 @@ class AIChatRequestSerializer(serializers.Serializer):
 
 
 class CallSummaryRequestSerializer(serializers.Serializer):
+    ALLOWED_AUDIO_EXTENSIONS = ('.mp3', '.wav', '.m4a', '.ogg', '.webm', '.flac', '.aac')
+    MAX_AUDIO_SIZE_BYTES = 50 * 1024 * 1024  # 50 MB
+
     lead_id = serializers.IntegerField(required=False, allow_null=True)
     notes = serializers.CharField(required=False, allow_blank=True, default='')
     audio_file = serializers.FileField(required=False, allow_null=True)
     call_type = serializers.CharField(required=False, default='Outbound')
     duration_seconds = serializers.IntegerField(required=False, default=0)
     call_id = serializers.IntegerField(required=False, allow_null=True)
+
+    def validate_audio_file(self, value):
+        if value:
+            import os
+            ext = os.path.splitext(value.name)[1].lower()
+            if ext not in self.ALLOWED_AUDIO_EXTENSIONS:
+                raise serializers.ValidationError(
+                    f"Unsupported audio format '{ext}'. Allowed: {', '.join(self.ALLOWED_AUDIO_EXTENSIONS)}"
+                )
+            if value.size > self.MAX_AUDIO_SIZE_BYTES:
+                raise serializers.ValidationError(
+                    f"Audio file exceeds 50MB limit ({value.size / (1024*1024):.1f}MB received)."
+                )
+        return value
 
 
 class UpdateTranscriptSerializer(serializers.Serializer):

@@ -8,6 +8,7 @@ from rest_framework import permissions, status
 from rest_framework.parsers import JSONParser, FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.throttling import AnonRateThrottle
 
 from accounts.models import User
 from activity.models import ActivityLog
@@ -20,6 +21,10 @@ from .services import execute_stage_task_automations
 logger = logging.getLogger(__name__)
 
 
+class PublicContactThrottle(AnonRateThrottle):
+    scope = 'public_contact'
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class PublicContactLeadView(APIView):
     """
@@ -28,6 +33,7 @@ class PublicContactLeadView(APIView):
 
     Key Features:
     - Unauthenticated (permission_classes = [AllowAny], authentication_classes = [])
+    - Rate limited via PublicContactThrottle to prevent spam & resource exhaustion
     - CSRF-exempt to accept cross-origin and standard HTML <form> POST requests
     - Honeypot anti-spam protection (detects hidden bot fields)
     - Deduplication: If a lead with matching email/phone already exists in an active stage,
@@ -38,6 +44,7 @@ class PublicContactLeadView(APIView):
     """
     permission_classes = [permissions.AllowAny]
     authentication_classes = []
+    throttle_classes = [PublicContactThrottle]
     parser_classes = [JSONParser, FormParser, MultiPartParser]
 
     def finalize_response(self, request, response, *args, **kwargs):

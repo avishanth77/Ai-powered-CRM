@@ -12,6 +12,7 @@ from drf_spectacular.utils import extend_schema, OpenApiParameter
 from .serializers import (
     CustomTokenObtainPairSerializer,
     UserSerializer,
+    CurrentUserProfileSerializer,
     UserCreateSerializer,
     UserUpdateSerializer,
     ChangePasswordSerializer,
@@ -39,8 +40,8 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
 
 class CurrentUserView(generics.RetrieveUpdateAPIView):
-    """Retrieve or update currently logged in user profile."""
-    serializer_class = UserSerializer
+    """Retrieve or update currently logged in user profile (protected against privilege escalation)."""
+    serializer_class = CurrentUserProfileSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):

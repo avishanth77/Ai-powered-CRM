@@ -45,11 +45,15 @@ function renderInlineTokens(text) {
     } else if (token.startsWith('[')) {
       const linkMatch = token.match(/^\[(.*?)\]\((.*?)\)$/);
       if (linkMatch) {
+        const rawHref = (linkMatch[2] || '').trim();
+        // Disallow dangerous URI schemes (javascript:, data:, vbscript:)
+        const isSafeProtocol = /^(https?:\/\/|mailto:|\/)/i.test(rawHref);
+        const safeHref = isSafeProtocol ? rawHref : '#';
         elements.push(
           <a
             key={key}
-            href={linkMatch[2]}
-            target="_blank"
+            href={safeHref}
+            target={isSafeProtocol && !rawHref.startsWith('/') ? "_blank" : undefined}
             rel="noopener noreferrer"
             className="chat-inline-link"
           >

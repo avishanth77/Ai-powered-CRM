@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.throttling import UserRateThrottle
 from django.db.models import Q
 from drf_spectacular.utils import extend_schema
 
@@ -22,6 +23,10 @@ from leads.models import Lead
 logger = logging.getLogger(__name__)
 
 
+class AIChatThrottle(UserRateThrottle):
+    scope = 'ai'
+
+
 class AIChatView(APIView):
     """
     POST /api/ai/chat/
@@ -29,6 +34,7 @@ class AIChatView(APIView):
     Uses real AI Provider with live CRM context.
     """
     permission_classes = [permissions.IsAuthenticated]
+    throttle_classes = [AIChatThrottle]
 
     @extend_schema(request=AIChatRequestSerializer, responses={200: dict})
     def post(self, request):

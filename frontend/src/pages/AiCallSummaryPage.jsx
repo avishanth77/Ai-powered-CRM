@@ -1106,7 +1106,7 @@ CRM Lite Team`;
                     href={`mailto:${selectedLeadObj.email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`}
                     className="btn btn-primary"
                     target="_blank"
-                    rel="noreferrer"
+                    rel="noopener noreferrer"
                   >
                     <Mail size={15} />
                     <span>Open in Email Client</span>
