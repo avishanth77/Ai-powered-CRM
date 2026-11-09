@@ -96,6 +96,20 @@ class TelegramUpdateHandler:
             parts = text.split(maxsplit=1)
             query_filter = parts[1].strip() if len(parts) > 1 else None
             self._send_tasks_overview(chat_id, user, staff_query=query_filter)
+        elif cmd in ['/create_lead', '/newlead', '/add_lead', '/create']:
+            parts = text.split(maxsplit=1)
+            lead_prompt = parts[1].strip() if len(parts) > 1 else ""
+            if not lead_prompt:
+                self.client.send_message(
+                    chat_id,
+                    "💡 <b>How to create a new lead:</b>\n\n"
+                    "Type:\n"
+                    "<code>Create lead &lt;Name&gt;, phone &lt;Phone&gt;, company &lt;Company&gt;</code>\n\n"
+                    "<i>Example:</i>\n"
+                    "<code>Create lead Rahul Sharma, phone 9876543210, company TechNova</code>"
+                )
+                return
+            self._process_ai_query(chat_id, user, f"Create lead {lead_prompt}")
         elif cmd in ['/agenda', '/today', '/followups']:
             self._send_today_agenda(chat_id, user)
         elif cmd == '/status':
@@ -473,9 +487,11 @@ class TelegramUpdateHandler:
                 expires_at=timezone.now() + timedelta(minutes=10)
             )
 
+            action_type = action_payload.get('action_type', 'ACTION')
+            btn_label = "✅ Create Lead" if action_type == 'CREATE_LEAD' else "✅ Confirm Action"
             keyboard = [
                 [
-                    {'text': "✅ Confirm Action", 'callback_data': f"act_confirm_{session.id}"},
+                    {'text': btn_label, 'callback_data': f"act_confirm_{session.id}"},
                     {'text': "❌ Cancel", 'callback_data': f"act_cancel_{session.id}"}
                 ]
             ]
@@ -541,11 +557,35 @@ class TelegramUpdateHandler:
                 session.save(update_fields=['status'])
 
                 self.client.answer_callback_query(cq_id, "Action executed successfully!")
-                self.client.edit_message_text(
-                    chat_id,
-                    message_id,
-                    f"✅ <b>Action Completed!</b>\n\n{res.get('message', 'Update applied successfully.')}"
-                )
+
+                lead_id = res.get('lead_id')
+                keyboard = None
+                if lead_id:
+                    keyboard = [
+                        [
+                            {'text': '🔍 View Lead', 'callback_data': f"lead_detail_{lead_id}"},
+                            {'text': '⚡ Move Stage', 'callback_data': f"lead_move_{lead_id}"}
+                        ],
+                        [
+                            {'text': '📋 View All Leads', 'callback_data': 'cmd_leads'},
+                            {'text': '📝 Staff Tasks', 'callback_data': 'cmd_tasks'}
+                        ]
+                    ]
+
+                formatted_msg = self._format_ai_response_for_telegram(res.get('message', 'Update applied successfully.'))
+                if keyboard:
+                    self.client.edit_message_text(
+                        chat_id,
+                        message_id,
+                        f"✅ <b>Action Completed!</b>\n\n{formatted_msg}",
+                        reply_markup={'inline_keyboard': keyboard}
+                    )
+                else:
+                    self.client.edit_message_text(
+                        chat_id,
+                        message_id,
+                        f"✅ <b>Action Completed!</b>\n\n{formatted_msg}"
+                    )
             except Exception as e:
                 logger.error(f"[TelegramHandler] Action execution failed: {e}", exc_info=True)
                 self.client.answer_callback_query(cq_id, f"Execution failed: {e}", show_alert=True)

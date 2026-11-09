@@ -4,6 +4,7 @@ Connects to real AI Provider (Gemini) with controlled CRM Tools and safety bound
 """
 import logging
 import re
+from decimal import Decimal
 from typing import Dict, Any, Optional, List
 from django.utils import timezone
 from django.db.models import Q
@@ -107,7 +108,86 @@ class ChatbotService:
                     }
                 }
 
+        # Check for create lead intent (e.g., "Create lead Rahul Sharma, phone 9876543210, company TechNova")
+        if re.search(r'^(?:/create_lead|/newlead|/add_lead|create\s+lead|add\s+lead|new\s+lead)\b', prompt_lower):
+            parsed = ChatbotService._parse_create_lead_prompt(prompt)
+            if parsed.get('name'):
+                comp_str = f" ({parsed['company_name']})" if parsed.get('company_name') else ""
+                phone_str = f", Phone: {parsed['phone']}" if parsed.get('phone') else ""
+                email_str = f", Email: {parsed['email']}" if parsed.get('email') else ""
+                return {
+                    "action_type": "CREATE_LEAD",
+                    "description": f"Create new lead '{parsed['name']}'{comp_str}{phone_str}{email_str}",
+                    "parameters": parsed
+                }
+
         return None
+
+    @staticmethod
+    def _parse_create_lead_prompt(prompt: str) -> Dict[str, Any]:
+        """
+        Parses structured and unstructured lead creation requests, e.g.:
+        'Create lead Rahul Sharma, phone 9876543210, company TechNova'
+        'new lead Alice Doe, email alice@doe.com, phone 555-1234, company Doe Enterprises, value 50000, priority high'
+        """
+        text = prompt.strip()
+        cleaned = re.sub(
+            r'^(?:/create_lead|/newlead|/add_lead|create\s+lead|add\s+lead|new\s+lead)\s*[:\-]?\s*',
+            '',
+            text,
+            flags=re.IGNORECASE
+        ).strip()
+
+        data = {
+            'name': '',
+            'phone': '',
+            'email': '',
+            'company_name': '',
+            'expected_value': 0.0,
+            'priority': 'MEDIUM',
+        }
+
+        # 1. Extract email
+        email_m = re.search(r'(?:email|mail)\s*[:=]?\s*([a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+)', cleaned, re.IGNORECASE)
+        if not email_m:
+            email_m = re.search(r'\b[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+\b', cleaned)
+        if email_m:
+            data['email'] = email_m.group(1 if email_m.lastindex else 0).strip()
+            cleaned = cleaned[:email_m.start()] + ' , ' + cleaned[email_m.end():]
+
+        # 2. Extract phone
+        phone_m = re.search(r'(?:phone|mobile|tel|cell|contact)\s*[:=]?\s*([+0-9\s-]{7,18})', cleaned, re.IGNORECASE)
+        if phone_m:
+            data['phone'] = phone_m.group(1).strip()
+            cleaned = cleaned[:phone_m.start()] + ' , ' + cleaned[phone_m.end():]
+
+        # 3. Extract company
+        comp_m = re.search(r'(?:company|company_name|org|organization|firm)\s*[:=]?\s*([^,\n;]+)', cleaned, re.IGNORECASE)
+        if comp_m:
+            data['company_name'] = comp_m.group(1).strip()
+            cleaned = cleaned[:comp_m.start()] + ' , ' + cleaned[comp_m.end():]
+
+        # 4. Extract deal value
+        val_m = re.search(r'(?:value|deal|amount|expected_value)\s*[:=]?\s*\$?\s*([0-9,]+(?:\.[0-9]+)?)', cleaned, re.IGNORECASE)
+        if val_m:
+            val_str = val_m.group(1).replace(',', '')
+            try:
+                data['expected_value'] = float(val_str)
+            except ValueError:
+                pass
+            cleaned = cleaned[:val_m.start()] + ' , ' + cleaned[val_m.end():]
+
+        # 5. Extract priority
+        prio_m = re.search(r'(?:priority)\s*[:=]?\s*(low|medium|high|urgent)', cleaned, re.IGNORECASE)
+        if prio_m:
+            data['priority'] = prio_m.group(1).upper()
+            cleaned = cleaned[:prio_m.start()] + ' , ' + cleaned[prio_m.end():]
+
+        # 6. Whatever clean text remains is the lead name
+        name_candidate = re.sub(r'[,;:]+', ' ', cleaned).strip()
+        data['name'] = ' '.join(name_candidate.split())
+
+        return data
 
     @staticmethod
     def _build_live_crm_context(user, prompt: str) -> Dict[str, Any]:
@@ -672,6 +752,91 @@ class ChatbotService:
                 "message": f"Successfully updated priority of **{lead.name}** to **{priority}**.",
                 "lead_id": lead.id,
                 "new_priority": priority,
+            }
+
+        # -------------------------------------------------------------
+        # Action 5: CREATE_LEAD
+        # -------------------------------------------------------------
+        if act_type_norm in ["CREATE_LEAD", "ADD_LEAD", "NEW_LEAD"]:
+            name = (params.get("name") or "").strip()
+            if not name:
+                desc = action_payload.get("description", "")
+                name_match = re.search(r"'(.*?)'", desc)
+                if name_match:
+                    name = name_match.group(1).strip()
+
+            if not name:
+                raise ValueError("Lead name is required to create a lead.")
+
+            phone = (params.get("phone") or "").strip()
+            email = (params.get("email") or "").strip()
+            company_name = (params.get("company_name") or "").strip()
+            val_raw = params.get("expected_value", 0.0)
+            try:
+                expected_value = Decimal(str(val_raw or 0.0))
+            except Exception:
+                expected_value = Decimal('0.00')
+
+            priority = str(params.get("priority") or "MEDIUM").strip().upper()
+            if priority not in Lead.Priority.values:
+                priority = Lead.Priority.MEDIUM
+
+            # Default initial stage (first active stage, usually 'New')
+            stage = LeadStage.objects.filter(is_active=True).order_by('display_order').first()
+
+            lead = Lead.objects.create(
+                name=name,
+                phone=phone,
+                email=email,
+                company_name=company_name,
+                expected_value=expected_value,
+                priority=priority,
+                stage=stage,
+                assigned_to=user,
+                created_by=user
+            )
+
+            # Log activity
+            try:
+                log_activity(
+                    entity_type='lead',
+                    entity_id=lead.id,
+                    action=ActivityLog.ActionType.LEAD_CREATED,
+                    new_value={
+                        'name': lead.name,
+                        'phone': lead.phone,
+                        'email': lead.email,
+                        'company_name': lead.company_name,
+                        'stage': stage.name if stage else None,
+                        'assigned_to': user.get_full_name() or user.email
+                    },
+                    performed_by=user,
+                    notes="Lead created via AI Assistant / Telegram."
+                )
+            except Exception:
+                pass
+
+            # Trigger automated customizable task assignments on new lead
+            if lead.stage:
+                try:
+                    execute_stage_task_automations(
+                        lead=lead,
+                        new_stage=lead.stage,
+                        old_stage=None,
+                        actor=user
+                    )
+                except Exception as te:
+                    logger.warning("Stage task automation for new lead failed: %s", te)
+
+            comp_display = f" ({lead.company_name})" if lead.company_name else ""
+            stage_display = f" in stage **{stage.name}**" if stage else ""
+            return {
+                "success": True,
+                "message": f"Successfully created lead **{lead.name}**{comp_display}{stage_display}.",
+                "lead_id": lead.id,
+                "lead_name": lead.name,
+                "company_name": lead.company_name,
+                "stage": stage.name if stage else "New",
             }
 
         raise ValueError(f"Unknown or unsupported action type: {action_type}")

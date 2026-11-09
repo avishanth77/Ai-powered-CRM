@@ -447,3 +447,65 @@ class TelegramBotIntegrationTestCase(TestCase):
         breakdown_text = mock_send_keyboard.call_args[0][1]
         self.assertIn('Team Staff Tasks Breakdown', breakdown_text)
         self.assertIn('Sarah Connor', breakdown_text)
+
+    # --------------------------------------------------------------------------
+    # 7. CREATE LEAD VIA TELEGRAM NATURAL LANGUAGE FLOW
+    # --------------------------------------------------------------------------
+
+    @patch('telegram_bot.services.telegram_client.TelegramClient.edit_message_text')
+    @patch('telegram_bot.services.telegram_client.TelegramClient.answer_callback_query')
+    @patch('telegram_bot.services.telegram_client.TelegramClient.send_inline_keyboard')
+    def test_create_lead_via_telegram_flow(self, mock_send_keyboard, mock_answer, mock_edit_text):
+        """User can type 'Create lead Rahul Sharma, phone 9876543210, company TechNova' and confirm in Telegram."""
+        handler = TelegramUpdateHandler()
+
+        # Step 1: User sends creation text
+        msg_update = {
+            'update_id': 114,
+            'message': {
+                'chat': {'id': self.profile.chat_id},
+                'from': {'username': 'alex_rivera_crm'},
+                'text': 'Create lead Rahul Sharma, phone 9876543210, company TechNova'
+            }
+        }
+        handler.handle_update(msg_update)
+
+        # Action session created with confirmation keyboard
+        session = TelegramActionSession.objects.filter(user=self.user, action_type='CREATE_LEAD').first()
+        self.assertIsNotNone(session)
+        self.assertEqual(session.action_payload['parameters']['name'], 'Rahul Sharma')
+        self.assertEqual(session.action_payload['parameters']['phone'], '9876543210')
+        self.assertEqual(session.action_payload['parameters']['company_name'], 'TechNova')
+
+        mock_send_keyboard.assert_called_once()
+        keyboard = mock_send_keyboard.call_args[0][2]
+        self.assertEqual(keyboard[0][0]['callback_data'], f"act_confirm_{session.id}")
+
+        # Step 2: User taps [✅ Create Lead]
+        cb_update = {
+            'update_id': 115,
+            'callback_query': {
+                'id': 'cq_confirm_create',
+                'data': f"act_confirm_{session.id}",
+                'message': {
+                    'chat': {'id': self.profile.chat_id},
+                    'message_id': 999
+                }
+            }
+        }
+        handler.handle_update(cb_update)
+
+        # Verify lead created in DB
+        created_lead = Lead.objects.filter(name='Rahul Sharma').first()
+        self.assertIsNotNone(created_lead)
+        self.assertEqual(created_lead.phone, '9876543210')
+        self.assertEqual(created_lead.company_name, 'TechNova')
+        self.assertEqual(created_lead.assigned_to, self.user)
+        self.assertEqual(created_lead.created_by, self.user)
+
+        # Verify message updated with success and navigation buttons
+        session.refresh_from_db()
+        self.assertEqual(session.status, TelegramActionSession.Status.EXECUTED)
+        mock_answer.assert_called_with('cq_confirm_create', 'Action executed successfully!')
+        mock_edit_text.assert_called_once()
+        self.assertIn('Rahul Sharma', mock_edit_text.call_args[0][2])
