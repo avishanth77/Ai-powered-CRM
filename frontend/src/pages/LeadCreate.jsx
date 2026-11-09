@@ -8,12 +8,26 @@ import { extractErrorMessage, normalizeServerErrors, isValidEmail, isValidPhone 
 import { FieldError } from '../components/FieldError';
 import { LEAD_PRIORITY } from '../utils/constants';
 import ProductSelector from '../components/ProductSelector';
-import { ArrowLeft, Save, UserPlus, Package, User, Building2, Target, DollarSign } from 'lucide-react';
+import {
+  ArrowLeft,
+  Save,
+  UserPlus,
+  Package,
+  User,
+  Building2,
+  Target,
+  DollarSign,
+  Loader2,
+  CheckCircle2,
+  UserCheck,
+  Sparkles,
+} from 'lucide-react';
 
 export const LeadCreate = () => {
   const navigate = useNavigate();
   const { user, canAssignLeads } = useAuth();
   const { showToast } = useToast();
+  const [processingStep, setProcessingStep] = useState(0);
 
   const [formData, setFormData] = useState({
     name: '',
@@ -144,6 +158,10 @@ export const LeadCreate = () => {
     }
 
     setLoading(true);
+    setProcessingStep(0);
+    const stepTimer1 = setTimeout(() => setProcessingStep(1), 160);
+    const stepTimer2 = setTimeout(() => setProcessingStep(2), 340);
+
     try {
       const payload = {
         name: formData.name.trim() || `${formData.first_name} ${formData.last_name}`.trim() || 'Prospect Lead',
@@ -187,9 +205,17 @@ export const LeadCreate = () => {
       };
 
       const res = await leadApi.createLead(payload);
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
+      setProcessingStep(3);
       showToast(`Lead "${res.name}" successfully created!`, 'success');
-      navigate(`/leads/${res.id}`);
+      setTimeout(() => {
+        navigate(`/leads/${res.id}`);
+      }, 450);
     } catch (err) {
+      clearTimeout(stepTimer1);
+      clearTimeout(stepTimer2);
+      setLoading(false);
       const msg = extractErrorMessage(err, 'Failed to create lead.');
       showToast(msg, 'error');
       if (err.response?.data?.errors) {
@@ -197,8 +223,6 @@ export const LeadCreate = () => {
         setErrors(fieldErrors);
         setFormError(summary.length > 0 ? summary : null);
       }
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -822,6 +846,194 @@ export const LeadCreate = () => {
           </div>
         </form>
       </div>
+
+      {/* Processing Animation Modal Overlay */}
+      {loading && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            backgroundColor: 'rgba(11, 15, 23, 0.78)',
+            backdropFilter: 'blur(8px)',
+            WebkitBackdropFilter: 'blur(8px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+        >
+          <div
+            className="card"
+            style={{
+              maxWidth: '440px',
+              width: '100%',
+              padding: '2.25rem 2rem',
+              textAlign: 'center',
+              background: 'var(--surface-color, #131a26)',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              boxShadow: '0 25px 60px rgba(0, 0, 0, 0.7), 0 0 40px rgba(99, 102, 241, 0.2)',
+              borderRadius: '18px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '1.25rem',
+            }}
+          >
+            {/* Animated Rotating Gradient Ring / Checkmark */}
+            <div
+              style={{
+                position: 'relative',
+                width: '74px',
+                height: '74px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              {processingStep === 3 ? (
+                <div
+                  style={{
+                    width: '64px',
+                    height: '64px',
+                    borderRadius: '50%',
+                    background: 'rgba(34, 197, 94, 0.15)',
+                    border: '2px solid var(--success, #22c55e)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    color: 'var(--success, #22c55e)',
+                  }}
+                >
+                  <CheckCircle2 size={36} />
+                </div>
+              ) : (
+                <>
+                  <div
+                    style={{
+                      position: 'absolute',
+                      inset: 0,
+                      borderRadius: '50%',
+                      border: '3px solid transparent',
+                      borderTopColor: '#6366f1',
+                      borderRightColor: '#3b82f6',
+                      animation: 'spin 0.9s linear infinite',
+                    }}
+                  />
+                  <div
+                    style={{
+                      width: '54px',
+                      height: '54px',
+                      borderRadius: '50%',
+                      background: 'rgba(99, 102, 241, 0.12)',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      color: '#818cf8',
+                    }}
+                  >
+                    <UserCheck size={28} className="animate-pulse" />
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Title & Status */}
+            <div>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.4rem 0', color: 'var(--text-main, #fff)' }}>
+                {processingStep === 3 ? 'Lead Created Successfully!' : 'Creating & Routing Lead...'}
+              </h3>
+              <p className="text-dim" style={{ fontSize: '0.875rem', margin: 0 }}>
+                {processingStep === 3
+                  ? 'Redirecting to prospect profile...'
+                  : 'Applying intelligent routing & auto-assigning to staff'}
+              </p>
+            </div>
+
+            {/* Step Indicators */}
+            <div
+              style={{
+                width: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.75rem',
+                textAlign: 'left',
+                backgroundColor: 'rgba(255, 255, 255, 0.03)',
+                padding: '1rem',
+                borderRadius: '12px',
+                border: '1px solid rgba(255, 255, 255, 0.06)',
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.85rem' }}>
+                {processingStep >= 1 ? (
+                  <CheckCircle2 size={16} className="text-success" />
+                ) : (
+                  <Loader2 size={16} className="animate-spin text-primary" />
+                )}
+                <span style={{ color: processingStep >= 1 ? 'var(--text-main)' : 'var(--text-dim)', fontWeight: processingStep === 0 ? 600 : 400 }}>
+                  1. Validating Prospect Information
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.85rem' }}>
+                {processingStep >= 2 ? (
+                  <CheckCircle2 size={16} className="text-success" />
+                ) : processingStep === 1 ? (
+                  <Loader2 size={16} className="animate-spin text-primary" />
+                ) : (
+                  <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)' }} />
+                )}
+                <span style={{ color: processingStep >= 1 ? 'var(--text-main)' : 'var(--text-dim)', fontWeight: processingStep === 1 ? 600 : 400 }}>
+                  2. Auto-Assigning to Sales Staff
+                </span>
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', fontSize: '0.85rem' }}>
+                {processingStep >= 3 ? (
+                  <CheckCircle2 size={16} className="text-success" />
+                ) : processingStep === 2 ? (
+                  <Loader2 size={16} className="animate-spin text-primary" />
+                ) : (
+                  <div style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid rgba(255,255,255,0.2)' }} />
+                )}
+                <span style={{ color: processingStep >= 2 ? 'var(--text-main)' : 'var(--text-dim)', fontWeight: processingStep === 2 ? 600 : 400 }}>
+                  3. Generating Stage Tasks & Notifications
+                </span>
+              </div>
+            </div>
+
+            {/* Dynamic Progress Bar */}
+            <div
+              style={{
+                width: '100%',
+                height: '6px',
+                background: 'rgba(255, 255, 255, 0.08)',
+                borderRadius: '3px',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  height: '100%',
+                  background:
+                    processingStep === 3
+                      ? 'var(--success, #22c55e)'
+                      : 'linear-gradient(90deg, #3b82f6, #6366f1)',
+                  width:
+                    processingStep === 0
+                      ? '30%'
+                      : processingStep === 1
+                      ? '65%'
+                      : processingStep === 2
+                      ? '90%'
+                      : '100%',
+                  transition: 'width 0.35s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s ease',
+                }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

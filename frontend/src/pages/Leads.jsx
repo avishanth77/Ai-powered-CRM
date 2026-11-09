@@ -2224,6 +2224,41 @@ export const Leads = () => {
                           )}
                         </div>
                       )}
+
+                      {/* Bulk Import & Auto-Assigning Progress Animation */}
+                      {importing && (
+                        <div
+                          style={{
+                            padding: '1.25rem',
+                            borderRadius: 'var(--radius-md)',
+                            backgroundColor: 'rgba(99, 102, 241, 0.08)',
+                            border: '1px solid rgba(99, 102, 241, 0.25)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.75rem',
+                            alignItems: 'center',
+                            textAlign: 'center',
+                          }}
+                        >
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--primary)', fontWeight: 600 }}>
+                            <RefreshCw size={18} className="animate-spin" />
+                            <span>Processing CSV & Auto-Assigning Leads to Staff...</span>
+                          </div>
+                          <div style={{ width: '100%', height: '6px', background: 'rgba(255, 255, 255, 0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                            <div
+                              style={{
+                                width: '100%',
+                                height: '100%',
+                                background: 'linear-gradient(90deg, #3b82f6, #6366f1, #3b82f6)',
+                                animation: 'pulse 1.2s infinite ease-in-out',
+                              }}
+                            />
+                          </div>
+                          <span style={{ fontSize: '0.8rem', color: 'var(--text-dim)' }}>
+                            Validating data, routing leads through assignment rules, and generating stage tasks
+                          </span>
+                        </div>
+                      )}
                     </>
                   )}
                 </div>

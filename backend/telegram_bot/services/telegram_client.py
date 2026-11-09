@@ -22,7 +22,7 @@ class TelegramClient:
     def is_configured(self) -> bool:
         return bool(self.token and len(self.token.strip()) > 10)
 
-    def _make_request(self, endpoint: str, payload: Optional[Dict[str, Any]] = None, timeout: int = 20) -> Dict[str, Any]:
+    def _make_request(self, endpoint: str, payload: Optional[Dict[str, Any]] = None, timeout: int = 6) -> Dict[str, Any]:
         """Performs HTTPS POST or GET request to Telegram API."""
         if not self.is_configured:
             logger.warning("[TelegramClient] Bot token is not configured in settings. Skipping request.")

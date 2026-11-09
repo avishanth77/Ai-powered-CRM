@@ -701,7 +701,9 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
         if not lead.assigned_to:
             from leads.services.assignment import assign_lead_to_salesman
             actor = request.user if request and request.user.is_authenticated else None
-            assign_lead_to_salesman(lead, channel='manual', actor=actor, commit=True)
+            assigned_user = assign_lead_to_salesman(lead, channel='manual', actor=actor, commit=True)
+            if assigned_user:
+                lead._auto_assigned_notified = True
 
         if custom_props:
             _save_custom_properties(lead, custom_props)

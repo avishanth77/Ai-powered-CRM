@@ -158,3 +158,4 @@ class Command(BaseCommand):
         else:
             self.stdout.write("• Status: No active webhook (Polling mode enabled)")
         self.stdout.write("-------------------------------\n")
+

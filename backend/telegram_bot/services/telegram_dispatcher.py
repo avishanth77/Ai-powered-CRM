@@ -1,4 +1,6 @@
+import sys
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 from django.conf import settings
 from .telegram_client import TelegramClient
@@ -6,21 +8,44 @@ from ..models import TelegramProfile
 
 logger = logging.getLogger(__name__)
 
+# Background thread pool executor for non-blocking outbound notification delivery
+_dispatcher_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='tg-notify')
+
 
 class TelegramNotificationDispatcher:
     """
     Dispatches outbound proactive CRM notifications (new leads, overdue follow-ups,
     deal won alerts) directly to user's Telegram chat with actionable inline buttons.
+    Runs asynchronously in the background so lead creation and auto-assignment are instantaneous.
     """
 
     @classmethod
-    def dispatch(cls, notification) -> bool:
+    def dispatch(cls, notification, async_mode: Optional[bool] = None) -> bool:
         """
         Sends an in-app notification to the recipient's Telegram chat if linked and enabled.
+        When async_mode is True (default in server runtime), delivers in a background thread
+        to ensure zero delay for HTTP requests.
         """
         if not notification or not notification.recipient:
             return False
 
+        if async_mode is None:
+            # Execute synchronously in test runner so assertions and mocks work deterministically
+            async_mode = 'test' not in sys.argv
+
+        if async_mode:
+            try:
+                _dispatcher_executor.submit(cls._do_dispatch, notification)
+                return True
+            except Exception as e:
+                logger.warning(f"[TelegramDispatcher] ThreadPool submission failed, falling back: {e}")
+                return cls._do_dispatch(notification)
+
+        return cls._do_dispatch(notification)
+
+    @classmethod
+    def _do_dispatch(cls, notification) -> bool:
+        """Internal synchronous worker for Telegram message delivery."""
         try:
             profile = TelegramProfile.objects.filter(
                 user=notification.recipient,
@@ -82,6 +107,6 @@ class TelegramNotificationDispatcher:
             return True
 
         except Exception as e:
-            logger.error(f"[TelegramDispatcher] Failed to dispatch notification {notification.id}: {e}", exc_info=True)
+            logger.error(f"[TelegramDispatcher] Failed to dispatch notification {getattr(notification, 'id', 'unknown')}: {e}", exc_info=True)
             return False
 

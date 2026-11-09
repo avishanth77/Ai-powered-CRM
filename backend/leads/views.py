@@ -602,7 +602,7 @@ class LeadViewSet(viewsets.ModelViewSet):
             performed_by=self.request.user,
             notes=f"Lead created by {self.request.user.get_full_name() or self.request.user.email}"
         )
-        if lead.assigned_to:
+        if lead.assigned_to and not getattr(lead, '_auto_assigned_notified', False):
             NotificationService.notify_lead_assigned(
                 lead=lead,
                 assignee=lead.assigned_to,
