@@ -30,7 +30,7 @@ class TelegramProfileSerializer(serializers.ModelSerializer):
         ]
 
     def get_bot_username(self, obj) -> str:
-        return getattr(settings, 'TELEGRAM_BOT_USERNAME', 'CrmLiteCopilotBot')
+        return getattr(settings, 'TELEGRAM_BOT_USERNAME', 'mycrm_sales_copilot_bot')
 
     def get_is_bot_configured(self, obj) -> bool:
         token = getattr(settings, 'TELEGRAM_BOT_TOKEN', '')

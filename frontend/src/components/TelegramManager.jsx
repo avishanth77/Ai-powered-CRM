@@ -123,7 +123,8 @@ export const TelegramManager = () => {
   }
 
   const isVerified = statusData?.is_verified;
-  const botHandle = statusData?.bot_username || '@CrmLiteCopilotBot';
+  const rawBotHandle = statusData?.bot_username || 'mycrm_sales_copilot_bot';
+  const botHandle = rawBotHandle.startsWith('@') ? rawBotHandle : `@${rawBotHandle}`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -216,7 +217,7 @@ export const TelegramManager = () => {
                   <span>{sendingTest ? 'Sending...' : 'Send Test Alert'}</span>
                 </button>
                 <a
-                  href={`https://t.me/${statusData.bot_username || 'CrmLiteCopilotBot'}`}
+                  href={`https://t.me/${(statusData.bot_username || 'mycrm_sales_copilot_bot').replace('@', '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="btn btn-secondary btn-sm"

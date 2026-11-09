@@ -38,7 +38,7 @@ class Command(BaseCommand):
 
         bot_user = bot_info.get('result', {})
         bot_name = bot_user.get('first_name', 'CRM Bot')
-        bot_handle = bot_user.get('username', 'crm_bot')
+        bot_handle = bot_user.get('username', getattr(settings, 'TELEGRAM_BOT_USERNAME', 'mycrm_sales_copilot_bot'))
 
         self.stdout.write(self.style.SUCCESS(
             f"\n======================================================\n"

@@ -239,6 +239,6 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY', '')
 # TELEGRAM BOT INTEGRATION
 # ==============================================================================
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '')
-TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', 'CrmLiteCopilotBot').lstrip('@')
+TELEGRAM_BOT_USERNAME = os.getenv('TELEGRAM_BOT_USERNAME', 'mycrm_sales_copilot_bot').lstrip('@')
 TELEGRAM_WEBHOOK_SECRET = os.getenv('TELEGRAM_WEBHOOK_SECRET', 'crm_lite_telegram_secret_2026')
 

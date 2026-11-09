@@ -77,7 +77,7 @@ class TelegramGenerateLinkCodeView(APIView):
     def post(self, request):
         profile, _ = TelegramProfile.objects.get_or_create(user=request.user)
         code = profile.generate_verification_code(expiry_minutes=15)
-        bot_username = getattr(settings, 'TELEGRAM_BOT_USERNAME', 'CrmLiteCopilotBot').lstrip('@')
+        bot_username = getattr(settings, 'TELEGRAM_BOT_USERNAME', 'mycrm_sales_copilot_bot').lstrip('@')
         deep_link = f"https://t.me/{bot_username}?start={code}"
 
         return Response({
