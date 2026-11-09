@@ -171,3 +171,4 @@ class TelegramSendTestMessageView(APIView):
                 'success': False,
                 'message': f"Telegram API error: {res.get('description', 'Unknown error')}"
             }, status=status.HTTP_502_BAD_GATEWAY)
+

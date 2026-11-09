@@ -84,3 +84,4 @@ class TelegramNotificationDispatcher:
         except Exception as e:
             logger.error(f"[TelegramDispatcher] Failed to dispatch notification {notification.id}: {e}", exc_info=True)
             return False
+

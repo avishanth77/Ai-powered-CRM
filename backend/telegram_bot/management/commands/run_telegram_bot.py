@@ -82,3 +82,4 @@ class Command(BaseCommand):
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f"[CRM Bot] Polling error: {e}"))
                 time.sleep(3)
+

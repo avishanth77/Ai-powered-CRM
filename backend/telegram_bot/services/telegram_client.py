@@ -156,3 +156,4 @@ class TelegramClient:
         if offset is not None:
             payload['offset'] = offset
         return self._make_request('getUpdates', payload, timeout=timeout + 5)
+

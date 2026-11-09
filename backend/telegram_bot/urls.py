@@ -21,3 +21,4 @@ urlpatterns = [
     path('disconnect/', TelegramDisconnectView.as_view(), name='telegram-disconnect'),
     path('test-message/', TelegramSendTestMessageView.as_view(), name='telegram-test-message'),
 ]
+

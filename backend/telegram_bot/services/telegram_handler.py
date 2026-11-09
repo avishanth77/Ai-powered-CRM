@@ -59,6 +59,12 @@ class TelegramUpdateHandler:
             self._handle_connect(chat_id, text, username, first_name, last_name, profile)
             return
 
+        # Handle direct 6-digit PIN entry (with or without brackets <...>)
+        cleaned_pin = text.strip("<>#\"'`* ")
+        if not profile and re.fullmatch(r'\d{6}', cleaned_pin):
+            self._handle_connect(chat_id, f"/connect {cleaned_pin}", username, first_name, last_name, profile)
+            return
+
         # If not verified, instruct user how to connect
         if not profile:
             self.client.send_message(
@@ -99,7 +105,14 @@ class TelegramUpdateHandler:
 
     def _handle_connect(self, chat_id: int, text: str, username: str, first_name: str, last_name: str, existing_profile: Optional[TelegramProfile]):
         parts = text.split()
-        code = parts[1].strip() if len(parts) > 1 else None
+        raw_code = parts[1].strip() if len(parts) > 1 else None
+
+        # Clean off any angle brackets, quotes, or extract exact 6 digits
+        code = None
+        if raw_code:
+            cleaned = raw_code.strip("<>#\"'`* ")
+            match = re.search(r'\d{6}', cleaned)
+            code = match.group(0) if match else cleaned
 
         if not code:
             if existing_profile:

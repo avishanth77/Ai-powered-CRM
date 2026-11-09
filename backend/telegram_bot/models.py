@@ -130,3 +130,4 @@ class TelegramActionSession(models.Model):
 
     def is_valid(self) -> bool:
         return self.status == self.Status.PENDING and timezone.now() <= self.expires_at
+

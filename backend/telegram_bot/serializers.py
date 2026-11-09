@@ -52,3 +52,4 @@ class TelegramLinkCodeResponseSerializer(serializers.Serializer):
     bot_username = serializers.CharField()
     deep_link = serializers.CharField()
     expires_in_minutes = serializers.IntegerField(default=15)
+
