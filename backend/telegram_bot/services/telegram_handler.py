@@ -6,7 +6,7 @@ from django.utils import timezone
 from django.db.models import Q
 
 from accounts.models import User
-from leads.models import Lead, LeadStage
+from leads.models import Lead, LeadStage, LeadStageTask
 from followups.models import FollowUp
 from ai.services.chatbot_service import ChatbotService
 from ai.services.crm_tools import CRMTools
@@ -467,18 +467,147 @@ class TelegramUpdateHandler:
                 l_id, s_id = parts[1], parts[2]
                 lead = Lead.objects.filter(pk=l_id).first()
                 new_stage = LeadStage.objects.filter(pk=s_id).first()
-                if lead and new_stage:
-                    old_stage_name = lead.stage.name if lead.stage else 'None'
-                    lead.stage = new_stage
-                    lead.save(update_fields=['stage', 'updated_at'])
-                    self.client.answer_callback_query(cq_id, f"Moved to {new_stage.name}!")
+                if not lead or not new_stage:
+                    self.client.answer_callback_query(cq_id, "Lead or stage not found.", show_alert=True)
+                    return
+
+                if lead.stage and lead.stage.id == new_stage.id:
+                    self.client.answer_callback_query(cq_id, f"Lead is already in {new_stage.name}.")
+                    return
+
+                # Enforce stage progression rules & mandatory stage tasks
+                from leads.services import check_stage_progression, execute_stage_task_automations
+                from leads.serializers import _check_stage_gate
+                from activity.services import log_activity
+
+                can_progress, missing_tasks, progress_msg = check_stage_progression(
+                    lead, new_stage, actor=user
+                )
+
+                if not can_progress:
+                    self.client.answer_callback_query(cq_id, "⚠️ Stage progression blocked: Mandatory tasks pending!", show_alert=True)
+                    task_items = "\n".join([f"• <b>{t['title']}</b>" for t in missing_tasks[:5]])
+                    text = (
+                        f"⚠️ <b>Stage Progression Blocked</b>\n\n"
+                        f"Lead <b>{lead.name}</b> cannot move to <code>{new_stage.name}</code> yet.\n\n"
+                        f"The following mandatory task(s) in <code>{lead.stage.name if lead.stage else 'Current'}</code> must be completed first:\n"
+                        f"{task_items}\n\n"
+                        f"<i>Tap a task below to mark it done, then retry moving:</i>"
+                    )
+                    keyboard = []
+                    for t in missing_tasks[:4]:
+                        keyboard.append([{
+                            'text': f"✅ Complete: {t['title'][:25]}",
+                            'callback_data': f"stagetask_done_{t['id']}_{lead.id}_{new_stage.id}"
+                        }])
+                    keyboard.append([
+                        {'text': f"🔄 Try Move to {new_stage.name}", 'callback_data': f"setstage_{lead.id}_{new_stage.id}"},
+                        {'text': '⬅️ Back to Lead', 'callback_data': f"lead_detail_{lead.id}"}
+                    ])
+                    self.client.edit_message_text(chat_id, message_id, text, reply_markup={'inline_keyboard': keyboard})
+                    return
+
+                # Enforce PLD stage gates
+                missing_gates = _check_stage_gate(lead, new_stage)
+                if missing_gates:
+                    gate_msg = " ".join([item.get('message', '') for item in missing_gates])
+                    self.client.answer_callback_query(cq_id, f"Stage gate unmet: {gate_msg}", show_alert=True)
                     self.client.edit_message_text(
                         chat_id,
                         message_id,
-                        f"✅ <b>Stage Updated!</b>\nLead <b>{lead.name}</b> moved from <code>{old_stage_name}</code> to <code>{new_stage.name}</code>."
+                        f"⚠️ <b>Stage Gate Requirement Unmet</b>\n\n"
+                        f"Cannot move lead <b>{lead.name}</b> to <code>{new_stage.name}</code>:\n"
+                        f"{gate_msg}",
+                        reply_markup={'inline_keyboard': [[{'text': '⬅️ Back to Lead', 'callback_data': f"lead_detail_{lead.id}"}]]}
                     )
+                    return
+
+                # Allowed! Move the stage
+                old_stage = lead.stage
+                old_stage_name = old_stage.name if old_stage else 'None'
+                lead.stage = new_stage
+                lead.save(update_fields=['stage', 'updated_at'])
+
+                # Trigger automated task assignments on stage transition
+                execute_stage_task_automations(
+                    lead=lead,
+                    new_stage=new_stage,
+                    old_stage=old_stage,
+                    actor=user
+                )
+
+                # Log activity
+                try:
+                    log_activity(
+                        entity_type='lead',
+                        entity_id=lead.id,
+                        action='STATUS_CHANGED',
+                        old_value={'stage': old_stage_name},
+                        new_value={'stage': new_stage.name},
+                        performed_by=user,
+                        notes=f"Stage moved to {new_stage.name} via Telegram Bot."
+                    )
+                except Exception:
+                    pass
+
+                self.client.answer_callback_query(cq_id, f"Moved to {new_stage.name}!")
+                self.client.edit_message_text(
+                    chat_id,
+                    message_id,
+                    f"✅ <b>Stage Updated!</b>\nLead <b>{lead.name}</b> moved from <code>{old_stage_name}</code> to <code>{new_stage.name}</code>.",
+                    reply_markup={'inline_keyboard': [
+                        [{'text': '👤 View Lead', 'callback_data': f"lead_detail_{lead.id}"}],
+                        [{'text': '📋 View Leads', 'callback_data': 'cmd_leads'}]
+                    ]}
+                )
+
+        # 5b. Complete Stage Task: stagetask_done_<task_id>_<lead_id>_<target_stage_id>
+        elif data.startswith('stagetask_done_'):
+            parts = data.split('_')
+            if len(parts) >= 5:
+                t_id, l_id, s_id = parts[2], parts[3], parts[4]
+                from leads.models import LeadStageTask
+                from leads.services import complete_stage_task, check_stage_progression
+
+                task = LeadStageTask.objects.filter(pk=t_id).first()
+                lead = Lead.objects.filter(pk=l_id).first()
+                target_stage = LeadStage.objects.filter(pk=s_id).first()
+
+                if task:
+                    complete_stage_task(task, actor=user, outcome_notes="Completed via Telegram Bot")
+                    self.client.answer_callback_query(cq_id, f"✅ Completed: {task.title}")
                 else:
-                    self.client.answer_callback_query(cq_id, "Lead or stage not found.", show_alert=True)
+                    self.client.answer_callback_query(cq_id, "Task not found.")
+
+                if lead and target_stage:
+                    can_progress, missing_tasks, _ = check_stage_progression(lead, target_stage, actor=user)
+                    if can_progress:
+                        text = (
+                            f"🎉 <b>All Mandatory Tasks Completed!</b>\n\n"
+                            f"Lead <b>{lead.name}</b> is now ready to advance to <code>{target_stage.name}</code>."
+                        )
+                        keyboard = [
+                            [{'text': f"➡️ Move to {target_stage.name} Now", 'callback_data': f"setstage_{lead.id}_{target_stage.id}"}],
+                            [{'text': '⬅️ Back to Lead', 'callback_data': f"lead_detail_{lead.id}"}]
+                        ]
+                    else:
+                        task_items = "\n".join([f"• <b>{t['title']}</b>" for t in missing_tasks[:5]])
+                        text = (
+                            f"✅ <i>Task '{task.title if task else t_id}' marked as completed.</i>\n\n"
+                            f"Remaining mandatory task(s) for <b>{lead.name}</b> before moving to <code>{target_stage.name}</code>:\n"
+                            f"{task_items}"
+                        )
+                        keyboard = []
+                        for t in missing_tasks[:4]:
+                            keyboard.append([{
+                                'text': f"✅ Complete: {t['title'][:25]}",
+                                'callback_data': f"stagetask_done_{t['id']}_{lead.id}_{target_stage.id}"
+                            }])
+                        keyboard.append([
+                            {'text': f"🔄 Try Move to {target_stage.name}", 'callback_data': f"setstage_{lead.id}_{target_stage.id}"},
+                            {'text': '⬅️ Back to Lead', 'callback_data': f"lead_detail_{lead.id}"}
+                        ])
+                    self.client.edit_message_text(chat_id, message_id, text, reply_markup={'inline_keyboard': keyboard})
 
         # 6. Navigation Commands from buttons: cmd_leads, cmd_today
         elif data == 'cmd_leads':

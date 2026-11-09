@@ -396,6 +396,22 @@ class ChatbotService:
             if not stage:
                 raise ValueError("Target lead stage was not found.")
 
+            # Enforce Stage Progression & Mandatory Stage Tasks
+            from leads.services import check_stage_progression
+            from leads.serializers import _check_stage_gate
+
+            can_progress, missing_tasks, progress_msg = check_stage_progression(
+                lead, stage, actor=user
+            )
+            if not can_progress:
+                raise ValueError(progress_msg)
+
+            # Enforce PLD stage gates
+            missing_gates = _check_stage_gate(lead, stage)
+            if missing_gates:
+                gate_msg = " ".join([item.get('message', '') for item in missing_gates])
+                raise ValueError(f"Cannot move to stage '{stage.name}': {gate_msg}")
+
             old_stage = lead.stage
             old_stage_name = lead.stage.name if lead.stage else getattr(lead, 'status', 'New')
             lead.stage = stage

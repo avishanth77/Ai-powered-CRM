@@ -6,7 +6,7 @@ from rest_framework import status
 from rest_framework.test import APIClient
 
 from accounts.models import User
-from leads.models import Lead, LeadStage
+from leads.models import Lead, LeadStage, LeadStageTask
 from followups.models import FollowUp
 from .models import TelegramProfile, TelegramActionSession
 from .services.telegram_handler import TelegramUpdateHandler
@@ -220,6 +220,73 @@ class TelegramBotIntegrationTestCase(TestCase):
         self.lead.refresh_from_db()
         self.assertEqual(self.lead.stage, self.stage_qual)
         mock_answer_cb.assert_called_once()
+
+    @patch('telegram_bot.services.telegram_client.TelegramClient.edit_message_text')
+    @patch('telegram_bot.services.telegram_client.TelegramClient.answer_callback_query')
+    def test_quick_setstage_blocked_when_mandatory_task_pending(self, mock_answer, mock_edit_text):
+        """Moving lead stage via Telegram is blocked if mandatory tasks for current stage are incomplete."""
+        # Create a mandatory task on the lead for stage_new
+        task = LeadStageTask.objects.create(
+            lead=self.lead,
+            stage=self.stage_new,
+            title='Verify Contact Details',
+            is_mandatory=True,
+            status=LeadStageTask.Status.PENDING,
+            due_date=timezone.now() + timedelta(days=2),
+            assigned_to=self.user
+        )
+
+        handler = TelegramUpdateHandler()
+        cb_update = {
+            'update_id': 108,
+            'callback_query': {
+                'id': 'cq_stage_blocked',
+                'data': f"setstage_{self.lead.id}_{self.stage_qual.id}",
+                'message': {
+                    'chat': {'id': self.profile.chat_id},
+                    'message_id': 789
+                }
+            }
+        }
+        handler.handle_update(cb_update)
+
+        # Stage should NOT have changed
+        self.lead.refresh_from_db()
+        self.assertEqual(self.lead.stage, self.stage_new)
+        mock_answer.assert_called_with('cq_stage_blocked', '⚠️ Stage progression blocked: Mandatory tasks pending!', show_alert=True)
+        self.assertIn('Stage Progression Blocked', mock_edit_text.call_args[0][2])
+
+        # Complete the task via stagetask_done_ callback
+        complete_update = {
+            'update_id': 109,
+            'callback_query': {
+                'id': 'cq_task_done',
+                'data': f"stagetask_done_{task.id}_{self.lead.id}_{self.stage_qual.id}",
+                'message': {
+                    'chat': {'id': self.profile.chat_id},
+                    'message_id': 789
+                }
+            }
+        }
+        handler.handle_update(complete_update)
+        task.refresh_from_db()
+        self.assertEqual(task.status, LeadStageTask.Status.COMPLETED)
+
+        # Now re-attempt moving stage -> Should succeed!
+        retry_update = {
+            'update_id': 110,
+            'callback_query': {
+                'id': 'cq_stage_allowed',
+                'data': f"setstage_{self.lead.id}_{self.stage_qual.id}",
+                'message': {
+                    'chat': {'id': self.profile.chat_id},
+                    'message_id': 789
+                }
+            }
+        }
+        handler.handle_update(retry_update)
+        self.lead.refresh_from_db()
+        self.assertEqual(self.lead.stage, self.stage_qual)
 
     # --------------------------------------------------------------------------
     # 4. REST API ENDPOINTS
