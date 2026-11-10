@@ -780,7 +780,7 @@ export const LeadCreate = () => {
           {/* Multi-Product Selection */}
           <div className="form-group">
             <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
-              <Package size={15} color="var(--primary)" /> Products & Line Items
+              <Package size={15} color="var(--primary)" /> Interested Products & Line Items
             </label>
             <ProductSelector
               selectedProductIds={formData.product_ids || []}

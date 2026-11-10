@@ -733,6 +733,7 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
             _save_custom_properties(lead, custom_props)
 
         if product_ids is not None:
+            from decimal import Decimal
             from products.models import Product, LeadProduct
             from django.db.models import Sum
             existing_pids = set(lead.lead_products.values_list('product_id', flat=True))
@@ -745,7 +746,10 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
                 if p:
                     LeadProduct.objects.create(lead=lead, product=p, unit_price=p.unit_price, quantity=1)
             total = lead.lead_products.aggregate(s=Sum('total_price'))['s']
-            if total and (lead.expected_value == 0 or 'expected_value' not in validated_data):
+            if 'expected_value' not in validated_data:
+                lead.expected_value = total if total is not None else Decimal('0.00')
+                lead.save(update_fields=['expected_value'])
+            elif total and lead.expected_value == 0:
                 lead.expected_value = total
                 lead.save(update_fields=['expected_value'])
         return lead

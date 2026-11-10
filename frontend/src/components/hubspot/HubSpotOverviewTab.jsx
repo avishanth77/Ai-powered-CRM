@@ -36,6 +36,7 @@ export const HubSpotOverviewTab = ({
   onCompleteTask,
   onScheduleFollowup,
   onOpenAiSummary,
+  onManageProducts,
 }) => {
   const [collapsedSections, setCollapsedSections] = useState({});
 
@@ -293,6 +294,83 @@ export const HubSpotOverviewTab = ({
                 <span className="hs-prop-value">{lead.decision_maker || <span className="hs-prop-empty">Not identified</span>}</span>
               </div>
 
+              <div className="hs-prop-row">
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', marginBottom: '0.25rem' }}>
+                  <span className="hs-prop-label" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Package size={13} color="var(--primary, #6366f1)" />
+                    <span>Interested Products</span>
+                  </span>
+                  {onManageProducts && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-xs"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onManageProducts();
+                      }}
+                      style={{ padding: '0.15rem 0.5rem', fontSize: '0.72rem', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}
+                      title="Add or update interested products"
+                    >
+                      <Package size={11} />
+                      <span>{lead.products?.length > 0 ? 'Edit' : '+ Add'}</span>
+                    </button>
+                  )}
+                </div>
+                <div className="hs-prop-value">
+                  {lead.products?.length > 0 ? (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.35rem', marginTop: '0.2rem' }}>
+                      {lead.products.map((p) => (
+                        <span
+                          key={p.id || p.lead_product_id}
+                          className="badge"
+                          style={{
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '0.35rem',
+                            padding: '0.2rem 0.55rem',
+                            fontSize: '0.75rem',
+                            borderRadius: '9999px',
+                            background: 'rgba(99, 102, 241, 0.12)',
+                            color: 'var(--primary, #6366f1)',
+                            border: '1px solid rgba(99, 102, 241, 0.25)',
+                          }}
+                        >
+                          <Package size={11} />
+                          <strong>{p.name}</strong>
+                          {p.quantity > 1 && <span style={{ opacity: 0.75 }}>×{p.quantity}</span>}
+                          <span style={{ opacity: 0.85, fontWeight: 700 }}>({formatCurrency(p.total_price || p.unit_price)})</span>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span className="hs-prop-empty">No products selected</span>
+                      {onManageProducts && (
+                        <button
+                          type="button"
+                          className="btn-link"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onManageProducts();
+                          }}
+                          style={{
+                            fontSize: '0.75rem',
+                            color: 'var(--primary, #6366f1)',
+                            textDecoration: 'underline',
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: 0,
+                          }}
+                        >
+                          + Add Interested Product
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {lead.customer_requirements && (
                 <div className="hs-prop-row">
                   <span className="hs-prop-label">Customer Requirements</span>
@@ -378,43 +456,121 @@ export const HubSpotOverviewTab = ({
           )}
         </div>
 
-        {/* Attached Products */}
-        {lead.products?.length > 0 && (
-          <div className="hs-card">
-            <div className="hs-card-header" onClick={() => toggleSection('products')} style={{ cursor: 'pointer' }}>
-              <h3 className="hs-card-title">
-                <Package size={16} color="#a855f7" />
-                <span>Selected Products ({lead.products.length})</span>
+        {/* Interested Products Card */}
+        <div className="hs-card">
+          <div
+            className="hs-card-header"
+            style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer' }}
+            onClick={() => toggleSection('products')}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <Package size={16} color="#a855f7" />
+              <h3 className="hs-card-title" style={{ margin: 0 }}>
+                <span>Interested Products ({lead.products?.length || 0})</span>
               </h3>
               {collapsedSections.products ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
             </div>
 
-            {!collapsedSections.products && (
-              <div className="hs-card-body" style={{ padding: '0.75rem' }}>
-                <table className="table" style={{ margin: 0, fontSize: '0.8125rem' }}>
-                  <thead>
-                    <tr>
-                      <th>Product</th>
-                      <th>Qty</th>
-                      <th>Price</th>
-                      <th>Total</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lead.products.map((p) => (
-                      <tr key={p.id || p.lead_product_id}>
-                        <td><strong>{p.name}</strong></td>
-                        <td>{p.quantity}</td>
-                        <td>{formatCurrency(p.unit_price)}</td>
-                        <td><strong>{formatCurrency(p.total_price)}</strong></td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+            {onManageProducts && (
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onManageProducts();
+                }}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.35rem',
+                  padding: '0.25rem 0.6rem',
+                  fontSize: '0.75rem',
+                }}
+                title="Add or update products for this lead"
+              >
+                <Package size={13} />
+                <span>{lead.products?.length > 0 ? 'Edit Products' : '+ Add Products'}</span>
+              </button>
             )}
           </div>
-        )}
+
+          {!collapsedSections.products && (
+            <div className="hs-card-body" style={{ padding: lead.products?.length > 0 ? '0.75rem' : '1.25rem' }}>
+              {lead.products?.length > 0 ? (
+                <>
+                  <table className="table" style={{ margin: 0, fontSize: '0.8125rem' }}>
+                    <thead>
+                      <tr>
+                        <th>Product</th>
+                        <th>Code</th>
+                        <th>Qty</th>
+                        <th>Unit Price</th>
+                        <th>Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {lead.products.map((p) => (
+                        <tr key={p.id || p.lead_product_id}>
+                          <td><strong>{p.name}</strong></td>
+                          <td><span className="badge badge-secondary" style={{ fontSize: '0.7rem' }}>{p.code || '—'}</span></td>
+                          <td>{p.quantity}</td>
+                          <td>{formatCurrency(p.unit_price)}</td>
+                          <td><strong>{formatCurrency(p.total_price)}</strong></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ borderTop: '2px solid var(--border-subtle)', fontWeight: 700 }}>
+                        <td colSpan={4} style={{ textAlign: 'right', color: 'var(--text-dim)' }}>
+                          Total Expected Value:
+                        </td>
+                        <td style={{ color: 'var(--success, #10b981)', fontSize: '0.875rem' }}>
+                          {formatCurrency(
+                            lead.products.reduce((acc, p) => acc + (parseFloat(p.total_price) || 0), 0)
+                          )}
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                  {onManageProducts && (
+                    <div style={{ marginTop: '0.75rem', display: 'flex', justifyContent: 'flex-end' }}>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-xs"
+                        onClick={onManageProducts}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                      >
+                        <Edit2 size={12} />
+                        <span>Modify Products</span>
+                      </button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '1rem', color: 'var(--text-dim)' }}>
+                  <Package size={28} style={{ opacity: 0.35, marginBottom: '0.5rem' }} />
+                  <div style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.25rem' }}>
+                    No Interested Products
+                  </div>
+                  <p style={{ fontSize: '0.8rem', margin: '0 0 0.85rem 0' }}>
+                    Attach products or services to this lead to automatically calculate deal value and track line items.
+                  </p>
+                  {onManageProducts && (
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={onManageProducts}
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', margin: '0 auto' }}
+                    >
+                      <Package size={14} />
+                      <span>+ Add Interested Product</span>
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Dynamic Custom Properties Card */}
         {customProps.length > 0 && (

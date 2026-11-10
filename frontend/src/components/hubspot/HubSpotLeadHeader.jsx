@@ -21,6 +21,7 @@ import {
   User,
   Sparkles,
   RotateCcw,
+  Package,
 } from 'lucide-react';
 import { PriorityBadge } from '../PriorityBadge';
 import { StatusBadge } from '../StatusBadge';
@@ -44,6 +45,7 @@ export const HubSpotLeadHeader = ({
   onMarkLost,
   onDelete,
   onOpenWinProb,
+  onManageProducts,
   canAssignLeads = false,
   canConvertLeads = false,
   canHandoverLeads = false,
@@ -251,6 +253,21 @@ export const HubSpotLeadHeader = ({
                     <span>Set Win Probability</span>
                   </button>
 
+                  {onManageProducts && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      style={{ justifyContent: 'flex-start', border: 'none', background: 'transparent' }}
+                      onClick={() => {
+                        setMoreMenuOpen(false);
+                        onManageProducts();
+                      }}
+                    >
+                      <Package size={14} />
+                      <span>Manage Interested Products</span>
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
@@ -355,6 +372,34 @@ export const HubSpotLeadHeader = ({
               {formatCurrency(lead.expected_value)}
             </span>
           )}
+
+          {lead.products?.length > 0 ? (
+            <span
+              className="hs-score-badge"
+              style={{ cursor: 'pointer', background: 'rgba(99, 102, 241, 0.12)', color: 'var(--primary)' }}
+              onClick={onManageProducts}
+              title="Click to manage interested products"
+            >
+              <Package size={13} />
+              <span>{lead.products.length} Product{lead.products.length > 1 ? 's' : ''}</span>
+            </span>
+          ) : onManageProducts ? (
+            <button
+              type="button"
+              className="hs-score-badge"
+              style={{
+                cursor: 'pointer',
+                background: 'rgba(99, 102, 241, 0.08)',
+                border: '1px dashed rgba(99, 102, 241, 0.4)',
+                color: 'var(--primary)',
+              }}
+              onClick={onManageProducts}
+              title="Add interested products"
+            >
+              <Package size={13} />
+              <span>+ Add Product</span>
+            </button>
+          ) : null}
         </div>
       </div>
 

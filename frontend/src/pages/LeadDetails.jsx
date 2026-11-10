@@ -777,6 +777,7 @@ export const LeadDetails = () => {
         }}
         onDelete={() => setDeleteConfirmOpen(true)}
         onOpenWinProb={handleOpenEditWinProb}
+        onManageProducts={handleOpenEditProducts}
         canAssignLeads={canAssignLeads}
         canConvertLeads={canConvertLeads}
         canHandoverLeads={canHandoverLeads}
@@ -867,6 +868,7 @@ export const LeadDetails = () => {
         {activeTab === 'overview' && (
           <HubSpotOverviewTab
             lead={lead}
+            onManageProducts={handleOpenEditProducts}
             onViewTasksTab={() => setActiveTab('stage-tasks')}
             onViewActivitiesTab={() => setActiveTab('activities')}
             onScheduleFollowup={() => setScheduleModalOpen(true)}
@@ -1862,7 +1864,7 @@ export const LeadDetails = () => {
                 </div>
                 <div>
                   <h3 style={{ fontSize: '1.1rem', margin: 0, fontWeight: 700 }}>
-                    Manage Products for Deal
+                    Interested Products & Line Items
                   </h3>
                   <p className="text-dim font-xs" style={{ margin: '2px 0 0 0' }}>
                     {lead?.name} {lead?.company_name ? `• ${lead.company_name}` : ''}
@@ -1902,7 +1904,7 @@ export const LeadDetails = () => {
                   style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
                 >
                   {isSubmittingProducts ? <Loader2 size={16} className="spinner" /> : <Package size={16} />}
-                  Save Products
+                  Save Interested Products
                 </button>
               </div>
             </form>
