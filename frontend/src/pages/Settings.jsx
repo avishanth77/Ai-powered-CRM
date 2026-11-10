@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { leadApi } from '../api/leadApi';
 import { authApi } from '../api/authApi';
@@ -39,6 +39,8 @@ import {
   Package,
   UserCheck,
   Send,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 
 export const Settings = () => {
@@ -72,6 +74,51 @@ export const Settings = () => {
     setActiveTab(tabKey);
     setSearchParams({ tab: tabKey });
   };
+
+  // Horizontal Tabs Scroll Controls
+  const tabsNavRef = useRef(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(false);
+
+  const checkTabsScroll = () => {
+    const el = tabsNavRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 6);
+    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 6);
+  };
+
+  useEffect(() => {
+    checkTabsScroll();
+    window.addEventListener('resize', checkTabsScroll);
+    return () => window.removeEventListener('resize', checkTabsScroll);
+  }, [activeTab, canManageStages, canManageSources, canManageIcp, isAdmin, isManager]);
+
+  const handleTabsWheel = (e) => {
+    if (tabsNavRef.current) {
+      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        tabsNavRef.current.scrollLeft += e.deltaY;
+        checkTabsScroll();
+      }
+    }
+  };
+
+  const scrollTabs = (direction) => {
+    if (tabsNavRef.current) {
+      const offset = direction === 'left' ? -220 : 220;
+      tabsNavRef.current.scrollBy({ left: offset, behavior: 'smooth' });
+      setTimeout(checkTabsScroll, 320);
+    }
+  };
+
+  useEffect(() => {
+    if (tabsNavRef.current) {
+      const activeBtn = tabsNavRef.current.querySelector('.tab-btn-active');
+      if (activeBtn) {
+        activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+      }
+      setTimeout(checkTabsScroll, 300);
+    }
+  }, [activeTab]);
 
   // Profile Form
   const [profileData, setProfileData] = useState({
@@ -419,7 +466,26 @@ export const Settings = () => {
       </div>
 
       {/* Tabs Navigation */}
-      <div className="tabs-navigation" style={{ marginBottom: '1.5rem' }} role="tablist" aria-label="Settings sections">
+      <div className="tabs-navigation-wrapper">
+        {canScrollLeft && (
+          <button
+            type="button"
+            className="tabs-scroll-btn tabs-scroll-left"
+            onClick={() => scrollTabs('left')}
+            aria-label="Scroll tabs left"
+            title="Scroll left"
+          >
+            <ChevronLeft size={16} />
+          </button>
+        )}
+        <div
+          ref={tabsNavRef}
+          className="tabs-navigation"
+          onWheel={handleTabsWheel}
+          onScroll={checkTabsScroll}
+          role="tablist"
+          aria-label="Settings sections"
+        >
         {canManageStages && (
           <button
             type="button"
@@ -548,6 +614,18 @@ export const Settings = () => {
           <Send size={16} />
           <span>Telegram Bot</span>
         </button>
+        </div>
+        {canScrollRight && (
+          <button
+            type="button"
+            className="tabs-scroll-btn tabs-scroll-right"
+            onClick={() => scrollTabs('right')}
+            aria-label="Scroll tabs right"
+            title="Scroll right"
+          >
+            <ChevronRight size={16} />
+          </button>
+        )}
       </div>
 
       {/* TAB 1: LEAD STAGES MANAGEMENT (Admin Only) */}

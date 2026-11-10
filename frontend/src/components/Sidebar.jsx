@@ -23,6 +23,7 @@ import {
   Sparkles,
   Globe,
   UserCheck,
+  Send,
 } from 'lucide-react';
 
 export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
@@ -193,6 +194,12 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
       tab: 'assignment',
       icon: UserCheck,
       show: isAdmin || isManager,
+    },
+    {
+      label: 'Telegram Bot',
+      tab: 'telegram',
+      icon: Send,
+      show: true,
     },
   ];
 
