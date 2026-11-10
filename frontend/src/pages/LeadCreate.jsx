@@ -122,6 +122,19 @@ export const LeadCreate = () => {
     if (errors[name]) {
       setErrors((prev) => ({ ...prev, [name]: null }));
     }
+
+    if (name === 'email' || name === 'phone' || name === 'mobile_phone') {
+      setErrors((prev) => {
+        const next = { ...prev };
+        if (next.email && next.email.includes('Please provide an Email Address or Work Phone')) {
+          delete next.email;
+        }
+        if (next.phone && next.phone.includes('Please provide a Work Phone or Email Address')) {
+          delete next.phone;
+        }
+        return next;
+      });
+    }
   };
 
   const selectedStageObj = stages.find((s) => s.id === parseInt(formData.stage));
@@ -129,6 +142,16 @@ export const LeadCreate = () => {
 
   const validateForm = () => {
     const newErrors = {};
+
+    const hasEmail = Boolean(formData.email && formData.email.trim());
+    const hasPhone = Boolean(formData.phone && formData.phone.trim());
+    const hasMobile = Boolean(formData.mobile_phone && formData.mobile_phone.trim());
+
+    if (!hasEmail && !hasPhone && !hasMobile) {
+      newErrors.email = 'Please provide an Email Address or Work Phone.';
+      newErrors.phone = 'Please provide a Work Phone or Email Address.';
+    }
+
     if (formData.phone && !isValidPhone(formData.phone)) {
       newErrors.phone = 'Please enter a valid phone number (minimum 7 digits).';
     }
@@ -155,7 +178,12 @@ export const LeadCreate = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) {
-      showToast('Please fix the errors in the form.', 'warning');
+      const hasContact = Boolean((formData.email && formData.email.trim()) || (formData.phone && formData.phone.trim()) || (formData.mobile_phone && formData.mobile_phone.trim()));
+      if (!hasContact) {
+        showToast('Please provide at least one contact method: Email Address or Work Phone.', 'warning');
+      } else {
+        showToast('Please fix the errors in the form.', 'warning');
+      }
       return;
     }
 
@@ -282,6 +310,9 @@ export const LeadCreate = () => {
                 <User size={16} color="var(--primary)" />
                 <span>Contact Information</span>
               </h3>
+              <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', fontWeight: 500 }}>
+                * At least one contact method required (Email or Work Phone)
+              </span>
             </div>
             <div className="form-layout">
 
@@ -314,12 +345,14 @@ export const LeadCreate = () => {
 
           <div className="form-grid-2">
             <div className="form-group">
-              <label className="form-label" htmlFor="lead-email">Email Address</label>
+              <label className="form-label" htmlFor="lead-email">
+                Email Address <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>(or Work Phone required)</span>
+              </label>
               <input
                 id="lead-email"
                 name="email"
                 type="email"
-                className="form-control"
+                className={`form-control ${errors.email ? 'border-danger' : ''}`}
                 placeholder="e.g. john.doe@company.com"
                 value={formData.email}
                 onChange={handleChange}
@@ -329,12 +362,14 @@ export const LeadCreate = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="lead-phone">Work Phone</label>
+              <label className="form-label" htmlFor="lead-phone">
+                Work Phone <span style={{ fontSize: '0.75rem', fontWeight: 500, color: 'var(--text-muted)' }}>(or Email required)</span>
+              </label>
               <input
                 id="lead-phone"
                 name="phone"
                 type="tel"
-                className="form-control"
+                className={`form-control ${errors.phone ? 'border-danger' : ''}`}
                 placeholder="e.g. +91 9876543210"
                 value={formData.phone}
                 onChange={handleChange}

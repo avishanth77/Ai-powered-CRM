@@ -597,6 +597,27 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, attrs):
+        # Ensure at least one direct contact detail (Email Address or Work Phone / Mobile) is provided
+        email_val = attrs.get('email') if 'email' in attrs else getattr(self.instance, 'email', None)
+        phone_val = attrs.get('phone') if 'phone' in attrs else getattr(self.instance, 'phone', None)
+        mobile_val = attrs.get('mobile_phone') if 'mobile_phone' in attrs else getattr(self.instance, 'mobile_phone', None)
+
+        def is_meaningful_contact(val):
+            if not val:
+                return False
+            s = str(val).strip()
+            return bool(s and s.upper() not in ('NONE', 'NULL', 'N/A', '-', 'NOT PROVIDED', 'UNKNOWN', 'NO PHONE'))
+
+        has_email = is_meaningful_contact(email_val)
+        has_phone = is_meaningful_contact(phone_val) or is_meaningful_contact(mobile_val)
+
+        if not has_email and not has_phone:
+            raise serializers.ValidationError({
+                "contact": "Please provide at least one contact detail: Email Address or Work Phone.",
+                "email": "Email address or work phone is required.",
+                "phone": "Work phone or email address is required."
+            })
+
         # Auto-generate or synchronize name with first_name and last_name
         name_val = attrs.get('name')
         first_val = attrs.get('first_name') or (getattr(self.instance, 'first_name', '') if self.instance else '')

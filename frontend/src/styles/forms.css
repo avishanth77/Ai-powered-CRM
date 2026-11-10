@@ -77,6 +77,13 @@ textarea.form-textarea {
   resize: vertical;
 }
 
+.form-control[aria-invalid="true"],
+.form-input[aria-invalid="true"],
+.form-select[aria-invalid="true"],
+.form-control.border-danger {
+  border-color: var(--danger, #ef4444) !important;
+}
+
 .form-error-msg {
   font-size: 0.75rem;
   color: var(--danger);

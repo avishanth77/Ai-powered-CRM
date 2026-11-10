@@ -493,3 +493,48 @@ class LeadAndPermissionTests(TestCase):
         self.assertEqual(data['total_count'], 1)
         self.assertEqual(data['records'][0]['name'], 'Exec 1 Lead')
 
+    # ============================================================
+    # CONTACT DETAILS REQUIREMENT TESTS (Email or Work Phone)
+    # ============================================================
+    def test_lead_creation_fails_without_email_and_without_phone(self):
+        """Lead creation must be rejected if neither email nor phone is provided."""
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post('/api/leads/', {
+            'first_name': 'NoContact',
+            'last_name': 'Person',
+            'stage': self.stage_new.id,
+            'expected_value': 1000
+        })
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+        response_data = response.data.get('errors', response.data)
+        self.assertTrue('contact' in response_data or 'email' in response_data or 'phone' in response_data)
+
+    def test_lead_creation_succeeds_with_only_email(self):
+        """Lead creation succeeds when email is provided without a phone number."""
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post('/api/leads/', {
+            'first_name': 'EmailOnly',
+            'last_name': 'Lead',
+            'email': 'emailonly.prospect@testcrm.com',
+            'stage': self.stage_new.id,
+            'expected_value': 2500
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        res_email = response.data.get('email') or (response.data.get('data', {}).get('email'))
+        self.assertEqual(res_email, 'emailonly.prospect@testcrm.com')
+
+    def test_lead_creation_succeeds_with_only_phone(self):
+        """Lead creation succeeds when phone is provided without an email address."""
+        self.client.force_authenticate(user=self.admin)
+        response = self.client.post('/api/leads/', {
+            'first_name': 'PhoneOnly',
+            'last_name': 'Lead',
+            'phone': '+919876543219',
+            'stage': self.stage_new.id,
+            'expected_value': 3500
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        res_phone = response.data.get('phone') or (response.data.get('data', {}).get('phone'))
+        self.assertEqual(res_phone, '+919876543219')
+
+
