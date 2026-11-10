@@ -7,6 +7,8 @@ import { useToast } from '../context/ToastContext';
 import { extractErrorMessage, normalizeServerErrors, isValidEmail, isValidPhone } from '../utils/validation';
 import { FieldError } from '../components/FieldError';
 import { LEAD_PRIORITY } from '../utils/constants';
+import { formatCurrency } from '../utils/formatters';
+import { PriorityBadge } from '../components/PriorityBadge';
 import ProductSelector from '../components/ProductSelector';
 import {
   ArrowLeft,
@@ -228,38 +230,60 @@ export const LeadCreate = () => {
 
   return (
     <div className="lead-form-page">
-      <div className="page-header">
+      {/* Top Page Header with Quick Actions */}
+      <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
         <div>
-          <Link to="/leads" className="contact-item mb-2" style={{ marginBottom: '0.5rem' }}>
-            <ArrowLeft size={16} /> Back to Leads List
+          <Link to="/leads" className="contact-item mb-2" style={{ marginBottom: '0.4rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+            <ArrowLeft size={15} /> Back to Leads List
           </Link>
-          <h1 className="page-title">
-            <UserPlus size={26} />
+          <h1 className="page-title" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+            <UserPlus size={26} color="var(--primary)" />
             <span>Create New Lead</span>
           </h1>
-          <p className="page-subtitle">Add a comprehensive prospect profile to your CRM pipeline</p>
+          <p className="page-subtitle" style={{ margin: '0.2rem 0 0 0' }}>Add a comprehensive prospect profile to your CRM pipeline</p>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <Link to="/leads" className="btn btn-secondary">
+            Cancel
+          </Link>
+          <button
+            type="submit"
+            form="lead-create-form"
+            className="btn btn-primary"
+            disabled={loading}
+            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+          >
+            {loading ? <Loader2 size={16} className="spinner" /> : <Save size={16} />}
+            <span>{loading ? 'Creating Lead...' : 'Create Lead'}</span>
+          </button>
         </div>
       </div>
 
-      <div className="card" style={{ maxWidth: '880px' }}>
-        <form onSubmit={handleSubmit} className="form-layout">
-          {formError && (
-            <div className="toast-item toast-error" role="alert" style={{ marginBottom: '0.5rem' }}>
+      <form id="lead-create-form" onSubmit={handleSubmit} className="lead-form-grid">
+        {formError && (
+          <div style={{ gridColumn: '1 / -1', marginBottom: '0.5rem' }}>
+            <div className="toast-item toast-error" role="alert">
               <div className="toast-message">
                 {formError.map((msg, i) => (
                   <div key={i}>{msg}</div>
                 ))}
               </div>
             </div>
-          )}
-
-          {/* Section 1: Contact Information */}
-          <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '0.75rem' }}>
-            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
-              <User size={16} color="var(--primary)" />
-              <span>Contact Information</span>
-            </h3>
           </div>
+        )}
+
+        {/* LEFT COLUMN: Prospect Profile & Discovery */}
+        <div className="lead-form-main">
+          {/* Section 1: Contact Information */}
+          <div className="lead-form-card">
+            <div className="lead-form-card-header">
+              <h3 className="lead-form-card-title">
+                <User size={16} color="var(--primary)" />
+                <span>Contact Information</span>
+              </h3>
+            </div>
+            <div className="form-layout">
 
           <div className="form-grid-2">
             <div className="form-group">
@@ -395,14 +419,18 @@ export const LeadCreate = () => {
               onChange={handleChange}
             />
           </div>
+          </div>
+        </div>
 
-          {/* Section 2: Company Information */}
-          <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', margin: '1.25rem 0 0.75rem 0' }}>
-            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+        {/* Section 2: Company Information */}
+        <div className="lead-form-card">
+          <div className="lead-form-card-header">
+            <h3 className="lead-form-card-title">
               <Building2 size={16} color="#38bdf8" />
               <span>Company Information</span>
             </h3>
           </div>
+          <div className="form-layout">
 
           <div className="form-grid-2">
             <div className="form-group">
@@ -535,180 +563,86 @@ export const LeadCreate = () => {
               onChange={handleChange}
             />
           </div>
+          </div>
+        </div>
 
-          {/* Section 3: Lead Qualification */}
-          <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', margin: '1.25rem 0 0.75rem 0' }}>
-            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+        {/* Section 3: Lead Discovery & Scope */}
+        <div className="lead-form-card">
+          <div className="lead-form-card-header">
+            <h3 className="lead-form-card-title">
               <Target size={16} color="#f59e0b" />
-              <span>Lead Qualification</span>
+              <span>Discovery & Scope</span>
             </h3>
           </div>
 
-          <div className="form-grid-2">
+          <div className="form-layout">
             <div className="form-group">
-              <label className="form-label" htmlFor="lead-score">Lead Score (0-100)</label>
+              <label className="form-label" htmlFor="decision-maker">Key Decision Maker Name / Title</label>
               <input
-                id="lead-score"
-                name="lead_score"
-                type="number"
-                min="0"
-                max="100"
+                id="decision-maker"
+                name="decision_maker"
+                type="text"
                 className="form-control"
-                value={formData.lead_score}
+                placeholder="e.g. Jane Smith, VP of Finance"
+                value={formData.decision_maker}
                 onChange={handleChange}
               />
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="buying-intent">Buying Intent</label>
-              <select
-                id="buying-intent"
-                name="buying_intent"
+              <label className="form-label" htmlFor="customer-requirements">Customer Requirements / Scope</label>
+              <textarea
+                id="customer-requirements"
+                name="customer_requirements"
                 className="form-control"
-                value={formData.buying_intent}
-                onChange={handleChange}
-              >
-                <option value="HIGH">High Intent</option>
-                <option value="MEDIUM">Medium Intent</option>
-                <option value="LOW">Low Intent</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="form-grid-2">
-            <div className="form-group">
-              <label className="form-label" htmlFor="estimated-budget">Estimated Budget (₹)</label>
-              <input
-                id="estimated-budget"
-                name="estimated_budget"
-                type="number"
-                step="0.01"
-                className="form-control"
-                placeholder="e.g. 250000"
-                value={formData.estimated_budget}
+                rows={3}
+                placeholder="Key specifications, workflows, and problems they need solved..."
+                value={formData.customer_requirements}
                 onChange={handleChange}
               />
             </div>
 
             <div className="form-group">
-              <label className="form-label" htmlFor="purchasing-timeline">Purchasing Timeline</label>
-              <select
-                id="purchasing-timeline"
-                name="purchasing_timeline"
+              <label className="form-label" htmlFor="competitor-info">Competitor Information</label>
+              <textarea
+                id="competitor-info"
+                name="competitor_info"
                 className="form-control"
-                value={formData.purchasing_timeline}
+                rows={2}
+                placeholder="Competitors currently evaluated or incumbency..."
+                value={formData.competitor_info}
                 onChange={handleChange}
-              >
-                <option value="">Select Timeline</option>
-                <option value="IMMEDIATE">Immediate (&lt; 1 month)</option>
-                <option value="1_3_MONTHS">1 - 3 months</option>
-                <option value="3_6_MONTHS">3 - 6 months</option>
-                <option value="6_12_MONTHS">6 - 12 months</option>
-                <option value="NO_TIMELINE">No immediate plan</option>
-              </select>
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label" htmlFor="qualification-notes">Qualification Notes</label>
+              <textarea
+                id="qualification-notes"
+                name="qualification_notes"
+                className="form-control"
+                rows={2}
+                placeholder="Key takeaways from initial screening..."
+                value={formData.qualification_notes}
+                onChange={handleChange}
+              />
             </div>
           </div>
+        </div>
+      </div>
 
-          <div className="form-group">
-            <label className="form-label" htmlFor="decision-maker">Key Decision Maker Name / Title</label>
-            <input
-              id="decision-maker"
-              name="decision_maker"
-              type="text"
-              className="form-control"
-              placeholder="e.g. Jane Smith, VP of Finance"
-              value={formData.decision_maker}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="customer-requirements">Customer Requirements / Scope</label>
-            <textarea
-              id="customer-requirements"
-              name="customer_requirements"
-              className="form-control"
-              rows={3}
-              placeholder="Key specifications, workflows, and problems they need solved..."
-              value={formData.customer_requirements}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="competitor-info">Competitor Information</label>
-            <textarea
-              id="competitor-info"
-              name="competitor_info"
-              className="form-control"
-              rows={2}
-              placeholder="Competitors currently evaluated or incumbency..."
-              value={formData.competitor_info}
-              onChange={handleChange}
-            />
-          </div>
-
-          <div className="form-group">
-            <label className="form-label" htmlFor="qualification-notes">Qualification Notes</label>
-            <textarea
-              id="qualification-notes"
-              name="qualification_notes"
-              className="form-control"
-              rows={2}
-              placeholder="Key takeaways from initial screening..."
-              value={formData.qualification_notes}
-              onChange={handleChange}
-            />
-          </div>
-
-          {/* Section 4: Pipeline & Sales Information */}
-          <div style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', margin: '1.25rem 0 0.75rem 0' }}>
-            <h3 style={{ fontSize: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', margin: 0 }}>
+      {/* RIGHT COLUMN: Pipeline, Products, Assignment & Summary */}
+      <div className="lead-form-sidebar">
+        {/* Card 1: Pipeline & Deal */}
+        <div className="lead-form-card">
+          <div className="lead-form-card-header">
+            <h3 className="lead-form-card-title">
               <DollarSign size={16} color="#10b981" />
-              <span>Pipeline & Sales Information</span>
+              <span>Pipeline & Deal Stage</span>
             </h3>
           </div>
 
-          <div className="form-grid-2">
-            <div className="form-group">
-              <label className="form-label" htmlFor="lead-type">Lead Type</label>
-              <select
-                id="lead-type"
-                name="lead_type"
-                className="form-control"
-                value={formData.lead_type}
-                onChange={handleChange}
-              >
-                <option value="INBOUND">Inbound</option>
-                <option value="OUTBOUND">Outbound</option>
-                <option value="REFERRAL">Referral</option>
-                <option value="PARTNER">Partner</option>
-                <option value="EVENT">Event / Trade Show</option>
-                <option value="EXISTING_CUSTOMER">Existing Customer</option>
-                <option value="OTHER">Other</option>
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label" htmlFor="lead-source">Lead Source</label>
-              <select
-                id="lead-source"
-                name="source"
-                className="form-control"
-                value={formData.source}
-                onChange={handleChange}
-              >
-                <option value="">Select Lead Source</option>
-                {sources.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="form-grid-2">
+          <div className="form-layout">
             <div className="form-group">
               <label className="form-label form-label-required" htmlFor="lead-stage">Pipeline Stage</label>
               <select
@@ -729,35 +663,35 @@ export const LeadCreate = () => {
               <FieldError id="lead-stage-error" message={errors.stage} />
             </div>
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="lead-priority">Priority</label>
-              <select
-                id="lead-priority"
-                name="priority"
-                className="form-control"
-                value={formData.priority}
-                onChange={handleChange}
-              >
-                {Object.entries(LEAD_PRIORITY).map(([k, v]) => (
-                  <option key={k} value={v}>
-                    {v}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
+            <div className="form-grid-2">
+              <div className="form-group">
+                <label className="form-label" htmlFor="lead-priority">Priority</label>
+                <select
+                  id="lead-priority"
+                  name="priority"
+                  className="form-control"
+                  value={formData.priority}
+                  onChange={handleChange}
+                >
+                  {Object.entries(LEAD_PRIORITY).map(([k, v]) => (
+                    <option key={k} value={v}>
+                      {v}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          <div className="form-grid-2">
-            <div className="form-group">
-              <label className="form-label" htmlFor="expected-close-date">Expected Closing Date</label>
-              <input
-                id="expected-close-date"
-                name="expected_close_date"
-                type="date"
-                className="form-control"
-                value={formData.expected_close_date}
-                onChange={handleChange}
-              />
+              <div className="form-group">
+                <label className="form-label" htmlFor="expected-close-date">Close Date</label>
+                <input
+                  id="expected-close-date"
+                  name="expected_close_date"
+                  type="date"
+                  className="form-control"
+                  value={formData.expected_close_date}
+                  onChange={handleChange}
+                />
+              </div>
             </div>
 
             <div className="form-group">
@@ -775,77 +709,251 @@ export const LeadCreate = () => {
               />
               <FieldError id="lead-value-error" message={errors.expected_value} />
             </div>
+
+            {isLostStage && (
+              <div className="form-group">
+                <label className="form-label form-label-required" htmlFor="lead-lost-reason">
+                  Lost Reason (Mandatory when stage is Lost)
+                </label>
+                <textarea
+                  id="lead-lost-reason"
+                  name="lost_reason"
+                  className="form-control"
+                  rows={2}
+                  placeholder="Reason why this deal was lost..."
+                  value={formData.lost_reason}
+                  onChange={handleChange}
+                  required
+                  aria-invalid={Boolean(errors.lost_reason)}
+                />
+                <FieldError id="lead-lost-reason-error" message={errors.lost_reason} />
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Card 2: Interested Products & Line Items */}
+        <div className="lead-form-card">
+          <div className="lead-form-card-header">
+            <h3 className="lead-form-card-title">
+              <Package size={16} color="var(--primary)" />
+              <span>Interested Products</span>
+            </h3>
           </div>
 
-          {/* Multi-Product Selection */}
-          <div className="form-group">
-            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', fontWeight: 600 }}>
-              <Package size={15} color="var(--primary)" /> Interested Products & Line Items
-            </label>
-            <ProductSelector
-              selectedProductIds={formData.product_ids || []}
-              onChange={(ids) => setFormData((prev) => ({ ...prev, product_ids: ids }))}
-              onTotalValueChange={(val) => {
-                if (val > 0) {
-                  setFormData((prev) => ({ ...prev, expected_value: val.toFixed(2) }));
-                }
-              }}
-            />
+          <ProductSelector
+            selectedProductIds={formData.product_ids || []}
+            onChange={(ids) => setFormData((prev) => ({ ...prev, product_ids: ids }))}
+            onTotalValueChange={(val) => {
+              if (val > 0) {
+                setFormData((prev) => ({ ...prev, expected_value: val.toFixed(2) }));
+              }
+            }}
+          />
+        </div>
+
+        {/* Card 3: Ownership & Qualification Criteria */}
+        <div className="lead-form-card">
+          <div className="lead-form-card-header">
+            <h3 className="lead-form-card-title">
+              <Sparkles size={16} color="#06b6d4" />
+              <span>Qualification & Source</span>
+            </h3>
           </div>
 
-          {canAssignLeads && (
-            <div className="form-group">
-              <label className="form-label" htmlFor="lead-assigned">Assigned Representative</label>
-              <select
-                id="lead-assigned"
-                name="assigned_to"
-                className="form-control"
-                value={formData.assigned_to}
-                onChange={handleChange}
-              >
-                <option value="">✨ Auto-Assign via Salesman Rules</option>
-                {users
-                  .filter((u) => u.is_active && u.role === 'EXECUTIVE')
-                  .map((u) => (
-                    <option key={u.id} value={u.id}>
-                      {u.first_name || u.last_name ? `${u.first_name} ${u.last_name}` : u.email}
+          <div className="form-layout">
+            {canAssignLeads && (
+              <div className="form-group">
+                <label className="form-label" htmlFor="lead-assigned">Assigned Representative</label>
+                <select
+                  id="lead-assigned"
+                  name="assigned_to"
+                  className="form-control"
+                  value={formData.assigned_to}
+                  onChange={handleChange}
+                >
+                  <option value="">✨ Auto-Assign via Salesman Rules</option>
+                  {users
+                    .filter((u) => u.is_active && u.role === 'EXECUTIVE')
+                    .map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.first_name || u.last_name ? `${u.first_name} ${u.last_name}` : u.email}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            )}
+
+            <div className="form-grid-2">
+              <div className="form-group">
+                <label className="form-label" htmlFor="lead-type">Lead Type</label>
+                <select
+                  id="lead-type"
+                  name="lead_type"
+                  className="form-control"
+                  value={formData.lead_type}
+                  onChange={handleChange}
+                >
+                  <option value="INBOUND">Inbound</option>
+                  <option value="OUTBOUND">Outbound</option>
+                  <option value="REFERRAL">Referral</option>
+                  <option value="PARTNER">Partner</option>
+                  <option value="EVENT">Event / Trade Show</option>
+                  <option value="EXISTING_CUSTOMER">Existing Customer</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="lead-source">Lead Source</label>
+                <select
+                  id="lead-source"
+                  name="source"
+                  className="form-control"
+                  value={formData.source}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Source</option>
+                  {sources.map((s) => (
+                    <option key={s.id} value={s.id}>
+                      {s.name}
                     </option>
                   ))}
-              </select>
+                </select>
+              </div>
             </div>
-          )}
 
-          {isLostStage && (
-            <div className="form-group">
-              <label className="form-label form-label-required" htmlFor="lead-lost-reason">
-                Lost Reason (Mandatory when stage is Lost)
-              </label>
-              <textarea
-                id="lead-lost-reason"
-                name="lost_reason"
-                className="form-control"
-                rows={2}
-                placeholder="Reason why this deal was lost..."
-                value={formData.lost_reason}
-                onChange={handleChange}
-                required
-                aria-invalid={Boolean(errors.lost_reason)}
-              />
-              <FieldError id="lead-lost-reason-error" message={errors.lost_reason} />
+            <div className="form-grid-2">
+              <div className="form-group">
+                <label className="form-label" htmlFor="lead-score">Lead Score (0-100)</label>
+                <input
+                  id="lead-score"
+                  name="lead_score"
+                  type="number"
+                  min="0"
+                  max="100"
+                  className="form-control"
+                  value={formData.lead_score}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="buying-intent">Buying Intent</label>
+                <select
+                  id="buying-intent"
+                  name="buying_intent"
+                  className="form-control"
+                  value={formData.buying_intent}
+                  onChange={handleChange}
+                >
+                  <option value="HIGH">High Intent</option>
+                  <option value="MEDIUM">Medium Intent</option>
+                  <option value="LOW">Low Intent</option>
+                </select>
+              </div>
             </div>
-          )}
 
-          <div className="form-actions" style={{ marginTop: '1.5rem', display: 'flex', gap: '0.75rem', justifyContent: 'flex-end' }}>
-            <Link to="/leads" className="btn btn-secondary">
+            <div className="form-grid-2">
+              <div className="form-group">
+                <label className="form-label" htmlFor="estimated-budget">Estimated Budget (₹)</label>
+                <input
+                  id="estimated-budget"
+                  name="estimated_budget"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  className="form-control"
+                  placeholder="e.g. 50000"
+                  value={formData.estimated_budget}
+                  onChange={handleChange}
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label" htmlFor="purchasing-timeline">Timeline</label>
+                <select
+                  id="purchasing-timeline"
+                  name="purchasing_timeline"
+                  className="form-control"
+                  value={formData.purchasing_timeline}
+                  onChange={handleChange}
+                >
+                  <option value="">Select Timeline</option>
+                  <option value="IMMEDIATE">Immediate (&lt; 1 mo)</option>
+                  <option value="1_3_MONTHS">This Quarter (1-3 mo)</option>
+                  <option value="3_6_MONTHS">Next Quarter (3-6 mo)</option>
+                  <option value="6_12_MONTHS">Future (&gt; 6 mo)</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 4: Live Summary & Action Buttons */}
+        <div className="lead-form-card" style={{ background: 'var(--bg-surface-elevated, var(--bg-surface))' }}>
+          <div className="lead-summary-preview">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-dim)' }}>
+                Deal Preview
+              </span>
+              <span style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--success, #10b981)' }}>
+                {formatCurrency(formData.expected_value || 0)}
+              </span>
+            </div>
+
+            <div style={{ fontSize: '0.9375rem', fontWeight: 700, color: 'var(--text-main)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+              {(formData.first_name || formData.last_name)
+                ? `${formData.first_name} ${formData.last_name}`.trim()
+                : formData.name || 'New Prospect'}
+            </div>
+
+            {formData.company_name && (
+              <div style={{ fontSize: '0.8125rem', color: 'var(--text-dim)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                <Building2 size={13} />
+                <span>{formData.company_name}</span>
+              </div>
+            )}
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
+              {selectedStageObj?.name && (
+                <span className="badge badge-secondary" style={{ fontSize: '0.7rem' }}>
+                  {selectedStageObj.name}
+                </span>
+              )}
+              {formData.priority && (
+                <PriorityBadge priority={formData.priority} />
+              )}
+              {formData.product_ids?.length > 0 && (
+                <span className="badge badge-primary" style={{ fontSize: '0.7rem' }}>
+                  {formData.product_ids.length} Product{formData.product_ids.length > 1 ? 's' : ''}
+                </span>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginTop: '1.25rem' }}>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading}
+              style={{ width: '100%', justifyContent: 'center', padding: '0.75rem 1rem', fontSize: '0.9375rem', fontWeight: 600 }}
+            >
+              {loading ? <Loader2 size={16} className="spinner" /> : <Save size={16} />}
+              <span>{loading ? 'Creating Lead...' : 'Create Lead'}</span>
+            </button>
+
+            <Link
+              to="/leads"
+              className="btn btn-secondary"
+              style={{ width: '100%', justifyContent: 'center' }}
+            >
               Cancel
             </Link>
-            <button type="submit" className="btn btn-primary" disabled={loading}>
-              <Save size={16} />
-              <span>{loading ? 'Creating...' : 'Create Lead'}</span>
-            </button>
           </div>
-        </form>
+        </div>
       </div>
+    </form>
 
       {/* Processing Animation Modal Overlay */}
       {loading && (
