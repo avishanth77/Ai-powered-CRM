@@ -3,14 +3,18 @@ import {
   ArrowDown,
   ArrowUp,
   Edit,
+  Globe,
   ListChecks,
+  Package,
   Plus,
   Power,
   SlidersHorizontal,
+  Tag,
   Trash2,
   X,
 } from 'lucide-react';
 import { icpApi } from '../api/icpApi';
+import { productApi } from '../api/productApi';
 import { useToast } from '../context/ToastContext';
 import { useDialogA11y } from '../hooks/useDialogA11y';
 import { extractErrorMessage, normalizeServerErrors } from '../utils/validation';
@@ -23,7 +27,8 @@ import { LoadingSpinner } from './LoadingSpinner';
 const emptyOption = () => ({ option_text: '', points: 0 });
 const emptyRule = () => ({ min: '', max: '', points: 0 });
 
-const emptyForm = () => ({
+const emptyForm = (defaultProdId = null) => ({
+  product: defaultProdId,
   question_text: '',
   description: '',
   question_type: 'DROPDOWN',
@@ -41,6 +46,10 @@ const toNumber = (value) => {
 
 export const IcpQuestionsManager = () => {
   const { showToast } = useToast();
+
+  const [products, setProducts] = useState([]);
+  const [productFilter, setProductFilter] = useState('all'); // 'all', 'global', or product id
+  const [configProduct, setConfigProduct] = useState('global');
 
   const [questions, setQuestions] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -65,11 +74,25 @@ export const IcpQuestionsManager = () => {
 
   const formDialogRef = useDialogA11y(formOpen, closeForm);
 
+  const loadProducts = useCallback(async () => {
+    try {
+      const res = await productApi.getProducts({ page_size: 100 });
+      const prods = res?.results ?? (Array.isArray(res) ? res : (res?.data ?? []));
+      setProducts(prods);
+    } catch {
+      // Products might not be configured or empty
+    }
+  }, []);
+
   const loadQuestions = useCallback(async () => {
     setLoading(true);
     const currentRequest = ++requestId.current;
     try {
-      const res = await icpApi.getQuestions({ include_inactive: 'true' });
+      const params = { include_inactive: 'true' };
+      if (productFilter !== 'all') {
+        params.product = productFilter;
+      }
+      const res = await icpApi.getQuestions(params);
       if (currentRequest !== requestId.current) return;
       const rows = res?.results ?? (Array.isArray(res) ? res : []);
       setQuestions(rows.sort((a, b) => a.display_order - b.display_order || a.id - b.id));
@@ -78,21 +101,29 @@ export const IcpQuestionsManager = () => {
     } finally {
       if (currentRequest === requestId.current) setLoading(false);
     }
-  }, [showToast]);
+  }, [productFilter, showToast]);
 
-  const loadConfig = useCallback(async () => {
+  const loadConfig = useCallback(async (prodScope = configProduct) => {
     try {
-      const res = await icpApi.getScoringConfig();
+      const params = prodScope !== 'global' ? { product_id: prodScope } : {};
+      const res = await icpApi.getScoringConfig(params);
       if (res?.data) setConfig(res.data);
     } catch (err) {
       showToast(extractErrorMessage(err, 'Failed to load scoring thresholds'), 'error');
     }
-  }, [showToast]);
+  }, [configProduct, showToast]);
+
+  useEffect(() => {
+    loadProducts();
+  }, [loadProducts]);
 
   useEffect(() => {
     loadQuestions();
-    loadConfig();
-  }, [loadQuestions, loadConfig]);
+  }, [loadQuestions]);
+
+  useEffect(() => {
+    loadConfig(configProduct);
+  }, [loadConfig, configProduct]);
 
   const typeMeta = getIcpQuestionType(formData.question_type);
 
@@ -157,8 +188,9 @@ export const IcpQuestionsManager = () => {
     }));
 
   const openCreate = () => {
+    const defaultProd = (productFilter !== 'all' && productFilter !== 'global') ? parseInt(productFilter, 10) : null;
     setEditing(null);
-    setFormData(emptyForm());
+    setFormData(emptyForm(defaultProd));
     setFormErrors({});
     setFormOpen(true);
   };
@@ -166,6 +198,7 @@ export const IcpQuestionsManager = () => {
   const openEdit = (question) => {
     setEditing(question);
     setFormData({
+      product: question.product || null,
       question_text: question.question_text || '',
       description: question.description || '',
       question_type: question.question_type,
@@ -228,6 +261,7 @@ export const IcpQuestionsManager = () => {
 
   const buildPayload = () => {
     const payload = {
+      product: formData.product || null,
       question_text: formData.question_text.trim(),
       description: formData.description.trim(),
       question_type: formData.question_type,
@@ -326,13 +360,22 @@ export const IcpQuestionsManager = () => {
     e.preventDefault();
     setSavingConfig(true);
     try {
-      const res = await icpApi.updateScoringConfig({
+      const payload = {
         poor_fit_max: toNumber(config.poor_fit_max),
         potential_fit_max: toNumber(config.potential_fit_max),
         good_fit_max: toNumber(config.good_fit_max),
-      });
+      };
+      if (configProduct !== 'global') {
+        payload.product_id = parseInt(configProduct, 10);
+      }
+      const res = await icpApi.updateScoringConfig(payload);
       if (res?.data) setConfig(res.data);
-      showToast('Scoring thresholds updated.', 'success');
+      showToast(
+        configProduct !== 'global'
+          ? 'Product scoring thresholds updated.'
+          : 'Global scoring thresholds updated.',
+        'success'
+      );
     } catch (err) {
       showToast(extractErrorMessage(err, 'Failed to update scoring thresholds'), 'error');
     } finally {
@@ -357,13 +400,47 @@ export const IcpQuestionsManager = () => {
               <span>ICP Qualification Questions</span>
             </h3>
             <p className="text-muted font-sm icp-section-subtitle">
-              These questions are shown to sales users in this order when they run an ICP test.
+              Configure product-specific or general ICP questions to qualify leads accurately.
             </p>
           </div>
           <button type="button" className="btn btn-primary" onClick={openCreate}>
             <Plus size={16} />
             <span>Add Question</span>
           </button>
+        </div>
+
+        {/* Product Scope Filter Tabs */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.45rem', marginBottom: '1.25rem', flexWrap: 'wrap', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.85rem' }}>
+          <span style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', marginRight: '0.25rem' }}>
+            <Package size={15} color="var(--primary)" /> Scope:
+          </span>
+          <button
+            type="button"
+            className={`btn btn-sm ${productFilter === 'all' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ borderRadius: '20px', padding: '0.2rem 0.75rem', fontSize: '0.8rem' }}
+            onClick={() => setProductFilter('all')}
+          >
+            All Questions
+          </button>
+          <button
+            type="button"
+            className={`btn btn-sm ${productFilter === 'global' ? 'btn-primary' : 'btn-secondary'}`}
+            style={{ borderRadius: '20px', padding: '0.2rem 0.75rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+            onClick={() => setProductFilter('global')}
+          >
+            <Globe size={13} /> Global / General
+          </button>
+          {products.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              className={`btn btn-sm ${productFilter === String(p.id) ? 'btn-primary' : 'btn-secondary'}`}
+              style={{ borderRadius: '20px', padding: '0.2rem 0.75rem', fontSize: '0.8rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+              onClick={() => setProductFilter(String(p.id))}
+            >
+              <Package size={13} /> {p.name}
+            </button>
+          ))}
         </div>
 
         {loading ? (
@@ -401,6 +478,23 @@ export const IcpQuestionsManager = () => {
                       {question.description && (
                         <div className="text-dim font-sm">{question.description}</div>
                       )}
+                      <div style={{ marginTop: '0.25rem' }}>
+                        {question.product_details ? (
+                          <span
+                            className="badge badge-info font-xs"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.15rem 0.5rem', borderRadius: '4px' }}
+                          >
+                            <Package size={11} /> {question.product_details.name}
+                          </span>
+                        ) : (
+                          <span
+                            className="badge badge-neutral font-xs"
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', padding: '0.15rem 0.5rem', borderRadius: '4px' }}
+                          >
+                            <Globe size={11} /> Global
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <span className="icp-type-tag">
@@ -494,15 +588,38 @@ export const IcpQuestionsManager = () => {
 
       {/* Scoring thresholds */}
       <div className="card icp-config-card">
-        <div className="icp-section-header">
+        <div className="icp-section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <h3 className="icp-section-title">
               <SlidersHorizontal size={20} color="var(--primary)" />
-              <span>Score Classification</span>
+              <span>Score Classification & Thresholds</span>
             </h3>
             <p className="text-muted font-sm icp-section-subtitle">
-              Percentage = (earned points / maximum points) × 100. Changes apply to future qualifications only.
+              Percentage = (earned points / maximum points) × 100. Configure thresholds globally or for a specific product.
             </p>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <label htmlFor="config-product-select" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+              Configure for:
+            </label>
+            <select
+              id="config-product-select"
+              className="form-control"
+              style={{ width: 'auto', minWidth: '200px', padding: '0.35rem 0.65rem', fontSize: '0.85rem' }}
+              value={configProduct}
+              onChange={(e) => {
+                const val = e.target.value;
+                setConfigProduct(val);
+                loadConfig(val);
+              }}
+            >
+              <option value="global">Global Default</option>
+              {products.map((p) => (
+                <option key={p.id} value={String(p.id)}>
+                  {p.name} ({p.code})
+                </option>
+              ))}
+            </select>
           </div>
         </div>
 
@@ -584,6 +701,28 @@ export const IcpQuestionsManager = () => {
             <form onSubmit={handleSubmit}>
               <div className="modal-body">
                 <div className="form-grid-2">
+                  <div className="form-group icp-span-2">
+                    <label className="form-label" htmlFor="icp-question-product">
+                      Product Scope
+                    </label>
+                    <select
+                      id="icp-question-product"
+                      className="form-control"
+                      value={formData.product || ''}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, product: e.target.value ? parseInt(e.target.value, 10) : null }))}
+                    >
+                      <option value="">Global / General (Applies to all products)</option>
+                      {products.map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.code}) — {p.category}
+                        </option>
+                      ))}
+                    </select>
+                    <small className="text-muted font-xs">
+                      Choose whether this question is specific to a single product or shared globally across all products.
+                    </small>
+                  </div>
+
                   <div className="form-group icp-span-2">
                     <label className="form-label form-label-required" htmlFor="icp-question-text">
                       Question

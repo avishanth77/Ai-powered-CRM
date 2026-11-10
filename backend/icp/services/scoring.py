@@ -26,12 +26,21 @@ class ICPValidationError(Exception):
         self.errors = errors or {}
 
 
-def get_active_questions():
-    """Active questions in configured display order, with options prefetched."""
+def get_active_questions(product=None, include_global=True):
+    """Active questions in configured display order, with options and product prefetched.
+    If product is provided, returns questions for that product (plus global if include_global).
+    """
+    from django.db.models import Q
     from icp.models import ICPQuestion
-    return list(
-        ICPQuestion.objects.filter(is_active=True).prefetch_related('options').order_by('display_order', 'id')
-    )
+
+    qs = ICPQuestion.objects.filter(is_active=True).prefetch_related('options', 'product')
+    if product is not None:
+        prod_id = getattr(product, 'id', product)
+        if include_global:
+            qs = qs.filter(Q(product_id=prod_id) | Q(product__isnull=True))
+        else:
+            qs = qs.filter(product_id=prod_id)
+    return list(qs.order_by('display_order', 'id'))
 
 
 def classify_score(percentage, config=None):
@@ -210,9 +219,9 @@ def calculate_percentage(total_score, max_score):
 
 
 @transaction.atomic
-def submit_qualification(lead, user, answers_payload):
+def submit_qualification(lead, user, answers_payload, product=None):
     """Validate, score and persist an ICP qualification attempt for a lead."""
-    questions = get_active_questions()
+    questions = get_active_questions(product=product)
     if not questions:
         raise ICPValidationError('There are no active ICP questions configured yet.')
 
@@ -252,12 +261,13 @@ def submit_qualification(lead, user, answers_payload):
     if errors:
         raise ICPValidationError('Please complete all required questions before submitting.', errors)
 
-    config = get_scoring_config()
+    config = get_scoring_config(product=product)
     percentage = calculate_percentage(total_score, max_score)
     icp_status = classify_score(percentage, config)
 
     qualification = ICPQualification.objects.create(
         lead=lead,
+        product=product,
         qualified_by=user if (user and user.is_authenticated) else None,
         total_score=total_score,
         max_score=max_score,

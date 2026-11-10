@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
+from products.models import Product
 from .models import (
     ICPQuestion,
     ICPQuestionOption,
@@ -19,6 +20,12 @@ CHOICE_TYPES = (
     QuestionType.YES_NO,
     QuestionType.DROPDOWN,
 )
+
+
+class ProductRefSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Product
+        fields = ['id', 'name', 'code', 'category', 'unit_price', 'currency']
 
 
 class ICPQuestionOptionSerializer(serializers.ModelSerializer):
@@ -46,11 +53,14 @@ class ICPQuestionSerializer(serializers.ModelSerializer):
 
     options = ICPQuestionOptionSerializer(many=True, read_only=True)
     created_by_details = UserRefSerializer(source='created_by', read_only=True)
+    product_details = ProductRefSerializer(source='product', read_only=True)
 
     class Meta:
         model = ICPQuestion
         fields = [
             'id',
+            'product',
+            'product_details',
             'question_text',
             'description',
             'question_type',
@@ -72,20 +82,37 @@ class ICPQuestionTestSerializer(serializers.ModelSerializer):
     """Question payload used to run the test. No admin-only data is exposed."""
 
     options = ICPQuestionOptionSerializer(many=True, read_only=True)
+    product_details = ProductRefSerializer(source='product', read_only=True)
 
     class Meta:
         model = ICPQuestion
-        fields = ['id', 'question_text', 'description', 'question_type', 'is_required', 'display_order', 'options']
+        fields = [
+            'id',
+            'product',
+            'product_details',
+            'question_text',
+            'description',
+            'question_type',
+            'is_required',
+            'display_order',
+            'options',
+        ]
 
 
 class ICPQuestionCreateUpdateSerializer(serializers.ModelSerializer):
     options = ICPQuestionOptionWriteSerializer(many=True, required=False)
+    product = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(),
+        required=False,
+        allow_null=True
+    )
     display_order = serializers.IntegerField(required=False, min_value=1)
     max_points = serializers.IntegerField(required=False, min_value=0, max_value=10000)
 
     class Meta:
         model = ICPQuestion
         fields = [
+            'product',
             'question_text',
             'description',
             'question_type',
@@ -238,11 +265,25 @@ class ICPQualificationListSerializer(serializers.ModelSerializer):
     lead_name = serializers.CharField(source='lead.name', read_only=True)
     qualified_by_details = UserRefSerializer(source='qualified_by', read_only=True)
     icp_status_display = serializers.CharField(source='get_icp_status_display', read_only=True)
+    product_details = ProductRefSerializer(source='product', read_only=True)
 
     class Meta:
         model = ICPQualification
-        fields = ['id', 'lead', 'lead_name', 'qualified_by', 'qualified_by_details', 'total_score',
-                  'max_score', 'percentage', 'icp_status', 'icp_status_display', 'qualified_at']
+        fields = [
+            'id',
+            'lead',
+            'lead_name',
+            'product',
+            'product_details',
+            'qualified_by',
+            'qualified_by_details',
+            'total_score',
+            'max_score',
+            'percentage',
+            'icp_status',
+            'icp_status_display',
+            'qualified_at',
+        ]
         read_only_fields = fields
 
 
@@ -259,9 +300,16 @@ class ICPQualificationDetailSerializer(ICPQualificationListSerializer):
 
 
 class ICPScoringConfigSerializer(serializers.ModelSerializer):
+    product = serializers.PrimaryKeyRelatedField(
+        queryset=Product.objects.all(),
+        required=False,
+        allow_null=True
+    )
+    product_details = ProductRefSerializer(source='product', read_only=True)
+
     class Meta:
         model = ICPScoringConfig
-        fields = ['poor_fit_max', 'potential_fit_max', 'good_fit_max']
+        fields = ['id', 'product', 'product_details', 'poor_fit_max', 'potential_fit_max', 'good_fit_max']
 
     def validate(self, attrs):
         poor = attrs.get('poor_fit_max', getattr(self.instance, 'poor_fit_max', 39))
@@ -280,6 +328,7 @@ class ICPScoringConfigSerializer(serializers.ModelSerializer):
 
 
 class ICPQualificationSubmitSerializer(serializers.Serializer):
-    """Only the raw answers are accepted. Scores are always computed server-side."""
+    """Answers and optional product_id are accepted."""
 
     answers = serializers.ListField(child=serializers.DictField(), allow_empty=True)
+    product_id = serializers.IntegerField(required=False, allow_null=True)

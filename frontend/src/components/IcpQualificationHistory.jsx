@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { History, Target, X } from 'lucide-react';
+import { History, Package, Target, X } from 'lucide-react';
 import { icpApi } from '../api/icpApi';
 import { useToast } from '../context/ToastContext';
 import { useDialogA11y } from '../hooks/useDialogA11y';
@@ -54,6 +54,18 @@ const IcpResultModal = ({ qualification, onClose }) => {
           </div>
 
           <dl className="icp-result-meta">
+            <div>
+              <dt>Product</dt>
+              <dd>
+                {qualification.product_details ? (
+                  <span className="badge badge-info font-xs" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <Package size={12} /> {qualification.product_details.name}
+                  </span>
+                ) : (
+                  <span className="text-muted font-xs">Global / General</span>
+                )}
+              </dd>
+            </div>
             <div>
               <dt>Qualified by</dt>
               <dd>
@@ -176,6 +188,7 @@ export const IcpQualificationHistory = ({ leadId, refreshToken }) => {
           <thead>
             <tr>
               <th>Date</th>
+              <th>Product</th>
               <th>Score</th>
               <th>Percentage</th>
               <th>Status</th>
@@ -194,6 +207,15 @@ export const IcpQualificationHistory = ({ leadId, refreshToken }) => {
                       <span className="icp-latest-tag" title="Most recent test">
                         Latest
                       </span>
+                    )}
+                  </td>
+                  <td>
+                    {row.product_details ? (
+                      <span className="badge badge-info font-xs" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                        <Package size={11} /> {row.product_details.name}
+                      </span>
+                    ) : (
+                      <span className="text-dim font-xs">Global</span>
                     )}
                   </td>
                   <td>

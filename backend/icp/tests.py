@@ -638,3 +638,109 @@ class ICPScoringConfigApiTests(ICPTestBase):
             reverse('icp-config'), {'poor_fit_max': 80, 'potential_fit_max': 50, 'good_fit_max': 90}, format='json'
         )
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ProductSpecificICPTests(ICPTestBase):
+    def setUp(self):
+        super().setUp()
+        from products.models import Product
+        self.product_a = Product.objects.create(
+            name='Enterprise Cloud Suite',
+            code='ECS-PRO',
+            category='Software',
+            unit_price=50000
+        )
+        self.product_b = Product.objects.create(
+            name='Basic CRM Seat',
+            code='BCRM',
+            category='Software',
+            unit_price=500
+        )
+
+    def test_product_specific_question_creation_and_filtering(self):
+        """Questions can be attached to a specific product and filtered accordingly."""
+        self.login(self.admin)
+        # Create global question
+        res_global = self.client.post('/api/icp/questions/', {
+            'question_text': 'What is your company headcount?',
+            'question_type': 'SINGLE_CHOICE',
+            'options': [{'option_text': '1-10', 'points': 5}, {'option_text': '50+', 'points': 20}],
+        }, format='json')
+        self.assertEqual(res_global.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(res_global.data['data']['product'])
+
+        # Create product-specific question for Enterprise Cloud Suite
+        res_prod = self.client.post('/api/icp/questions/', {
+            'product': self.product_a.id,
+            'question_text': 'Do you have dedicated IT infrastructure?',
+            'question_type': 'YES_NO',
+            'options': [{'option_text': 'Yes', 'points': 50}, {'option_text': 'No', 'points': 0}],
+        }, format='json')
+        self.assertEqual(res_prod.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_prod.data['data']['product'], self.product_a.id)
+
+        # Query questions for product A
+        list_a = self.client.get(f'/api/icp/questions/?product={self.product_a.id}')
+        self.assertEqual(list_a.status_code, status.HTTP_200_OK)
+        # Strictly product A questions
+        self.assertTrue(any(q['id'] == res_prod.data['data']['id'] for q in list_a.data['results']))
+
+        # Query global questions
+        list_global = self.client.get('/api/icp/questions/?product=global')
+        self.assertEqual(list_global.status_code, status.HTTP_200_OK)
+        self.assertTrue(all(q['product'] is None for q in list_global.data['results']))
+
+    def test_product_specific_scoring_config(self):
+        """Each product can customize its own scoring thresholds."""
+        self.login(self.admin)
+        # Set custom thresholds for product A: stricter Good Fit at 90%
+        res = self.client.put('/api/icp/config/', {
+            'product_id': self.product_a.id,
+            'poor_fit_max': 45,
+            'potential_fit_max': 70,
+            'good_fit_max': 90,
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data['data']['product'], self.product_a.id)
+        self.assertEqual(res.data['data']['good_fit_max'], 90)
+
+        # Global config remains default
+        res_global = self.client.get('/api/icp/config/')
+        self.assertEqual(res_global.status_code, status.HTTP_200_OK)
+        self.assertIsNone(res_global.data['data']['product'])
+        self.assertEqual(res_global.data['data']['good_fit_max'], 79)
+
+    def test_qualify_lead_for_specific_product(self):
+        """Qualifying a lead with product_id associates the qualification with that product."""
+        from products.models import LeadProduct
+        LeadProduct.objects.create(lead=self.lead, product=self.product_a, unit_price=50000)
+
+        # Create product-specific question
+        q = ICPQuestion.objects.create(
+            product=self.product_a,
+            question_text='Cloud Readiness',
+            question_type=QuestionType.SINGLE_CHOICE,
+            display_order=1
+        )
+        opt_ready = q.options.create(option_text='Fully Cloud Native', points=100, display_order=1)
+        q.max_points = 100
+        q.save(update_fields=['max_points'])
+
+        self.login(self.sales)
+        # Test endpoint returns selected product and questions
+        get_test = self.client.get(f'/api/leads/{self.lead.id}/icp/?product_id={self.product_a.id}')
+        self.assertEqual(get_test.status_code, status.HTTP_200_OK)
+        self.assertEqual(get_test.data['data']['selected_product']['id'], self.product_a.id)
+
+        # Submit qualification for product A
+        sub = self.client.post(
+            reverse('lead-icp-qualify', args=[self.lead.id]),
+            {
+                'product_id': self.product_a.id,
+                'answers': [{'question_id': q.id, 'value': opt_ready.id}]
+            },
+            format='json'
+        )
+        self.assertEqual(sub.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(sub.data['data']['product'], self.product_a.id)
+        self.assertEqual(sub.data['data']['product_details']['name'], 'Enterprise Cloud Suite')

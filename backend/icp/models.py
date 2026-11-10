@@ -33,6 +33,14 @@ CHOICE_BASED_TYPES = (
 
 
 class ICPQuestion(models.Model):
+    product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='icp_questions',
+        help_text='Specific product this question belongs to. If null, applies to all products (General).',
+    )
     question_text = models.CharField(max_length=300)
     description = models.TextField(blank=True, null=True, help_text='Optional help text shown under the question.')
     question_type = models.CharField(
@@ -95,6 +103,8 @@ class ICPQuestion(models.Model):
             'max_points': self.max_points,
             'scoring_rules': self.scoring_rules or [],
             'options': self.options_snapshot(),
+            'product_id': self.product_id,
+            'product_name': self.product.name if self.product else None,
         }
 
 
@@ -119,8 +129,16 @@ class ICPQuestionOption(models.Model):
 
 
 class ICPScoringConfig(models.Model):
-    """Singleton row (pk=1) holding the percentage thresholds used to classify a score."""
+    """Singleton default or product-specific thresholds used to classify an ICP score."""
 
+    product = models.OneToOneField(
+        'products.Product',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='icp_scoring_config',
+        help_text='If null, this is the default global scoring config.',
+    )
     poor_fit_max = models.PositiveIntegerField(default=39)
     potential_fit_max = models.PositiveIntegerField(default=59)
     good_fit_max = models.PositiveIntegerField(default=79)
@@ -133,23 +151,37 @@ class ICPScoringConfig(models.Model):
         verbose_name_plural = 'ICP Scoring Config'
 
     def __str__(self):
-        return 'ICP Scoring Config'
-
-    def save(self, *args, **kwargs):
-        self.pk = 1
-        super().save(*args, **kwargs)
+        if self.product:
+            return f'ICP Scoring Config ({self.product.name})'
+        return 'ICP Scoring Config (Global)'
 
     def as_dict(self):
-        return {
+        data = {
             'poor_fit_max': self.poor_fit_max,
             'potential_fit_max': self.potential_fit_max,
             'good_fit_max': self.good_fit_max,
         }
+        if self.product_id:
+            data['product_id'] = self.product_id
+            data['product_name'] = self.product.name if self.product else None
+        return data
 
 
-def get_scoring_config():
-    """Return the singleton config, creating it with defaults on first use."""
-    config, _ = ICPScoringConfig.objects.get_or_create(pk=1)
+def get_scoring_config(product=None):
+    """Return the product-specific config if configured, else the default global config."""
+    if product:
+        prod_id = getattr(product, 'id', product)
+        cfg = ICPScoringConfig.objects.filter(product_id=prod_id).first()
+        if cfg:
+            return cfg
+    config = ICPScoringConfig.objects.filter(product__isnull=True).first()
+    if not config:
+        config = ICPScoringConfig.objects.create(
+            product=None,
+            poor_fit_max=39,
+            potential_fit_max=59,
+            good_fit_max=79,
+        )
     return config
 
 
@@ -160,6 +192,14 @@ class ICPQualification(models.Model):
         'leads.Lead',
         on_delete=models.CASCADE,
         related_name='icp_qualifications',
+    )
+    product = models.ForeignKey(
+        'products.Product',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='icp_qualifications',
+        help_text='The specific product this qualification test was evaluated for, if any.',
     )
     qualified_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -185,7 +225,8 @@ class ICPQualification(models.Model):
         verbose_name_plural = 'ICP Qualifications'
 
     def __str__(self):
-        return f'{self.lead} - {self.total_score}/{self.max_score} ({self.get_icp_status_display()})'
+        prod_str = f" [{self.product.name}]" if self.product else ""
+        return f'{self.lead}{prod_str} - {self.total_score}/{self.max_score} ({self.get_icp_status_display()})'
 
 
 class ICPQualificationAnswer(models.Model):

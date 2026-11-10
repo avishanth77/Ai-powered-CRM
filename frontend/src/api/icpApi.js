@@ -34,8 +34,8 @@ export const icpApi = {
   },
 
   // Scoring thresholds
-  getScoringConfig: async () => {
-    const response = await api.get('/api/icp/config/');
+  getScoringConfig: async (params = {}) => {
+    const response = await api.get('/api/icp/config/', { params });
     return response.data;
   },
   updateScoringConfig: async (payload) => {
@@ -44,16 +44,18 @@ export const icpApi = {
   },
 
   // Lead scoped test + history
-  getLeadIcp: async (leadId) => {
-    const response = await api.get(`/api/leads/${leadId}/icp/`);
+  getLeadIcp: async (leadId, params = {}) => {
+    const response = await api.get(`/api/leads/${leadId}/icp/`, { params });
     return response.data;
   },
-  submitQualification: async (leadId, answers) => {
-    const response = await api.post(`/api/leads/${leadId}/icp/qualify/`, { answers });
+  submitQualification: async (leadId, payload) => {
+    // Accepts either an array of answers or an object { answers, product_id }
+    const body = Array.isArray(payload) ? { answers: payload } : payload;
+    const response = await api.post(`/api/leads/${leadId}/icp/qualify/`, body);
     return response.data;
   },
-  getQualificationHistory: async (leadId) => {
-    const response = await api.get(`/api/leads/${leadId}/icp/history/`);
+  getQualificationHistory: async (leadId, params = {}) => {
+    const response = await api.get(`/api/leads/${leadId}/icp/history/`, { params });
     return { ...response.data, results: asList(response.data) };
   },
   getQualification: async (qualificationId) => {
