@@ -1183,6 +1183,9 @@ export const Settings = () => {
                       onChange={(e) => setStageFormData({ ...stageFormData, display_order: e.target.value })}
                       required
                     />
+                    <span className="text-dim font-xs" style={{ marginTop: '0.25rem', display: 'block' }}>
+                      If an existing stage uses this position, all subsequent stages will shift down automatically.
+                    </span>
                     {stageFormErrors.display_order && (
                       <span className="form-error-msg">{stageFormErrors.display_order}</span>
                     )}
@@ -1358,6 +1361,9 @@ export const Settings = () => {
                       onChange={(e) => setStageToEdit({ ...stageToEdit, display_order: e.target.value })}
                       required
                     />
+                    <span className="text-dim font-xs" style={{ marginTop: '0.25rem', display: 'block' }}>
+                      Changing this position will dynamically resequence and shift other stages without duplicates.
+                    </span>
                   </div>
                 </div>
 

@@ -537,4 +537,117 @@ class LeadAndPermissionTests(TestCase):
         res_phone = response.data.get('phone') or (response.data.get('data', {}).get('phone'))
         self.assertEqual(res_phone, '+919876543219')
 
+    def test_stage_creation_with_existing_order_shifts_subsequent_stages(self):
+        """When creating a stage with an order already in use, all subsequent stages shift down automatically."""
+        self.client.force_authenticate(user=self.admin)
+
+        # Resequence clean slate for test
+        from leads.services.stage_ordering import resequence_stages
+        resequence_stages()
+
+        stage_at_3 = LeadStage.objects.filter(display_order=3).first()
+        self.assertIsNotNone(stage_at_3)
+        orig_order_3_id = stage_at_3.id
+        total_before = LeadStage.objects.count()
+
+        # Create a new stage at order 3
+        response = self.client.post('/api/lead-stages/', {
+            'name': 'Inserted Stage 3',
+            'color': '#6366F1',
+            'display_order': 3,
+            'is_active': True,
+        })
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        new_stage_id = response.data['id']
+        self.assertEqual(response.data['display_order'], 3)
+
+        # Stage previously at 3 must now be at 4
+        stage_at_3.refresh_from_db()
+        self.assertEqual(stage_at_3.display_order, 4)
+
+        # Verify all stages are contiguous 1..N with zero duplicates
+        stages = list(LeadStage.objects.all().order_by('display_order', 'id'))
+        self.assertEqual(len(stages), total_before + 1)
+        for expected_order, stg in enumerate(stages, start=1):
+            self.assertEqual(stg.display_order, expected_order, f"Stage {stg.name} expected order {expected_order} but got {stg.display_order}")
+
+    def test_stage_update_order_shifts_intermediate_stages(self):
+        """Updating a stage's display_order dynamically shifts intermediate stages."""
+        self.client.force_authenticate(user=self.admin)
+        from leads.services.stage_ordering import resequence_stages
+        resequence_stages()
+
+        # Pick a stage at order 5
+        stage_5 = LeadStage.objects.filter(display_order=5).first()
+        self.assertIsNotNone(stage_5)
+        stage_2 = LeadStage.objects.filter(display_order=2).first()
+        stage_3 = LeadStage.objects.filter(display_order=3).first()
+        stage_4 = LeadStage.objects.filter(display_order=4).first()
+
+        # Move stage_5 up to order 2
+        response = self.client.patch(f'/api/lead-stages/{stage_5.id}/', {
+            'display_order': 2
+        })
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        stage_5.refresh_from_db()
+        self.assertEqual(stage_5.display_order, 2)
+
+        # Old stage 2, 3, 4 should have shifted down to 3, 4, 5
+        stage_2.refresh_from_db()
+        stage_3.refresh_from_db()
+        stage_4.refresh_from_db()
+        self.assertEqual(stage_2.display_order, 3)
+        self.assertEqual(stage_3.display_order, 4)
+        self.assertEqual(stage_4.display_order, 5)
+
+        # All stages must remain strictly contiguous 1..N
+        stages = list(LeadStage.objects.all().order_by('display_order', 'id'))
+        for idx, stg in enumerate(stages, start=1):
+            self.assertEqual(stg.display_order, idx)
+
+    def test_stage_deletion_resequences_remaining_stages(self):
+        """Deleting a custom stage cleanly resequences all remaining stages to prevent gaps."""
+        self.client.force_authenticate(user=self.admin)
+        from leads.services.stage_ordering import resequence_stages
+        resequence_stages()
+
+        # Create a custom stage to delete
+        custom_stage = LeadStage.objects.create(
+            name='Temporary Stage To Delete',
+            color='#FF0000',
+            display_order=3,
+            is_active=True,
+            is_system=False,
+        )
+        resequence_stages()
+
+        del_res = self.client.delete(f'/api/lead-stages/{custom_stage.id}/')
+        self.assertEqual(del_res.status_code, status.HTTP_200_OK)
+
+        # Verify no gaps exist
+        stages = list(LeadStage.objects.all().order_by('display_order', 'id'))
+        for idx, stg in enumerate(stages, start=1):
+            self.assertEqual(stg.display_order, idx)
+
+    def test_stage_move_direction_resequences_correctly(self):
+        """The /move/ endpoint moves a stage up and down cleanly without collisions."""
+        self.client.force_authenticate(user=self.admin)
+        from leads.services.stage_ordering import resequence_stages
+        resequence_stages()
+
+        stage_3 = LeadStage.objects.filter(display_order=3).first()
+        stage_2 = LeadStage.objects.filter(display_order=2).first()
+        self.assertIsNotNone(stage_3)
+        self.assertIsNotNone(stage_2)
+
+        # Move stage 3 up
+        move_res = self.client.patch(f'/api/lead-stages/{stage_3.id}/move/', {'direction': 'up'})
+        self.assertEqual(move_res.status_code, status.HTTP_200_OK)
+
+        stage_3.refresh_from_db()
+        stage_2.refresh_from_db()
+        self.assertEqual(stage_3.display_order, 2)
+        self.assertEqual(stage_2.display_order, 3)
+
+
 

@@ -58,7 +58,7 @@ from activity.models import ActivityLog
 from activity.serializers import ActivityLogSerializer
 from customers.models import Customer
 from customers.serializers import CustomerSerializer
-from .services import send_lead_stage_update_email, execute_stage_task_automations, complete_stage_task, reopen_stage_task, check_stage_progression
+from .services import send_lead_stage_update_email, execute_stage_task_automations, complete_stage_task, reopen_stage_task, check_stage_progression, resequence_stages
 from notifications.services import NotificationService
 
 User = get_user_model()
@@ -130,14 +130,18 @@ class LeadStageViewSet(viewsets.ModelViewSet):
                 instance.leads.update(stage=target_stage)
                 stage_name = instance.name
                 instance.delete()
+                resequence_stages()
 
             return Response({
                 'success': True,
                 'message': f"Successfully moved {leads_count} leads to '{target_stage.name}' and deleted stage '{stage_name}'."
             }, status=status.HTTP_200_OK)
 
-        stage_name = instance.name
-        instance.delete()
+        with transaction.atomic():
+            stage_name = instance.name
+            instance.delete()
+            resequence_stages()
+
         return Response({
             'success': True,
             'message': f"Stage '{stage_name}' was safely deleted."
@@ -172,6 +176,10 @@ class LeadStageViewSet(viewsets.ModelViewSet):
         direction = request.data.get('direction')
         new_order = request.data.get('display_order')
 
+        # First ensure all stages are cleanly sequenced 1..N
+        resequence_stages()
+        instance.refresh_from_db()
+
         if direction == 'up':
             prev_stage = LeadStage.objects.filter(display_order__lt=instance.display_order).order_by('-display_order').first()
             if prev_stage:
@@ -181,9 +189,8 @@ class LeadStageViewSet(viewsets.ModelViewSet):
                     prev_stage.display_order = old_order
                     instance.save(update_fields=['display_order'])
                     prev_stage.save(update_fields=['display_order'])
-            elif instance.display_order > 1:
-                instance.display_order -= 1
-                instance.save(update_fields=['display_order'])
+                    resequence_stages()
+                    instance.refresh_from_db()
         elif direction == 'down':
             next_stage = LeadStage.objects.filter(display_order__gt=instance.display_order).order_by('display_order').first()
             if next_stage:
@@ -193,16 +200,17 @@ class LeadStageViewSet(viewsets.ModelViewSet):
                     next_stage.display_order = old_order
                     instance.save(update_fields=['display_order'])
                     next_stage.save(update_fields=['display_order'])
-            else:
-                instance.display_order += 1
-                instance.save(update_fields=['display_order'])
+                    resequence_stages()
+                    instance.refresh_from_db()
         elif new_order is not None:
             try:
                 val = int(new_order)
                 if val < 1:
                     return Response({'success': False, 'message': 'Display order must be >= 1.'}, status=status.HTTP_400_BAD_REQUEST)
-                instance.display_order = val
-                instance.save(update_fields=['display_order'])
+                serializer = self.get_serializer(instance, data={'display_order': val}, partial=True)
+                serializer.is_valid(raise_exception=True)
+                serializer.save()
+                instance.refresh_from_db()
             except (ValueError, TypeError):
                 return Response({'success': False, 'message': 'Invalid display order value.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -210,6 +218,41 @@ class LeadStageViewSet(viewsets.ModelViewSet):
             'success': True,
             'message': f"Order updated for '{instance.name}'.",
             'data': LeadStageSerializer(instance).data
+        })
+
+    @action(detail=False, methods=['post'], url_path='reorder')
+    def reorder(self, request):
+        """
+        Bulk reorder stages. Expects:
+        {"order": [stage_id_1, stage_id_2, ...]}
+        or
+        {"order": [{"id": 1, "display_order": 1}, ...]}
+        """
+        user = request.user
+        if not (user.role == 'ADMIN' or user.is_superuser):
+            return Response({'success': False, 'message': 'Only Admins can reorder stages.'}, status=status.HTTP_403_FORBIDDEN)
+
+        order_data = request.data.get('order')
+        if not isinstance(order_data, list):
+            return Response({'success': False, 'message': 'order list is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            if order_data and isinstance(order_data[0], dict):
+                for item in order_data:
+                    sid = item.get('id')
+                    dorder = item.get('display_order')
+                    if sid and dorder:
+                        LeadStage.objects.filter(id=sid).update(display_order=dorder)
+            elif order_data:
+                for idx, sid in enumerate(order_data, start=1):
+                    if isinstance(sid, int) or (isinstance(sid, str) and sid.isdigit()):
+                        LeadStage.objects.filter(id=int(sid)).update(display_order=idx)
+            resequence_stages()
+
+        return Response({
+            'success': True,
+            'message': 'Stages successfully reordered.',
+            'data': LeadStageSerializer(self.get_queryset(), many=True).data
         })
 
     @action(detail=True, methods=['get'], url_path='stats')

@@ -81,7 +81,10 @@ class LeadStageSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
+        from django.db import transaction
         from django.utils.text import slugify
+        from .services.stage_ordering import shift_stages_for_insert, resequence_stages
+
         name = validated_data['name']
         base_slug = slugify(name) or 'stage'
         slug = base_slug
@@ -90,10 +93,26 @@ class LeadStageSerializer(serializers.ModelSerializer):
             slug = f"{base_slug}-{counter}"
             counter += 1
         validated_data['slug'] = slug
-        return super().create(validated_data)
+
+        with transaction.atomic():
+            target_order = validated_data.get('display_order')
+            if target_order is None:
+                max_order = LeadStage.objects.aggregate(m=models.Max('display_order'))['m'] or 0
+                target_order = max_order + 1
+                validated_data['display_order'] = target_order
+            else:
+                shift_stages_for_insert(target_order)
+
+            instance = super().create(validated_data)
+            resequence_stages()
+            instance.refresh_from_db()
+            return instance
 
     def update(self, instance, validated_data):
+        from django.db import transaction
         from django.utils.text import slugify
+        from .services.stage_ordering import shift_stages_for_update, resequence_stages
+
         if 'name' in validated_data and validated_data['name'] != instance.name:
             if not instance.is_system:
                 base_slug = slugify(validated_data['name']) or 'stage'
@@ -103,7 +122,21 @@ class LeadStageSerializer(serializers.ModelSerializer):
                     slug = f"{base_slug}-{counter}"
                     counter += 1
                 validated_data['slug'] = slug
-        return super().update(instance, validated_data)
+
+        new_order = validated_data.get('display_order')
+        old_order = instance.display_order
+
+        with transaction.atomic():
+            if new_order is not None and new_order != old_order:
+                if new_order < 1:
+                    new_order = 1
+                    validated_data['display_order'] = 1
+                shift_stages_for_update(instance.id, new_order, old_order)
+
+            instance = super().update(instance, validated_data)
+            resequence_stages()
+            instance.refresh_from_db()
+            return instance
 
 
 class CustomPropertyDefinitionSerializer(serializers.ModelSerializer):
