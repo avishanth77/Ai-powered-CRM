@@ -81,6 +81,8 @@
   color: var(--text-main);
   line-height: 1.1;
   margin-bottom: 0.5rem;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .kpi-meta {
@@ -204,6 +206,8 @@
   font-size: 2rem;
   font-weight: 700;
   margin: 0.5rem 0;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
 }
 
 .funnel-won { color: var(--success); }
@@ -212,20 +216,16 @@
 
 /* Overdue Follow-ups Banner */
 .overdue-banner {
-  background: linear-gradient(90deg, rgba(220, 38, 38, 0.15), rgba(220, 38, 38, 0.05));
-  border: 1px solid rgba(220, 38, 38, 0.3);
-  border-radius: var(--radius-lg);
-  padding: 1rem 1.5rem;
+  background: var(--danger-bg);
+  border: 1px solid rgba(225, 29, 72, 0.25);
+  border-left: 4px solid var(--danger);
+  border-radius: var(--radius-md);
+  padding: 0.875rem 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 2rem;
-  animation: pulseGlow 3s infinite;
-}
-
-@keyframes pulseGlow {
-  0%, 100% { box-shadow: 0 0 0 rgba(220, 38, 38, 0); }
-  50% { box-shadow: 0 0 15px rgba(220, 38, 38, 0.2); }
+  margin-bottom: 1.5rem;
+  transition: border-color var(--transition-fast);
 }
 
 .overdue-banner-text {

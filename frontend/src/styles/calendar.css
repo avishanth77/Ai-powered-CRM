@@ -35,7 +35,7 @@
 .calendar-controls-card {
   background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-subtle, #e2e8f0);
-  border-radius: var(--radius-lg, 16px);
+  border-radius: var(--radius-lg, 10px);
   padding: 16px 20px;
   margin-bottom: 20px;
   box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.05));
@@ -106,7 +106,7 @@
   display: flex;
   background: var(--bg-surface-elevated, #f8fafc);
   border: 1px solid var(--border-subtle, #e2e8f0);
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--radius-md, 8px);
   padding: 3px;
   gap: 2px;
 }
@@ -135,7 +135,7 @@
 
 .calendar-select-filter {
   padding: 7px 12px;
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--radius-md, 8px);
   border: 1px solid var(--border-subtle, #e2e8f0);
   background: var(--bg-surface, #ffffff);
   color: var(--text-main, #0f172a);
@@ -154,7 +154,7 @@
 .calendar-board-card {
   background: var(--bg-surface, #ffffff);
   border: 1px solid var(--border-subtle, #e2e8f0);
-  border-radius: var(--radius-lg, 16px);
+  border-radius: var(--radius-lg, 10px);
   box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.05));
   overflow-x: auto;
   overflow-y: hidden;
@@ -438,7 +438,7 @@
   align-items: flex-start;
   gap: 16px;
   padding: 16px 20px;
-  border-radius: var(--radius-md, 10px);
+  border-radius: var(--radius-md, 8px);
   border: 1px solid var(--border-subtle, #e2e8f0);
   background: var(--bg-surface, #ffffff);
   transition: all 0.15s ease;

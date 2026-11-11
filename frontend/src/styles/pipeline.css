@@ -54,8 +54,8 @@
 .pipeline-column.drag-over {
   border-color: var(--primary);
   border-style: dashed;
-  background-color: rgba(13, 148, 136, 0.08);
-  box-shadow: 0 0 20px rgba(13, 148, 136, 0.18);
+  background-color: var(--primary-subtle);
+  box-shadow: var(--shadow-md);
 }
 
 .pipeline-column-header {
@@ -90,7 +90,9 @@
   font-size: 0.75rem;
   font-weight: 700;
   padding: 0.125rem 0.5rem;
-  border-radius: var(--radius-full);
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--border-subtle);
+  font-variant-numeric: tabular-nums;
 }
 
 .pipeline-cards-container {
@@ -237,6 +239,7 @@
   font-weight: 700;
   color: var(--primary);
   font-size: 0.9375rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .pipeline-assignee-avatar {
@@ -454,7 +457,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 14px rgba(13, 148, 136, 0.6);
+  box-shadow: var(--shadow-sm);
 }
 
 .pipeline-edge-title {
@@ -473,19 +476,19 @@
 /* Tab & Button drop targets when dragging */
 .pipeline-tab-pill.dnd-target {
   border: 1px dashed var(--primary);
-  background: rgba(13, 148, 136, 0.12);
+  background: var(--primary-subtle);
   color: var(--primary-light);
   animation: pulseTabTarget 1.2s infinite alternate;
 }
 
 @keyframes pulseTabTarget {
   0% { transform: scale(1); }
-  100% { transform: scale(1.03); box-shadow: 0 0 10px rgba(13, 148, 136, 0.3); }
+  100% { transform: scale(1.02); }
 }
 
 .btn.dnd-target {
   border: 1px dashed var(--primary) !important;
-  background: rgba(13, 148, 136, 0.15) !important;
-  color: var(--primary-light) !important;
+  background: var(--primary-subtle) !important;
+  color: var(--primary) !important;
 }
 
