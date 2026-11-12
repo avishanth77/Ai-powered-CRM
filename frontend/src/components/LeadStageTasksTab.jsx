@@ -926,12 +926,10 @@ export default function LeadStageTasksTab({
           onClick={() => setInspectedTask(null)}
           role="dialog"
           aria-modal="true"
-          style={{ zIndex: 1200 }}
         >
           <div
-            className="modal-container"
+            className="modal-container modal-container-lg"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '600px', width: '100%' }}
           >
             <div className="modal-header">
               <div className="modal-title-row">
@@ -1114,9 +1112,8 @@ export default function LeadStageTasksTab({
           aria-modal="true"
         >
           <div
-            className="modal-container"
+            className="modal-container modal-container-md"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '520px', width: '100%' }}
           >
             <div className="modal-header">
               <div className="modal-title-row">
@@ -1302,9 +1299,8 @@ export default function LeadStageTasksTab({
           aria-modal="true"
         >
           <div
-            className="modal-container"
+            className="modal-container modal-container-sm"
             onClick={(e) => e.stopPropagation()}
-            style={{ maxWidth: '480px', width: '100%' }}
           >
             <div className="modal-header">
               <div className="modal-title-row">

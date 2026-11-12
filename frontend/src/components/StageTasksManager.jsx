@@ -732,7 +732,7 @@ export const StageTasksManager = ({ initialStageId = null, onStageUpdated = null
 
       {/* Modal Dialog for Create & Edit */}
       {modalOpen && (
-        <div className="modal-backdrop" onClick={closeModal} style={{ zIndex: 1050, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem' }}>
+        <div className="modal-backdrop" onClick={closeModal}>
           <div
             ref={modalDialogRef}
             className="modal-container modal-container-lg"
@@ -740,16 +740,6 @@ export const StageTasksManager = ({ initialStageId = null, onStageUpdated = null
             aria-modal="true"
             aria-labelledby="stage-task-modal-title"
             onClick={(e) => e.stopPropagation()}
-            style={{
-              width: '100%',
-              maxWidth: '720px',
-              maxHeight: '90vh',
-              display: 'flex',
-              flexDirection: 'column',
-              borderRadius: '16px',
-              overflow: 'hidden',
-              backgroundColor: 'var(--bg-surface)'
-            }}
           >
             <div className="modal-header" style={{ flexShrink: 0, padding: '1.25rem 1.5rem', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <div className="modal-title-row" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>

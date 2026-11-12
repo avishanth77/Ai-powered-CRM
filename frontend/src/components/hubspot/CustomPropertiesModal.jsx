@@ -161,8 +161,7 @@ export const CustomPropertiesModal = ({ isOpen, onClose, onPropertiesChanged }) 
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className="modal-container"
-        style={{ maxWidth: '780px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}
+        className="modal-container modal-container-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="modal-header">

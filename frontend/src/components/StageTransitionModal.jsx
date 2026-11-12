@@ -158,13 +158,11 @@ export default function StageTransitionModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby="stage-transition-title"
-      style={{ zIndex: 1100 }}
     >
       <div
-        className="modal-container stage-transition-modal"
+        className="modal-container modal-container-md stage-transition-modal"
         ref={dialogRef}
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '580px', width: '100%' }}
       >
         {/* Modal Header */}
         <div className="modal-header">
@@ -221,7 +219,7 @@ export default function StageTransitionModal({
         </div>
 
         {/* Modal Body */}
-        <div style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           {error && (
             <div
               style={{

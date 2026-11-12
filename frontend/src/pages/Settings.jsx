@@ -680,7 +680,7 @@ export const Settings = () => {
                   stages.map((st, idx) => (
                   <tr key={st.id} style={{ opacity: st.is_active ? 1 : 0.65 }}>
                     <td>
-                      <span className="font-semibold text-main font-sm" style={{ minWidth: '28px', height: '24px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: '0 0.45rem', background: 'var(--bg-surface-elevated)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-xs)', fontVariantNumeric: 'tabular-nums' }}>
+                      <span className="font-semibold text-main font-sm" style={{ padding: '0.25rem 0.5rem', background: 'var(--bg-surface-elevated)', borderRadius: 'var(--radius-sm)' }}>
                         {st.display_order}
                       </span>
                     </td>
@@ -688,11 +688,11 @@ export const Settings = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem' }}>
                         <span
                           style={{
-                            width: '10px',
-                            height: '10px',
+                            width: '14px',
+                            height: '14px',
                             borderRadius: '50%',
                             backgroundColor: st.color,
-                            border: '1px solid rgba(0, 0, 0, 0.15)',
+                            boxShadow: `0 0 8px ${st.color}88`,
                             display: 'inline-block',
                             flexShrink: 0
                           }}
@@ -711,7 +711,7 @@ export const Settings = () => {
                       </span>
                     </td>
                     <td>
-                      <span className="funnel-prob-chip" style={{ fontSize: '0.75rem', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+                      <span className="funnel-prob-chip" style={{ fontSize: '0.75rem', fontWeight: 700 }}>
                         🎯 {st.win_probability ?? 10}%
                       </span>
                     </td>

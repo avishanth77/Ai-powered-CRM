@@ -166,13 +166,12 @@ export const CalendarScheduleModal = ({ initialDate, onClose, onSuccess }) => {
   return (
     <div className="modal-backdrop" onClick={onClose}>
       <div
-        className="modal-container"
+        className="modal-container modal-container-md"
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
         aria-label="Schedule calendar event"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '580px', borderRadius: '16px' }}
       >
         {/* Header */}
         <div className="modal-header" style={{ padding: '18px 24px' }}>
