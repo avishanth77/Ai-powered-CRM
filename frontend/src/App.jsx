@@ -46,6 +46,7 @@ import './styles/icp.css';
 import './styles/pld.css';
 import './styles/stage_tasks.css';
 import './styles/funnel.css';
+import './styles/targets.css';
 
 
 const AppLayout = () => {

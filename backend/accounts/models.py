@@ -1,5 +1,7 @@
+from decimal import Decimal
 from django.db import models
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.validators import MinValueValidator
 
 class UserManager(BaseUserManager):
     """Custom user manager where email is the unique identifier for auth."""
@@ -70,3 +72,96 @@ class User(AbstractUser):
     @property
     def is_executive_role(self):
         return self.role == self.Role.EXECUTIVE
+
+
+class StaffTarget(models.Model):
+    """
+    Customizable sales targets for staff members / sales representatives,
+    configured and managed by Admin or Sales Managers.
+    Includes both Daily Targets (calls, leads, revenue) and
+    Monthly Targets (calls, leads, deals won, revenue quota).
+    """
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='targets',
+        help_text='Staff member / sales representative assigned to this target.'
+    )
+    period_month = models.CharField(
+        max_length=7,
+        db_index=True,
+        help_text='Target month in YYYY-MM format (e.g. 2026-11).'
+    )
+
+    # --- Daily Targets ---
+    daily_calls_target = models.PositiveIntegerField(
+        default=10,
+        validators=[MinValueValidator(0)],
+        help_text='Daily completed calls/follow-ups target.'
+    )
+    daily_leads_target = models.PositiveIntegerField(
+        default=3,
+        validators=[MinValueValidator(0)],
+        help_text='Daily new leads acquired / contacted target.'
+    )
+    daily_revenue_target = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('0.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text='Daily won/closed revenue target (in ₹).'
+    )
+
+    # --- Monthly Targets ---
+    monthly_calls_target = models.PositiveIntegerField(
+        default=200,
+        validators=[MinValueValidator(0)],
+        help_text='Monthly completed calls/follow-ups target.'
+    )
+    monthly_leads_target = models.PositiveIntegerField(
+        default=50,
+        validators=[MinValueValidator(0)],
+        help_text='Monthly leads target.'
+    )
+    monthly_deals_won_target = models.PositiveIntegerField(
+        default=5,
+        validators=[MinValueValidator(0)],
+        help_text='Monthly closed-won deals target.'
+    )
+    monthly_revenue_target = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        default=Decimal('50000.00'),
+        validators=[MinValueValidator(Decimal('0.00'))],
+        help_text='Monthly won sales revenue target (in ₹).'
+    )
+
+    notes = models.TextField(
+        blank=True,
+        default='',
+        help_text='Admin guidance, expectations, or incentives for this staff member.'
+    )
+    is_active = models.BooleanField(
+        default=True,
+        help_text='Whether this target is currently active.'
+    )
+    set_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_targets',
+        help_text='Admin who set or last customized this target.'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-period_month', '-updated_at']
+        unique_together = ['user', 'period_month']
+        verbose_name = 'Staff Target'
+        verbose_name_plural = 'Staff Targets'
+
+    def __str__(self):
+        return f"Target for {self.user.email} ({self.period_month}): {self.daily_calls_target}/day calls, ₹{self.monthly_revenue_target}/mo"
+

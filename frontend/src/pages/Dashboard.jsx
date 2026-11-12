@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../components/LoadingSpinner';
 import { Skeleton, SkeletonKpiGrid } from '../components/Skeleton';
 import { ErrorState } from '../components/ErrorState';
 import { useAuth } from '../context/AuthContext';
+import { MyTargetWidget } from '../components/MyTargetWidget';
 import {
   Users,
   UserCheck,
@@ -20,6 +21,7 @@ import {
   ArrowUpRight,
   Sparkles,
   Share2,
+  Target,
 } from 'lucide-react';
 
 export const Dashboard = () => {
@@ -125,6 +127,11 @@ export const Dashboard = () => {
           <Link to="/pipeline" className="btn btn-secondary">
             Visual Pipeline
           </Link>
+          {!isExecutive && (
+            <Link to="/users" className="btn btn-secondary" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+              <Target size={15} color="var(--primary)" /> Staff Targets
+            </Link>
+          )}
         </div>
       </div>
 
@@ -144,6 +151,9 @@ export const Dashboard = () => {
           </Link>
         </div>
       )}
+
+      {/* Staff Targets & Performance Widget */}
+      <MyTargetWidget />
 
       {/* KPI Cards Grid */}
       <div className="dashboard-stats-grid">

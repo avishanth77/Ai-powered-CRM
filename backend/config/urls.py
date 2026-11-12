@@ -22,6 +22,7 @@ from accounts.views import (
     ForgotPasswordView,
     ResetPasswordView,
 )
+from accounts.views_targets import StaffTargetViewSet
 
 from leads.views import LeadStageViewSet, StageTaskRuleViewSet
 from leads.views_email import EmailTestView
@@ -31,6 +32,10 @@ from leads.views_comments import InternalCommentDetailView, MentionSuggestionsVi
 # Top-level API router for Users
 user_router = DefaultRouter()
 user_router.register(r'', UserViewSet, basename='system-users')
+
+# Top-level API router for Staff Targets
+target_router = DefaultRouter()
+target_router.register(r'', StaffTargetViewSet, basename='staff-targets')
 
 # Top-level API router for Lead Stages
 stage_router = DefaultRouter()
@@ -58,6 +63,9 @@ urlpatterns = [
 
     # System Users Management
     path('api/users/', include(user_router.urls)),
+
+    # Staff Targets Management (Daily & Monthly Targets)
+    path('api/targets/', include(target_router.urls)),
 
     # Dynamic Lead Stages
     path('api/lead-stages/', include(stage_router.urls)),

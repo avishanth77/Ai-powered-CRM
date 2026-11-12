@@ -111,3 +111,96 @@ class ResetPasswordSerializer(serializers.Serializer):
         if attrs['new_password'] != attrs['confirm_new_password']:
             raise serializers.ValidationError({'confirm_new_password': "Passwords do not match."})
         return attrs
+
+
+class StaffTargetSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    user_email = serializers.CharField(source='user.email', read_only=True)
+    user_role = serializers.CharField(source='user.role', read_only=True)
+    set_by_name = serializers.SerializerMethodField()
+    progress = serializers.SerializerMethodField()
+
+    class Meta:
+        from .models import StaffTarget
+        model = StaffTarget
+        fields = [
+            'id',
+            'user',
+            'user_name',
+            'user_email',
+            'user_role',
+            'period_month',
+            'daily_calls_target',
+            'daily_leads_target',
+            'daily_revenue_target',
+            'monthly_calls_target',
+            'monthly_leads_target',
+            'monthly_deals_won_target',
+            'monthly_revenue_target',
+            'notes',
+            'is_active',
+            'set_by',
+            'set_by_name',
+            'progress',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'created_at', 'updated_at', 'set_by']
+
+    def get_user_name(self, obj):
+        return obj.user.get_full_name() or obj.user.email
+
+    def get_set_by_name(self, obj):
+        if obj.set_by:
+            return obj.set_by.get_full_name() or obj.set_by.email
+        return None
+
+    def get_progress(self, obj):
+        from .services.target_service import calculate_staff_progress
+        return calculate_staff_progress(obj.user, target=obj)
+
+
+class StaffTargetSaveSerializer(serializers.ModelSerializer):
+    """Serializer for Admin/Manager creating or customizing staff targets."""
+    class Meta:
+        from .models import StaffTarget
+        model = StaffTarget
+        fields = [
+            'user',
+            'period_month',
+            'daily_calls_target',
+            'daily_leads_target',
+            'daily_revenue_target',
+            'monthly_calls_target',
+            'monthly_leads_target',
+            'monthly_deals_won_target',
+            'monthly_revenue_target',
+            'notes',
+            'is_active',
+        ]
+        extra_kwargs = {
+            'period_month': {'required': False},
+        }
+
+    def validate_period_month(self, value):
+        import re
+        if value and not re.match(r'^\d{4}-\d{2}$', value):
+            raise serializers.ValidationError("Month must be in YYYY-MM format (e.g. 2026-11).")
+        return value
+
+    def create(self, validated_data):
+        from .models import StaffTarget
+        from .services.target_service import get_current_period_month
+
+        user = validated_data['user']
+        period_month = validated_data.get('period_month') or get_current_period_month()
+        validated_data['period_month'] = period_month
+
+        # Auto-upsert for (user, period_month)
+        target, _ = StaffTarget.objects.update_or_create(
+            user=user,
+            period_month=period_month,
+            defaults=validated_data
+        )
+        return target
+
