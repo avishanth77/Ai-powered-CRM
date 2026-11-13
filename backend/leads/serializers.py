@@ -207,6 +207,15 @@ class LeadNoteSerializer(serializers.ModelSerializer):
         fields = ['id', 'lead', 'user', 'user_name', 'user_email', 'note_type', 'note_text', 'created_at']
         read_only_fields = ['id', 'lead', 'user', 'created_at']
 
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            data = data.copy()
+            if 'note' in data and 'note_text' not in data:
+                data['note_text'] = data.get('note')
+            elif 'notes' in data and 'note_text' not in data:
+                data['note_text'] = data.get('notes')
+        return super().to_internal_value(data)
+
     def create(self, validated_data):
         request = self.context.get('request')
         if request and request.user.is_authenticated and 'user' not in validated_data:

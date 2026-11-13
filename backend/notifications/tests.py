@@ -1,8 +1,10 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+from datetime import timedelta
 from notifications.models import Notification
 from notifications.services import NotificationService
-from leads.models import Lead, LeadStage
+from leads.models import Lead, LeadStage, LeadStageTask
 
 User = get_user_model()
 
@@ -126,6 +128,105 @@ class NotificationModelAndServiceTests(TestCase):
         self.assertEqual(notif.notification_type, Notification.NotificationType.LEAD_HANDED_OVER)
         self.assertIn('Territory realignment', notif.message)
 
+    def test_notify_stage_task_assigned(self):
+        task = LeadStageTask.objects.create(
+            lead=self.lead,
+            stage=self.stage,
+            title='Review Contract NDA',
+            is_mandatory=True,
+            assigned_to=self.user1,
+            due_date=timezone.now() + timedelta(days=1)
+        )
+        notif = NotificationService.notify_stage_task_assigned(
+            task=task,
+            actor=self.user2,
+            allow_self=True
+        )
+        self.assertIsNotNone(notif)
+        self.assertEqual(notif.recipient, self.user1)
+        self.assertEqual(notif.notification_type, Notification.NotificationType.STAGE_TASK_ASSIGNED)
+        self.assertEqual(notif.priority, Notification.Priority.HIGH)
+        self.assertIn('Review Contract NDA', notif.title)
+        self.assertEqual(notif.action_url, f'/leads/{self.lead.id}?tab=stage-tasks')
+
+    def test_notify_stage_task_completed(self):
+        task = LeadStageTask.objects.create(
+            lead=self.lead,
+            stage=self.stage,
+            title='KYC Verification',
+            assigned_to=self.user1,
+            due_date=timezone.now() + timedelta(days=1),
+            outcome_notes='Documents fully verified'
+        )
+        notif = NotificationService.notify_stage_task_completed(
+            task=task,
+            actor=self.user1
+        )
+        # self.lead was created by self.user2, assigned to self.user1.
+        # actor is self.user1, so self.user2 should receive the completion notification!
+        self.assertIsNotNone(notif)
+        self.assertEqual(notif.recipient, self.user2)
+        self.assertEqual(notif.notification_type, Notification.NotificationType.STAGE_TASK_COMPLETED)
+        self.assertIn('KYC Verification', notif.message)
+
+    def test_notify_stage_task_approval_requested(self):
+        task = LeadStageTask.objects.create(
+            lead=self.lead,
+            stage=self.stage,
+            title='Custom Discount Approval',
+            requires_approval=True,
+            assigned_to=self.user1,
+            due_date=timezone.now() + timedelta(days=1)
+        )
+        notifs = NotificationService.notify_stage_task_approval_requested(
+            task=task,
+            actor=self.user1
+        )
+        self.assertTrue(len(notifs) >= 1)
+        manager_notif = next((n for n in notifs if n.recipient == self.user2), None)
+        self.assertIsNotNone(manager_notif)
+        self.assertEqual(manager_notif.notification_type, Notification.NotificationType.STAGE_TASK_APPROVAL_REQUESTED)
+        self.assertEqual(manager_notif.priority, Notification.Priority.HIGH)
+
+    def test_sync_user_tasks_overdue_and_due_soon(self):
+        now = timezone.now()
+        # Overdue task
+        overdue_task = LeadStageTask.objects.create(
+            lead=self.lead,
+            stage=self.stage,
+            title='Overdue Demo Prep',
+            assigned_to=self.user1,
+            due_date=now - timedelta(hours=3),
+            status=LeadStageTask.Status.PENDING
+        )
+        # Due soon task
+        due_soon_task = LeadStageTask.objects.create(
+            lead=self.lead,
+            stage=self.stage,
+            title='Upcoming Followup Call',
+            assigned_to=self.user1,
+            due_date=now + timedelta(hours=5),
+            status=LeadStageTask.Status.PENDING
+        )
+
+        NotificationService.sync_user_tasks(self.user1)
+
+        overdue_notif = Notification.objects.filter(
+            recipient=self.user1,
+            notification_type=Notification.NotificationType.STAGE_TASK_OVERDUE,
+            entity_id=str(overdue_task.id)
+        ).first()
+        self.assertIsNotNone(overdue_notif)
+        self.assertEqual(overdue_notif.priority, Notification.Priority.URGENT)
+
+        due_soon_notif = Notification.objects.filter(
+            recipient=self.user1,
+            notification_type=Notification.NotificationType.STAGE_TASK_DUE_SOON,
+            entity_id=str(due_soon_task.id)
+        ).first()
+        self.assertIsNotNone(due_soon_notif)
+        self.assertEqual(due_soon_notif.priority, Notification.Priority.HIGH)
+
 
 from rest_framework.test import APITestCase
 from rest_framework import status
@@ -229,4 +330,23 @@ class NotificationAPITests(APITestCase):
         resp = self.client.delete(f'/api/notifications/{self.notif_user1_a.id}/')
         self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
         self.assertFalse(Notification.objects.filter(id=self.notif_user1_a.id).exists())
+
+    def test_group_tasks_filter(self):
+        task_notif = Notification.objects.create(
+            recipient=self.user1,
+            actor=self.user2,
+            notification_type=Notification.NotificationType.STAGE_TASK_ASSIGNED,
+            title='Task Assigned',
+            message='You have a new stage task',
+            entity_type='stage_task',
+            entity_id='101'
+        )
+        self.client.force_authenticate(user=self.user1)
+        resp = self.client.get('/api/notifications/?group=tasks')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        results = resp.data.get('results', resp.data)
+        ids = [item['id'] for item in results]
+        self.assertIn(task_notif.id, ids)
+        self.assertNotIn(self.notif_user1_a.id, ids)
+
 

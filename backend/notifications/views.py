@@ -36,6 +36,11 @@ class NotificationViewSet(viewsets.ModelViewSet):
         group = self.request.query_params.get('group')
         if group == 'leads':
             qs = qs.filter(notification_type__startswith='LEAD')
+        elif group == 'tasks':
+            qs = qs.filter(
+                models.Q(notification_type__startswith='STAGE_TASK') |
+                models.Q(entity_type='stage_task')
+            )
         elif group == 'followups':
             qs = qs.filter(notification_type__startswith='FOLLOW_UP')
         elif group == 'mentions':

@@ -10,7 +10,11 @@ import {
   AtSign,
   Layers,
   Award,
-  ExternalLink
+  ExternalLink,
+  CheckSquare,
+  ShieldCheck,
+  AlertTriangle,
+  CheckCheck
 } from 'lucide-react';
 
 export const NotificationDropdown = ({
@@ -26,6 +30,16 @@ export const NotificationDropdown = ({
   const getNotificationIcon = (type) => {
     const t = (type || '').toLowerCase();
     switch (t) {
+      case 'stage_task_assigned':
+        return <CheckSquare size={16} />;
+      case 'stage_task_due_soon':
+        return <Clock size={16} />;
+      case 'stage_task_overdue':
+        return <AlertTriangle size={16} />;
+      case 'stage_task_completed':
+        return <CheckCheck size={16} />;
+      case 'stage_task_approval_requested':
+        return <ShieldCheck size={16} />;
       case 'lead_assigned':
       case 'lead_handed_over':
         return <UserCheck size={16} />;
@@ -59,6 +73,8 @@ export const NotificationDropdown = ({
 
   const getIconClass = (type) => {
     const t = (type || '').toLowerCase();
+    if (t === 'stage_task_overdue') return 'task-urgent';
+    if (t.startsWith('stage_task')) return 'task';
     if (t.startsWith('lead_')) return 'lead';
     if (t.startsWith('follow_up') || t.startsWith('followup')) return 'followup';
     if (t.includes('mention')) return 'mention';

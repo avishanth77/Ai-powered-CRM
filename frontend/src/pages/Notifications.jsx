@@ -14,7 +14,10 @@ import {
   Layers,
   Award,
   Search,
-  Check
+  Check,
+  CheckSquare,
+  ShieldCheck,
+  AlertTriangle
 } from 'lucide-react';
 import { notificationApi } from '../api/notificationApi';
 import { useToast } from '../context/ToastContext';
@@ -29,7 +32,7 @@ export const Notifications = () => {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(null);
-  const [activeTab, setActiveTab] = useState('all'); // all, unread, leads, followups, mentions
+  const [activeTab, setActiveTab] = useState('all'); // all, unread, leads, tasks, followups, mentions
   const [searchInput, setSearchInput] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -52,7 +55,7 @@ export const Notifications = () => {
     try {
       const params = { page: currentPage, page_size: pageSize, ordering: '-created_at' };
       if (activeTab === 'unread') params.is_read = false;
-      if (['leads', 'followups', 'mentions'].includes(activeTab)) params.group = activeTab;
+      if (['leads', 'tasks', 'followups', 'mentions'].includes(activeTab)) params.group = activeTab;
       if (searchQuery) params.search = searchQuery;
 
       const [res, unreadRes] = await Promise.all([
@@ -122,6 +125,16 @@ export const Notifications = () => {
   const getNotificationIcon = (type) => {
     const t = (type || '').toLowerCase();
     switch (t) {
+      case 'stage_task_assigned':
+        return <CheckSquare size={18} />;
+      case 'stage_task_due_soon':
+        return <Clock size={18} />;
+      case 'stage_task_overdue':
+        return <AlertTriangle size={18} />;
+      case 'stage_task_completed':
+        return <CheckCheck size={18} />;
+      case 'stage_task_approval_requested':
+        return <ShieldCheck size={18} />;
       case 'lead_assigned':
       case 'lead_handed_over':
         return <UserCheck size={18} />;
@@ -155,6 +168,8 @@ export const Notifications = () => {
 
   const getIconClass = (type) => {
     const t = (type || '').toLowerCase();
+    if (t === 'stage_task_overdue') return 'task-urgent';
+    if (t.startsWith('stage_task')) return 'task';
     if (t.startsWith('lead_')) return 'lead';
     if (t.startsWith('follow_up') || t.startsWith('followup')) return 'followup';
     if (t.includes('mention')) return 'mention';
@@ -215,6 +230,15 @@ export const Notifications = () => {
             onClick={() => handleTabChange('leads')}
           >
             Leads
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'tasks'}
+            className={`notifications-filter-tab ${activeTab === 'tasks' ? 'active' : ''}`}
+            onClick={() => handleTabChange('tasks')}
+          >
+            Tasks & Progression
           </button>
           <button
             type="button"

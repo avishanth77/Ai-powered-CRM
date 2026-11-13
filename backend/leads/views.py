@@ -1606,6 +1606,11 @@ class LeadViewSet(viewsets.ModelViewSet):
             serializer = LeadStageTaskSerializer(data=data, context={'request': request})
             serializer.is_valid(raise_exception=True)
             task = serializer.save()
+            try:
+                from notifications.services import NotificationService
+                NotificationService.notify_stage_task_assigned(task=task, actor=request.user, allow_self=True)
+            except Exception as notif_err:
+                logger.warning(f"[LeadStageTask] Notification error on manual create: {notif_err}")
             return Response({
                 'success': True,
                 'message': f"Task '{task.title}' created.",
@@ -1830,6 +1835,11 @@ class LeadStageTaskViewSet(viewsets.ModelViewSet):
             performed_by=self.request.user,
             notes=f"Created stage task '{task.title}' on Lead #{task.lead_id} ({task.stage.name})."
         )
+        try:
+            from notifications.services import NotificationService
+            NotificationService.notify_stage_task_assigned(task=task, actor=self.request.user, allow_self=True)
+        except Exception as notif_err:
+            logger.warning(f"[LeadStageTask] Notification error on perform_create: {notif_err}")
 
     def perform_destroy(self, instance):
         lead_id = instance.lead_id
@@ -1898,6 +1908,13 @@ class LeadStageTaskViewSet(viewsets.ModelViewSet):
             performed_by=user,
             notes=f"Reassigned task '{task.title}' to {new_user.get_full_name() if new_user else 'Unassigned'}."
         )
+
+        if new_user:
+            try:
+                from notifications.services import NotificationService
+                NotificationService.notify_stage_task_assigned(task=task, actor=user, allow_self=True)
+            except Exception as notif_err:
+                logger.warning(f"[LeadStageTask] Notification error on reassign: {notif_err}")
 
         return Response({
             'success': True,

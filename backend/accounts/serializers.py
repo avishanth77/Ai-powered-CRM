@@ -2,12 +2,28 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
+from django.db.models import Q
 
 User = get_user_model()
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Custom JWT serializer to include user details in token payload and response."""
     username_field = User.EMAIL_FIELD
+
+    def to_internal_value(self, data):
+        data = data.copy() if hasattr(data, 'copy') else dict(data)
+        identifier = str(data.get('email') or data.get('username') or '').strip()
+        if identifier:
+            matched_user = User.objects.filter(
+                Q(email__iexact=identifier) |
+                Q(username__iexact=identifier) |
+                Q(email__iexact=f"{identifier}@crmlite.com")
+            ).first()
+            if matched_user:
+                data['email'] = matched_user.email
+            elif 'email' not in data and 'username' in data:
+                data['email'] = identifier
+        return super().to_internal_value(data)
 
     @classmethod
     def get_token(cls, user):
@@ -18,6 +34,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
+        identifier = str(attrs.get('email') or attrs.get('username') or '').strip()
+        if identifier and '@' not in identifier:
+            matched_user = User.objects.filter(
+                Q(email__iexact=identifier) |
+                Q(username__iexact=identifier) |
+                Q(email__iexact=f"{identifier}@crmlite.com")
+            ).first()
+            if matched_user:
+                attrs['email'] = matched_user.email
         data = super().validate(attrs)
         data['user'] = {
             'id': self.user.id,

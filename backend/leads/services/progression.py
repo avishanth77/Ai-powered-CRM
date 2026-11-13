@@ -675,6 +675,8 @@ def instantiate_stage_tasks(lead, stage, actor=None):
 
             try:
 
+                NotificationService.notify_stage_task_assigned(task=stage_task, actor=actor_user, allow_self=True)
+
                 NotificationService.notify_followup_created(followup=followup, actor=actor_user)
 
             except Exception as notif_err:
@@ -770,6 +772,14 @@ def complete_stage_task(task, actor=None, outcome_notes=''):
         notes=f"Completed stage task '{task.title}' for Lead #{task.lead_id} ({task.stage.name})."
 
     )
+
+    try:
+        from notifications.services import NotificationService
+        NotificationService.notify_stage_task_completed(task=task, actor=actor_user)
+        if getattr(task, 'requires_approval', False) and not getattr(task, 'is_approved', False):
+            NotificationService.notify_stage_task_approval_requested(task=task, actor=actor_user)
+    except Exception as notif_err:
+        logger.warning(f"[Progression] Notification error on completing task #{task.id}: {notif_err}")
 
     return task
 

@@ -186,6 +186,16 @@
   color: #7c3aed;
 }
 
+.notification-icon-box.task {
+  background: rgba(99, 102, 241, 0.14);
+  color: #4f46e5;
+}
+
+.notification-icon-box.task-urgent {
+  background: rgba(239, 68, 68, 0.14);
+  color: #dc2626;
+}
+
 .notification-icon-box.mention {
   background: rgba(236, 72, 153, 0.12);
   color: #db2777;

@@ -513,3 +513,219 @@ class NotificationService:
                         actor=None,
                         allow_self=True
                     )
+
+        # Synchronize stage tasks (overdue & due-soon)
+        cls.sync_user_tasks(user)
+
+    @classmethod
+    def notify_stage_task_assigned(cls, task, actor=None, allow_self=False):
+        """
+        Notifies a user when a lead stage task is assigned or reassigned to them.
+        """
+        recipient = getattr(task, 'assigned_to', None)
+        if not recipient:
+            return None
+
+        actor_name = actor.get_full_name() or actor.email if actor else "Automated Progression"
+        lead_name = task.lead.name if getattr(task, 'lead', None) else f"Lead #{task.lead_id}"
+        stage_name = task.stage.name if getattr(task, 'stage', None) else "Pipeline"
+        due_str = task.due_date.strftime('%b %d at %H:%M') if getattr(task, 'due_date', None) else "No due date"
+
+        title = f"Task Assigned: {task.title}"
+        prefix = "Mandatory stage task" if getattr(task, 'is_mandatory', False) else "Stage task"
+        message = f"{prefix} '{task.title}' for {lead_name} ({stage_name}) was assigned to you by {actor_name}. Due: {due_str}."
+        action_url = f"/leads/{task.lead_id}?tab=stage-tasks"
+
+        return cls.create_notification(
+            recipient=recipient,
+            notification_type=Notification.NotificationType.STAGE_TASK_ASSIGNED,
+            title=title,
+            message=message,
+            entity_type='stage_task',
+            entity_id=task.id,
+            action_url=action_url,
+            actor=actor,
+            priority=Notification.Priority.HIGH if getattr(task, 'is_mandatory', False) else Notification.Priority.NORMAL,
+            allow_self=allow_self
+        )
+
+    @classmethod
+    def notify_stage_task_completed(cls, task, actor=None):
+        """
+        Notifies the lead owner or creator when a stage task is completed.
+        """
+        lead = getattr(task, 'lead', None)
+        if not lead:
+            return None
+
+        recipient = None
+        if lead.assigned_to and (not actor or lead.assigned_to.id != actor.id):
+            recipient = lead.assigned_to
+        elif lead.created_by and (not actor or lead.created_by.id != actor.id):
+            recipient = lead.created_by
+
+        if not recipient:
+            return None
+
+        actor_name = actor.get_full_name() or actor.email if actor else "Sales Rep"
+        lead_name = lead.name or f"Lead #{lead.id}"
+        stage_name = task.stage.name if getattr(task, 'stage', None) else "Pipeline"
+
+        title = f"Task Completed: {task.title}"
+        outcome_snippet = f' Notes: "{task.outcome_notes[:80]}..."' if getattr(task, 'outcome_notes', None) else ""
+        message = f"{actor_name} completed task '{task.title}' on {lead_name} ({stage_name}).{outcome_snippet}"
+        action_url = f"/leads/{task.lead_id}?tab=stage-tasks"
+
+        return cls.create_notification(
+            recipient=recipient,
+            notification_type=Notification.NotificationType.STAGE_TASK_COMPLETED,
+            title=title,
+            message=message,
+            entity_type='stage_task',
+            entity_id=task.id,
+            action_url=action_url,
+            actor=actor,
+            priority=Notification.Priority.NORMAL
+        )
+
+    @classmethod
+    def notify_stage_task_approval_requested(cls, task, actor=None):
+        """
+        Notifies managers and admins when a stage task requiring approval is completed.
+        """
+        lead = getattr(task, 'lead', None)
+        lead_name = lead.name if lead else f"Lead #{task.lead_id}"
+        stage_name = task.stage.name if getattr(task, 'stage', None) else "Pipeline"
+        actor_name = actor.get_full_name() or actor.email if actor else "Sales Rep"
+
+        managers = User.objects.filter(
+            role__in=[User.Role.MANAGER, User.Role.ADMIN],
+            is_active=True
+        )
+        notifications = []
+        for manager in managers:
+            if actor and manager.id == actor.id:
+                continue
+            n = cls.create_notification(
+                recipient=manager,
+                notification_type=Notification.NotificationType.STAGE_TASK_APPROVAL_REQUESTED,
+                title=f"Approval Required: {task.title}",
+                message=f"{actor_name} completed task '{task.title}' on {lead_name} ({stage_name}) which requires manager approval.",
+                entity_type='stage_task',
+                entity_id=task.id,
+                action_url=f"/leads/{task.lead_id}?tab=stage-tasks",
+                actor=actor,
+                priority=Notification.Priority.HIGH,
+                allow_self=False
+            )
+            if n:
+                notifications.append(n)
+        return notifications
+
+    @classmethod
+    def sync_user_tasks(cls, user):
+        """
+        Scans pending stage tasks for the user and generates overdue or due-soon notifications.
+        Also notifies managers of overdue stage tasks across the team.
+        """
+        if not user or not user.is_authenticated:
+            return
+
+        try:
+            from leads.models import LeadStageTask
+        except ImportError:
+            return
+
+        now = timezone.now()
+        upcoming_window = now + timedelta(days=2)
+
+        # 1. Overdue stage tasks for assigned user
+        overdue_tasks = LeadStageTask.objects.filter(
+            assigned_to=user,
+            status__in=[LeadStageTask.Status.PENDING, LeadStageTask.Status.IN_PROGRESS],
+            due_date__lt=now
+        ).select_related('lead', 'stage')
+
+        for task in overdue_tasks:
+            exists = Notification.objects.filter(
+                recipient=user,
+                notification_type=Notification.NotificationType.STAGE_TASK_OVERDUE,
+                entity_type='stage_task',
+                entity_id=str(task.id)
+            ).exists()
+
+            if not exists:
+                lead_name = task.lead.name if task.lead else f"Lead #{task.lead_id}"
+                cls.create_notification(
+                    recipient=user,
+                    notification_type=Notification.NotificationType.STAGE_TASK_OVERDUE,
+                    title=f"Task Overdue: {task.title}",
+                    message=f"Action Required: Task '{task.title}' on {lead_name} is overdue (was due {task.due_date.strftime('%b %d, %H:%M')}).",
+                    entity_type='stage_task',
+                    entity_id=task.id,
+                    action_url=f"/leads/{task.lead_id}?tab=stage-tasks",
+                    priority=Notification.Priority.URGENT,
+                    actor=None,
+                    allow_self=True
+                )
+
+        # 2. Due soon stage tasks (next 48 hours)
+        due_soon_tasks = LeadStageTask.objects.filter(
+            assigned_to=user,
+            status__in=[LeadStageTask.Status.PENDING, LeadStageTask.Status.IN_PROGRESS],
+            due_date__range=(now, upcoming_window)
+        ).select_related('lead', 'stage')
+
+        for task in due_soon_tasks:
+            exists = Notification.objects.filter(
+                recipient=user,
+                notification_type=Notification.NotificationType.STAGE_TASK_DUE_SOON,
+                entity_type='stage_task',
+                entity_id=str(task.id)
+            ).exists()
+
+            if not exists:
+                lead_name = task.lead.name if task.lead else f"Lead #{task.lead_id}"
+                cls.create_notification(
+                    recipient=user,
+                    notification_type=Notification.NotificationType.STAGE_TASK_DUE_SOON,
+                    title=f"Task Due Soon: {task.title}",
+                    message=f"Reminder: Task '{task.title}' on {lead_name} is due {task.due_date.strftime('%b %d at %H:%M')}.",
+                    entity_type='stage_task',
+                    entity_id=task.id,
+                    action_url=f"/leads/{task.lead_id}?tab=stage-tasks",
+                    priority=Notification.Priority.HIGH,
+                    actor=None,
+                    allow_self=True
+                )
+
+        # 3. For Admin / Manager, notify about team overdue stage tasks
+        user_role = getattr(user, 'role', '')
+        if user_role in ['ADMIN', 'MANAGER']:
+            team_overdue = LeadStageTask.objects.filter(
+                status__in=[LeadStageTask.Status.PENDING, LeadStageTask.Status.IN_PROGRESS],
+                due_date__lt=now
+            ).exclude(assigned_to=user).select_related('lead', 'assigned_to')[:5]
+
+            for s_task in team_overdue:
+                s_exists = Notification.objects.filter(
+                    recipient=user,
+                    notification_type=Notification.NotificationType.STAGE_TASK_OVERDUE,
+                    entity_type='stage_task',
+                    entity_id=str(s_task.id)
+                ).exists()
+                if not s_exists:
+                    rep_name = s_task.assigned_to.get_full_name() or s_task.assigned_to.email if s_task.assigned_to else "Unassigned"
+                    lead_name = s_task.lead.name if s_task.lead else f"Lead #{s_task.lead_id}"
+                    cls.create_notification(
+                        recipient=user,
+                        notification_type=Notification.NotificationType.STAGE_TASK_OVERDUE,
+                        title=f"Team Task Overdue: {s_task.title}",
+                        message=f"{rep_name}'s task '{s_task.title}' on {lead_name} is overdue ({s_task.due_date.strftime('%b %d')}).",
+                        entity_type='stage_task',
+                        entity_id=s_task.id,
+                        action_url=f"/leads/{s_task.lead_id}?tab=stage-tasks",
+                        priority=Notification.Priority.HIGH,
+                        actor=None,
+                        allow_self=True
+                    )

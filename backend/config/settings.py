@@ -140,6 +140,11 @@ CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$",
 ]
 CORS_ALLOW_CREDENTIALS = True
+from corsheaders.defaults import default_headers
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    'bypass-tunnel-reminder',
+    'ngrok-skip-browser-warning',
+]
 
 # REST Framework
 REST_FRAMEWORK = {
