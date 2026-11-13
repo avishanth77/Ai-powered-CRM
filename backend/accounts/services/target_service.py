@@ -99,10 +99,13 @@ def get_or_create_staff_target(user, period_month=None, admin_user=None):
 def calculate_staff_progress(user, target=None, target_date=None):
     """
     Calculates comprehensive daily and monthly target achievements for a given user.
+    Accurately tracks calls made, leads handled, and leads closed through stage progressions,
+    activities, notes, and follow-ups.
     """
     from followups.models import FollowUp
-    from leads.models import Lead
+    from leads.models import Lead, LeadStageTask, LeadNote
     from accounts.models import StaffTarget
+    from activity.models import ActivityLog
 
     today = target_date or timezone.localdate()
     period_month = f"{today.year:04d}-{today.month:02d}"
@@ -121,9 +124,10 @@ def calculate_staff_progress(user, target=None, target_date=None):
     start_of_month = timezone.make_aware(datetime(today.year, today.month, 1, 0, 0, 0))
     end_of_month = timezone.make_aware(datetime(today.year, today.month, days_in_month, 23, 59, 59))
 
-    # --- 1. DAILY ACTUALS ---
-    # Calls / Follow-ups completed today by this user
-    calls_completed_today = FollowUp.objects.filter(
+    # --- 1. DAILY ACTUALS (Strictly isolated to this specific staff member) ---
+    # Calls completed today by this user:
+    # A) Follow-up calls assigned to this user completed today
+    fu_calls_today = FollowUp.objects.filter(
         assigned_to=user,
         status=FollowUp.Status.COMPLETED
     ).filter(
@@ -131,27 +135,92 @@ def calculate_staff_progress(user, target=None, target_date=None):
         (Q(completed_at__isnull=True) & Q(updated_at__range=(start_of_day, end_of_day)))
     ).count()
 
-    # Leads acquired or assigned today
-    leads_handled_today = Lead.objects.filter(
-        Q(assigned_to=user) | Q(created_by=user)
+    # B) Stage checklist call tasks completed by this user today
+    stage_call_tasks_today = LeadStageTask.objects.filter(
+        Q(completed_by=user) | (Q(completed_by__isnull=True) & Q(assigned_to=user)),
+        status=LeadStageTask.Status.COMPLETED
     ).filter(
+        Q(title__icontains='call') | Q(purpose__icontains='call') | Q(title__icontains='discovery')
+    ).filter(
+        Q(completed_at__range=(start_of_day, end_of_day)) |
+        (Q(completed_at__isnull=True) & Q(updated_at__range=(start_of_day, end_of_day)))
+    ).count()
+
+    # C) Call logs created by this user today
+    call_notes_today = LeadNote.objects.filter(
+        user=user,
+        note_type='CALL',
         created_at__range=(start_of_day, end_of_day)
     ).count()
 
-    # Deals won today
-    won_leads_today_qs = Lead.objects.filter(
-        assigned_to=user,
-        stage__slug='won'
+    calls_completed_today = max(fu_calls_today + stage_call_tasks_today, call_notes_today)
+    if calls_completed_today == 0:
+        calls_completed_today = fu_calls_today or stage_call_tasks_today or call_notes_today
+
+    # Leads Handled Today by this user:
+    # Strictly tracks active progression and engagement by this specific user:
+    # 1. Stage checklist tasks completed today
+    # 2. Follow-ups completed today
+    # 3. Call outcomes or notes logged today
+    # 4. Lead stage transitions/progressions performed today
+    handled_lead_ids_today = set()
+
+    handled_lead_ids_today.update(
+        LeadStageTask.objects.filter(
+            Q(completed_by=user) | (Q(completed_by__isnull=True) & Q(assigned_to=user)),
+            status=LeadStageTask.Status.COMPLETED,
+            completed_at__range=(start_of_day, end_of_day)
+        ).exclude(lead__isnull=True).values_list('lead_id', flat=True)
+    )
+
+    handled_lead_ids_today.update(
+        FollowUp.objects.filter(
+            assigned_to=user,
+            status=FollowUp.Status.COMPLETED,
+            completed_at__range=(start_of_day, end_of_day)
+        ).exclude(lead__isnull=True).values_list('lead_id', flat=True)
+    )
+
+    handled_lead_ids_today.update(
+        LeadNote.objects.filter(
+            user=user,
+            created_at__range=(start_of_day, end_of_day)
+        ).values_list('lead_id', flat=True)
+    )
+
+    handled_lead_ids_today.update(
+        ActivityLog.objects.filter(
+            performed_by=user,
+            entity_type='lead',
+            action__in=['STATUS_CHANGED', 'LEAD_MARKED_LOST', 'stage_task_completed'],
+            created_at__range=(start_of_day, end_of_day)
+        ).values_list('entity_id', flat=True)
+    )
+
+    clean_handled_today = {int(lid) for lid in handled_lead_ids_today if lid and str(lid).isdigit()}
+    leads_handled_today = len(clean_handled_today)
+
+    # Leads Closed Today for this user:
+    closed_stage_slugs = ['won', 'lost', 'closed-won', 'closed-lost', 'closed']
+    closed_leads_today_qs = Lead.objects.filter(
+        assigned_to=user
+    ).filter(
+        Q(stage__slug__in=closed_stage_slugs) | Q(stage__win_probability__in=[0, 100])
     ).filter(
         Q(converted_at__range=(start_of_day, end_of_day)) |
-        (Q(converted_at__isnull=True) & Q(updated_at__range=(start_of_day, end_of_day)))
+        (Q(converted_at__isnull=True) & Q(stage_entered_at__range=(start_of_day, end_of_day)))
+    ).distinct()
+    leads_closed_today = closed_leads_today_qs.count()
+
+    won_stage_slugs = ['won', 'closed-won']
+    won_leads_today_qs = closed_leads_today_qs.filter(
+        Q(stage__slug__in=won_stage_slugs) | Q(stage__win_probability=100)
     )
     deals_won_today = won_leads_today_qs.count()
     revenue_won_today = won_leads_today_qs.aggregate(total=Sum('expected_value'))['total'] or Decimal('0.00')
 
-    # --- 2. MONTHLY ACTUALS ---
-    # Calls completed in the entire month
-    calls_completed_month = FollowUp.objects.filter(
+    # --- 2. MONTHLY ACTUALS (Strictly isolated to this specific staff member) ---
+    fu_calls_month = FollowUp.objects.filter(
         assigned_to=user,
         status=FollowUp.Status.COMPLETED
     ).filter(
@@ -159,20 +228,70 @@ def calculate_staff_progress(user, target=None, target_date=None):
         (Q(completed_at__isnull=True) & Q(updated_at__range=(start_of_month, end_of_month)))
     ).count()
 
-    # Leads acquired in the entire month
-    leads_handled_month = Lead.objects.filter(
-        Q(assigned_to=user) | Q(created_by=user)
+    stage_call_tasks_month = LeadStageTask.objects.filter(
+        Q(completed_by=user) | (Q(completed_by__isnull=True) & Q(assigned_to=user)),
+        status=LeadStageTask.Status.COMPLETED
     ).filter(
+        Q(title__icontains='call') | Q(purpose__icontains='call') | Q(title__icontains='discovery')
+    ).filter(
+        Q(completed_at__range=(start_of_month, end_of_month)) |
+        (Q(completed_at__isnull=True) & Q(updated_at__range=(start_of_month, end_of_month)))
+    ).count()
+
+    call_notes_month = LeadNote.objects.filter(
+        user=user,
+        note_type='CALL',
         created_at__range=(start_of_month, end_of_month)
     ).count()
 
-    # Deals won in the entire month
-    won_leads_month_qs = Lead.objects.filter(
-        assigned_to=user,
-        stage__slug='won'
+    calls_completed_month = max(fu_calls_month + stage_call_tasks_month, call_notes_month)
+    if calls_completed_month == 0:
+        calls_completed_month = fu_calls_month or stage_call_tasks_month or call_notes_month
+
+    handled_lead_ids_month = set()
+    handled_lead_ids_month.update(
+        LeadStageTask.objects.filter(
+            Q(completed_by=user) | (Q(completed_by__isnull=True) & Q(assigned_to=user)),
+            status=LeadStageTask.Status.COMPLETED,
+            completed_at__range=(start_of_month, end_of_month)
+        ).exclude(lead__isnull=True).values_list('lead_id', flat=True)
+    )
+    handled_lead_ids_month.update(
+        FollowUp.objects.filter(
+            assigned_to=user,
+            status=FollowUp.Status.COMPLETED,
+            completed_at__range=(start_of_month, end_of_month)
+        ).exclude(lead__isnull=True).values_list('lead_id', flat=True)
+    )
+    handled_lead_ids_month.update(
+        LeadNote.objects.filter(
+            user=user,
+            created_at__range=(start_of_month, end_of_month)
+        ).values_list('lead_id', flat=True)
+    )
+    handled_lead_ids_month.update(
+        ActivityLog.objects.filter(
+            performed_by=user,
+            entity_type='lead',
+            action__in=['STATUS_CHANGED', 'LEAD_MARKED_LOST', 'stage_task_completed'],
+            created_at__range=(start_of_month, end_of_month)
+        ).values_list('entity_id', flat=True)
+    )
+    clean_handled_month = {int(lid) for lid in handled_lead_ids_month if lid and str(lid).isdigit()}
+    leads_handled_month = len(clean_handled_month)
+
+    closed_leads_month_qs = Lead.objects.filter(
+        assigned_to=user
+    ).filter(
+        Q(stage__slug__in=closed_stage_slugs) | Q(stage__win_probability__in=[0, 100])
     ).filter(
         Q(converted_at__range=(start_of_month, end_of_month)) |
-        (Q(converted_at__isnull=True) & Q(updated_at__range=(start_of_month, end_of_month)))
+        (Q(converted_at__isnull=True) & Q(stage_entered_at__range=(start_of_month, end_of_month)))
+    ).distinct()
+    leads_closed_month = closed_leads_month_qs.count()
+
+    won_leads_month_qs = closed_leads_month_qs.filter(
+        Q(stage__slug__in=won_stage_slugs) | Q(stage__win_probability=100)
     )
     deals_won_month = won_leads_month_qs.count()
     revenue_won_month = won_leads_month_qs.aggregate(total=Sum('expected_value'))['total'] or Decimal('0.00')
@@ -180,6 +299,7 @@ def calculate_staff_progress(user, target=None, target_date=None):
     # Targets fallback if target not configured yet
     daily_calls_tgt = target.daily_calls_target if target else 10
     daily_leads_tgt = target.daily_leads_target if target else 3
+    daily_closed_tgt = max(1, getattr(target, 'daily_closed_target', 1))
     daily_rev_tgt = target.daily_revenue_target if target else Decimal('0.00')
 
     monthly_calls_tgt = target.monthly_calls_target if target else 200
@@ -195,6 +315,7 @@ def calculate_staff_progress(user, target=None, target_date=None):
 
     daily_calls_pct = safe_pct(calls_completed_today, daily_calls_tgt)
     daily_leads_pct = safe_pct(leads_handled_today, daily_leads_tgt)
+    daily_closed_pct = safe_pct(leads_closed_today, daily_closed_tgt)
     daily_rev_pct = safe_pct(revenue_won_today, daily_rev_tgt)
 
     monthly_calls_pct = safe_pct(calls_completed_month, monthly_calls_tgt)
@@ -204,8 +325,7 @@ def calculate_staff_progress(user, target=None, target_date=None):
 
     # Composite scores (average of percentages capped at 100% for score calculation)
     daily_score = round(
-        (min(daily_calls_pct, 100.0) + min(daily_leads_pct, 100.0) + (min(daily_rev_pct, 100.0) if daily_rev_tgt > 0 else 100.0)) /
-        (3.0 if daily_rev_tgt > 0 else 2.0),
+        (min(daily_calls_pct, 100.0) + min(daily_leads_pct, 100.0) + min(daily_closed_pct, 100.0)) / 3.0,
         1
     )
 
@@ -223,7 +343,7 @@ def calculate_staff_progress(user, target=None, target_date=None):
             return 'IN_PROGRESS'
         return 'BEHIND'
 
-    daily_status = determine_status(daily_score, daily_calls_pct, daily_leads_pct)
+    daily_status = determine_status(daily_score, daily_closed_pct, daily_calls_pct)
     monthly_status = determine_status(monthly_score, monthly_deals_pct, monthly_calls_pct)
 
     return {
@@ -239,6 +359,26 @@ def calculate_staff_progress(user, target=None, target_date=None):
         'set_by_name': target.set_by.get_full_name() or target.set_by.email if (target and target.set_by) else None,
         'updated_at': target.updated_at if target else None,
 
+        # Flat root keys for convenient mobile CRM and widget access
+        'daily_calls_completed': calls_completed_today,
+        'daily_calls_target': daily_calls_tgt,
+        'daily_leads_acquired': leads_handled_today,
+        'daily_leads_target': daily_leads_tgt,
+        'daily_leads_closed': leads_closed_today,
+        'daily_deals_won': deals_won_today,
+        'daily_closed_target': daily_closed_tgt,
+        'daily_revenue_won': float(revenue_won_today),
+        'daily_revenue_target': float(daily_rev_tgt),
+
+        'monthly_calls_completed': calls_completed_month,
+        'monthly_calls_target': monthly_calls_tgt,
+        'monthly_leads_acquired': leads_handled_month,
+        'monthly_leads_target': monthly_leads_tgt,
+        'monthly_deals_target': monthly_deals_tgt,
+        'monthly_deals_won': deals_won_month,
+        'monthly_revenue_won': float(revenue_won_month),
+        'monthly_revenue_target': float(monthly_rev_tgt),
+
         'daily': {
             'calls': {
                 'target': daily_calls_tgt,
@@ -253,6 +393,14 @@ def calculate_staff_progress(user, target=None, target_date=None):
                 'percentage': daily_leads_pct,
                 'remaining': max(0, daily_leads_tgt - leads_handled_today),
                 'achieved': leads_handled_today >= daily_leads_tgt,
+            },
+            'closed': {
+                'target': daily_closed_tgt,
+                'actual': leads_closed_today,
+                'deals_won': deals_won_today,
+                'percentage': daily_closed_pct,
+                'remaining': max(0, daily_closed_tgt - leads_closed_today),
+                'achieved': leads_closed_today >= daily_closed_tgt,
             },
             'revenue': {
                 'target': float(daily_rev_tgt),

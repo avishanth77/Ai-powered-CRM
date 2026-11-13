@@ -541,6 +541,11 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
         required=False,
         write_only=True
     )
+    product_items = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        write_only=True
+    )
     custom_properties = serializers.DictField(
         required=False,
         write_only=True
@@ -594,12 +599,21 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
             'win_probability_override',
             'win_probability_reason',
             'product_ids',
+            'product_items',
             # Dynamic Custom Properties
             'custom_properties',
         ]
 
     def to_internal_value(self, data):
         internal = super().to_internal_value(data)
+        if 'product_items' not in internal and 'products' in data and isinstance(data['products'], list):
+            internal['product_items'] = data['products']
+        if 'product_items' in internal and internal['product_items'] and 'product_ids' not in internal:
+            internal['product_ids'] = [
+                int(item.get('product_id') or item.get('id'))
+                for item in internal['product_items']
+                if item.get('product_id') or item.get('id')
+            ]
         if 'stage' not in internal and 'status' in data and data['status']:
             raw_st = str(data['status']).strip()
             found = None
@@ -748,7 +762,9 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         product_ids = validated_data.pop('product_ids', None)
+        product_items = validated_data.pop('product_items', None)
         custom_props = validated_data.pop('custom_properties', None)
+        has_explicit_expected_val = 'expected_value' in validated_data
         request = self.context.get('request')
         if 'stage' not in validated_data or not validated_data['stage']:
             default_stage = LeadStage.objects.filter(is_system=True, slug='new').first() or LeadStage.objects.filter(is_active=True).order_by('display_order').first()
@@ -771,17 +787,39 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
         if custom_props:
             _save_custom_properties(lead, custom_props)
 
-        if product_ids:
+        # Parse product items and quantities (number of product needed)
+        items_map = {}
+        if product_items:
+            for item in product_items:
+                pid = item.get('product_id') or item.get('id')
+                if pid:
+                    try:
+                        qty = max(1, int(item.get('quantity', 1)))
+                    except (ValueError, TypeError):
+                        qty = 1
+                    items_map[int(pid)] = qty
+        elif product_ids:
+            for pid in product_ids:
+                items_map[int(pid)] = 1
+
+        if items_map:
             from products.models import Product, LeadProduct
             from django.db.models import Sum
-            for pid in product_ids:
+            for pid, qty in items_map.items():
                 p = Product.objects.filter(id=pid, is_active=True).first()
                 if p:
-                    LeadProduct.objects.get_or_create(lead=lead, product=p, defaults={'unit_price': p.unit_price, 'quantity': 1})
-            total = lead.lead_products.aggregate(s=Sum('total_price'))['s']
-            if total and (lead.expected_value == 0 or 'expected_value' not in validated_data):
-                lead.expected_value = total
-                lead.save(update_fields=['expected_value'])
+                    LeadProduct.objects.create(
+                        lead=lead,
+                        product=p,
+                        unit_price=p.unit_price,
+                        quantity=qty
+                    )
+            # Only auto-fill expected_value if user DID NOT pass expected_value in payload at all
+            if not has_explicit_expected_val:
+                total = lead.lead_products.aggregate(s=Sum('total_price'))['s']
+                if total:
+                    lead.expected_value = total
+                    lead.save(update_fields=['expected_value'])
         return lead
 
     def to_representation(self, instance):
@@ -789,32 +827,51 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         product_ids = validated_data.pop('product_ids', None)
+        product_items = validated_data.pop('product_items', None)
         custom_props = validated_data.pop('custom_properties', None)
         lead = super().update(instance, validated_data)
 
         if custom_props is not None:
             _save_custom_properties(lead, custom_props)
 
-        if product_ids is not None:
-            from decimal import Decimal
+        if product_items is not None or product_ids is not None:
             from products.models import Product, LeadProduct
-            from django.db.models import Sum
-            existing_pids = set(lead.lead_products.values_list('product_id', flat=True))
-            new_pids = set(product_ids)
+            items_map = {}
+            if product_items is not None:
+                for item in product_items:
+                    pid = item.get('product_id') or item.get('id')
+                    if pid:
+                        try:
+                            qty = max(1, int(item.get('quantity', 1)))
+                        except (ValueError, TypeError):
+                            qty = 1
+                        items_map[int(pid)] = qty
+            elif product_ids is not None:
+                for pid in product_ids:
+                    existing_lp = lead.lead_products.filter(product_id=pid).first()
+                    items_map[int(pid)] = existing_lp.quantity if existing_lp else 1
+
+            target_pids = set(items_map.keys())
             # Remove removed products
-            lead.lead_products.exclude(product_id__in=new_pids).delete()
-            # Add newly selected products
-            for pid in new_pids - existing_pids:
-                p = Product.objects.filter(id=pid, is_active=True).first()
-                if p:
-                    LeadProduct.objects.create(lead=lead, product=p, unit_price=p.unit_price, quantity=1)
-            total = lead.lead_products.aggregate(s=Sum('total_price'))['s']
-            if 'expected_value' not in validated_data:
-                lead.expected_value = total if total is not None else Decimal('0.00')
-                lead.save(update_fields=['expected_value'])
-            elif total and lead.expected_value == 0:
-                lead.expected_value = total
-                lead.save(update_fields=['expected_value'])
+            lead.lead_products.exclude(product_id__in=target_pids).delete()
+
+            # Update existing quantities or create new ones
+            for pid, qty in items_map.items():
+                lp = lead.lead_products.filter(product_id=pid).first()
+                if lp:
+                    if lp.quantity != qty:
+                        lp.quantity = qty
+                        lp.save()
+                else:
+                    p = Product.objects.filter(id=pid, is_active=True).first()
+                    if p:
+                        LeadProduct.objects.create(
+                            lead=lead,
+                            product=p,
+                            unit_price=p.unit_price,
+                            quantity=qty
+                        )
+            # Never overwrite lead.expected_value on product updates
         return lead
 
 

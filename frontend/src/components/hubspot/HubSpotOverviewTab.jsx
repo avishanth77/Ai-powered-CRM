@@ -24,6 +24,8 @@ import {
   ChevronDown,
   ChevronUp,
   Package,
+  Plus,
+  Minus,
 } from 'lucide-react';
 import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatters';
 
@@ -37,6 +39,7 @@ export const HubSpotOverviewTab = ({
   onScheduleFollowup,
   onOpenAiSummary,
   onManageProducts,
+  onUpdateProductQuantity,
 }) => {
   const [collapsedSections, setCollapsedSections] = useState({});
 
@@ -337,8 +340,7 @@ export const HubSpotOverviewTab = ({
                         >
                           <Package size={11} />
                           <strong>{p.name}</strong>
-                          {p.quantity > 1 && <span style={{ opacity: 0.75 }}>×{p.quantity}</span>}
-                          <span style={{ opacity: 0.85, fontWeight: 700 }}>({formatCurrency(p.total_price || p.unit_price)})</span>
+                          <span style={{ opacity: 0.85, fontWeight: 600 }}>({p.quantity || 1} needed)</span>
                         </span>
                       ))}
                     </div>
@@ -503,7 +505,7 @@ export const HubSpotOverviewTab = ({
                       <tr>
                         <th>Product</th>
                         <th>Code</th>
-                        <th>Qty</th>
+                        <th>Qty Needed</th>
                         <th>Unit Price</th>
                         <th>Total</th>
                       </tr>
@@ -513,7 +515,36 @@ export const HubSpotOverviewTab = ({
                         <tr key={p.id || p.lead_product_id}>
                           <td><strong>{p.name}</strong></td>
                           <td><span className="badge badge-secondary" style={{ fontSize: '0.7rem' }}>{p.code || '—'}</span></td>
-                          <td>{p.quantity}</td>
+                          <td>
+                            {onUpdateProductQuantity ? (
+                              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', border: '1px solid var(--border-subtle)', borderRadius: '6px', background: 'var(--bg-surface)', padding: '1px 3px' }}>
+                                <button
+                                  type="button"
+                                  style={{ background: 'none', border: 'none', padding: '2px 5px', cursor: (p.quantity || 1) <= 1 ? 'not-allowed' : 'pointer', opacity: (p.quantity || 1) <= 1 ? 0.4 : 1, color: 'var(--text-main)', display: 'flex', alignItems: 'center' }}
+                                  disabled={(p.quantity || 1) <= 1}
+                                  onClick={() => onUpdateProductQuantity(p.id, Math.max(1, (p.quantity || 1) - 1))}
+                                  title="Decrease quantity needed"
+                                  aria-label="Decrease quantity needed"
+                                >
+                                  <Minus size={11} />
+                                </button>
+                                <span style={{ fontWeight: 700, minWidth: '22px', textAlign: 'center', fontSize: '0.8125rem' }}>
+                                  {p.quantity || 1}
+                                </span>
+                                <button
+                                  type="button"
+                                  style={{ background: 'none', border: 'none', padding: '2px 5px', cursor: 'pointer', color: 'var(--text-main)', display: 'flex', alignItems: 'center' }}
+                                  onClick={() => onUpdateProductQuantity(p.id, (p.quantity || 1) + 1)}
+                                  title="Increase quantity needed"
+                                  aria-label="Increase quantity needed"
+                                >
+                                  <Plus size={11} />
+                                </button>
+                              </div>
+                            ) : (
+                              <span>{p.quantity || 1}</span>
+                            )}
+                          </td>
                           <td>{formatCurrency(p.unit_price)}</td>
                           <td><strong>{formatCurrency(p.total_price)}</strong></td>
                         </tr>
@@ -522,9 +553,9 @@ export const HubSpotOverviewTab = ({
                     <tfoot>
                       <tr style={{ borderTop: '2px solid var(--border-subtle)', fontWeight: 700 }}>
                         <td colSpan={4} style={{ textAlign: 'right', color: 'var(--text-dim)' }}>
-                          Total Expected Value:
+                          Total Products Value:
                         </td>
-                        <td style={{ color: 'var(--success, #10b981)', fontSize: '0.875rem' }}>
+                        <td style={{ color: 'var(--primary, #6366f1)', fontSize: '0.875rem' }}>
                           {formatCurrency(
                             lead.products.reduce((acc, p) => acc + (parseFloat(p.total_price) || 0), 0)
                           )}

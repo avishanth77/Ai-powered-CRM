@@ -381,7 +381,9 @@ export const HubSpotLeadHeader = ({
               title="Click to manage interested products"
             >
               <Package size={13} />
-              <span>{lead.products.length} Product{lead.products.length > 1 ? 's' : ''}</span>
+              <span>
+                {lead.products.length} Product{lead.products.length > 1 ? 's' : ''} ({lead.products.reduce((s, p) => s + (p.quantity || 1), 0)} units)
+              </span>
             </span>
           ) : onManageProducts ? (
             <button

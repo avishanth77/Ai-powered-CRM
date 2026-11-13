@@ -152,9 +152,8 @@ class LeadProductViewSet(viewsets.ModelViewSet):
         self._update_lead_deal_value(lead)
 
     def _update_lead_deal_value(self, lead):
-        """Syncs the lead's expected deal value to the sum of its product line items if products exist."""
-        total = lead.lead_products.aggregate(s=Sum('total_price'))['s']
-        if total is not None and total > Decimal('0.00'):
-            lead.expected_value = total
-            lead.save(update_fields=['expected_value', 'updated_at'])
+        """
+        Lead deal value is maintained independently as budget; not overwritten by product unit prices.
+        """
+        pass
 

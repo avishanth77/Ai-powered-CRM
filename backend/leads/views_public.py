@@ -254,10 +254,14 @@ class PublicContactLeadView(APIView):
                     if not prod:
                         prod = Product.objects.filter(name__icontains=str(product_val).strip(), is_active=True).first()
                     if prod:
-                        LeadProduct.objects.create(lead=lead, product=prod, unit_price=prod.unit_price, quantity=1)
-                        if expected_value == Decimal('0.00'):
-                            lead.expected_value = prod.unit_price
-                            lead.save(update_fields=['expected_value'])
+                        qty_val = 1
+                        raw_qty = data.get('quantity') or data.get('product_quantity') or data.get('units_needed')
+                        if raw_qty:
+                            try:
+                                qty_val = max(1, int(raw_qty))
+                            except (ValueError, TypeError):
+                                qty_val = 1
+                        LeadProduct.objects.create(lead=lead, product=prod, unit_price=prod.unit_price, quantity=qty_val)
                 except Exception as ex:
                     logger.warning(f"Could not link web-to-lead product: {ex}")
 

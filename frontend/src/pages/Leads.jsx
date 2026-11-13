@@ -1445,7 +1445,7 @@ export const Leads = () => {
                               title={`${p.name} (${p.code}) - ${formatCurrency(p.unit_price)}`}
                             >
                               <Package size={9} />
-                              {p.name}
+                              {p.name}{p.quantity > 1 ? ` ×${p.quantity}` : ''}
                             </span>
                           ))}
                           {lead.products.length > 2 && (

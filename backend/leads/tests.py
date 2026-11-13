@@ -649,5 +649,54 @@ class LeadAndPermissionTests(TestCase):
         self.assertEqual(stage_3.display_order, 2)
         self.assertEqual(stage_2.display_order, 3)
 
+    def test_product_selection_with_quantity_does_not_override_expected_value(self):
+        """Selecting a product and number needed classifies the lead without overwriting expected_value."""
+        from products.models import Product, LeadProduct
+        prod = Product.objects.create(
+            name='Cloud ERP Solution',
+            code='ERP-CLOUD',
+            unit_price=Decimal('50000.00')
+        )
+        self.client.force_authenticate(user=self.admin)
+        res = self.client.post('/api/leads/', {
+            'first_name': 'MultiUnit',
+            'last_name': 'Buyer',
+            'email': 'buyer@multicorp.com',
+            'stage': self.stage_new.id,
+            'expected_value': Decimal('15000.00'),  # Custom deal budget
+            'product_items': [
+                {'product_id': prod.id, 'quantity': 4}  # 4 units needed
+            ]
+        }, format='json')
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        lead_id = res.data['id']
+        lead = Lead.objects.get(id=lead_id)
+
+        # Expected value remains the user's deal value, NOT the per-unit price or product total
+        self.assertEqual(lead.expected_value, Decimal('15000.00'))
+
+        # LeadProduct has quantity 4 and product classification
+        lp = lead.lead_products.filter(product=prod).first()
+        self.assertIsNotNone(lp)
+        self.assertEqual(lp.quantity, 4)
+        self.assertEqual(lp.unit_price, Decimal('50000.00'))
+        self.assertEqual(lp.total_price, Decimal('200000.00'))
+
+        # Edit quantity anytime to 10
+        update_res = self.client.patch(f'/api/leads/{lead_id}/', {
+            'product_items': [
+                {'product_id': prod.id, 'quantity': 10}
+            ]
+        }, format='json')
+        self.assertEqual(update_res.status_code, status.HTTP_200_OK)
+
+        lead.refresh_from_db()
+        lp.refresh_from_db()
+        self.assertEqual(lp.quantity, 10)
+        self.assertEqual(lp.total_price, Decimal('500000.00'))
+        # Deal value is still preserved
+        self.assertEqual(lead.expected_value, Decimal('15000.00'))
+
+
 
 

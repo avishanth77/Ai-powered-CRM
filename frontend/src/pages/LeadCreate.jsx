@@ -67,6 +67,7 @@ export const LeadCreate = () => {
     assigned_to: user?.id || '',
     expected_value: '0.00',
     product_ids: [],
+    product_items: [],
     lost_reason: '',
     win_probability_override: '',
     win_probability_reason: '',
@@ -229,6 +230,7 @@ export const LeadCreate = () => {
         assigned_to: formData.assigned_to ? parseInt(formData.assigned_to) : null,
         expected_value: parseFloat(formData.expected_value) || 0,
         product_ids: formData.product_ids || [],
+        product_items: formData.product_items || [],
         lost_reason: isLostStage ? formData.lost_reason.trim() : null,
         win_probability_override: formData.win_probability_override !== '' && formData.win_probability_override !== null && formData.win_probability_override !== undefined ? parseInt(formData.win_probability_override) : null,
         win_probability_reason: (formData.win_probability_reason || '').trim(),
@@ -778,12 +780,14 @@ export const LeadCreate = () => {
 
           <ProductSelector
             selectedProductIds={formData.product_ids || []}
-            onChange={(ids) => setFormData((prev) => ({ ...prev, product_ids: ids }))}
-            onTotalValueChange={(val) => {
-              if (val > 0) {
-                setFormData((prev) => ({ ...prev, expected_value: val.toFixed(2) }));
-              }
-            }}
+            productItems={formData.product_items || []}
+            onChange={(ids, items) =>
+              setFormData((prev) => ({
+                ...prev,
+                product_ids: ids,
+                product_items: items,
+              }))
+            }
           />
         </div>
 

@@ -160,6 +160,7 @@ export const LeadDetails = () => {
   const [isEditWinProbOpen, setIsEditWinProbOpen] = useState(false);
   const [isEditProductsOpen, setIsEditProductsOpen] = useState(false);
   const [editProductIds, setEditProductIds] = useState([]);
+  const [editProductItems, setEditProductItems] = useState([]);
   const [isSubmittingProducts, setIsSubmittingProducts] = useState(false);
   const [editWinProbVal, setEditWinProbVal] = useState(10);
   const [editWinProbReason, setEditWinProbReason] = useState('');
@@ -449,6 +450,7 @@ export const LeadDetails = () => {
 
   const handleOpenEditProducts = () => {
     setEditProductIds(lead?.product_ids || lead?.products?.map((p) => p.id) || []);
+    setEditProductItems(lead?.products?.map((p) => ({ product_id: p.id, quantity: p.quantity || 1 })) || []);
     setIsEditProductsOpen(true);
   };
 
@@ -458,8 +460,9 @@ export const LeadDetails = () => {
     try {
       await leadApi.updateLead(id, {
         product_ids: editProductIds,
+        product_items: editProductItems,
       });
-      showToast('Lead products updated successfully!', 'success');
+      showToast('Lead products and quantities updated successfully!', 'success');
       setIsEditProductsOpen(false);
       fetchLeadDetails();
       fetchTimeline();
@@ -467,6 +470,23 @@ export const LeadDetails = () => {
       showToast(extractErrorMessage(err, 'Failed to update products'), 'error');
     } finally {
       setIsSubmittingProducts(false);
+    }
+  };
+
+  const handleUpdateSingleProductQuantity = async (productId, newQuantity) => {
+    try {
+      const currentProducts = lead?.products || [];
+      const updatedItems = currentProducts.map((p) => ({
+        product_id: p.id,
+        quantity: p.id === productId ? Math.max(1, newQuantity) : (p.quantity || 1),
+      }));
+      await leadApi.updateLead(id, {
+        product_items: updatedItems,
+      });
+      showToast('Product quantity updated!', 'success');
+      fetchLeadDetails();
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Failed to update quantity'), 'error');
     }
   };
 
@@ -869,6 +889,7 @@ export const LeadDetails = () => {
           <HubSpotOverviewTab
             lead={lead}
             onManageProducts={handleOpenEditProducts}
+            onUpdateProductQuantity={handleUpdateSingleProductQuantity}
             onViewTasksTab={() => setActiveTab('stage-tasks')}
             onViewActivitiesTab={() => setActiveTab('activities')}
             onScheduleFollowup={() => setScheduleModalOpen(true)}
@@ -1885,7 +1906,11 @@ export const LeadDetails = () => {
             <form onSubmit={handleSaveProducts} style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <ProductSelector
                 selectedProductIds={editProductIds}
-                onChange={setEditProductIds}
+                productItems={editProductItems}
+                onChange={(ids, items) => {
+                  setEditProductIds(ids);
+                  setEditProductItems(items);
+                }}
               />
 
               <div className="modal-actions" style={{ justifyContent: 'flex-end', gap: '0.5rem', marginTop: '0.5rem' }}>

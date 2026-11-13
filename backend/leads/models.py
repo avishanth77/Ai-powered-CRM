@@ -413,6 +413,11 @@ class Lead(models.Model):
         elif not self.stage_entered_at:
             self.stage_entered_at = timezone.now()
 
+        # If entering Won stage, record converted_at timestamp for progression target tracking
+        if self.stage and (getattr(self.stage, 'slug', '') == 'won' or getattr(self.stage, 'win_probability', 0) == 100):
+            if not self.converted_at:
+                self.converted_at = timezone.now()
+
         # Synchronize first_name/last_name with name
         if (self.first_name or self.last_name) and (not self.name or self.name == 'Prospect Lead'):
             self.name = f"{self.first_name} {self.last_name}".strip()
