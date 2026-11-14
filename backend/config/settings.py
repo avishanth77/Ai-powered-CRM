@@ -252,22 +252,24 @@ SPECTACULAR_SETTINGS = {
 }
 
 # ==============================================================================
-# EMAIL CONFIGURATION
+# EMAIL CONFIGURATION (Resend HTTPS API for Cloud + SMTP Fallback)
 # ==============================================================================
+RESEND_API_KEY = os.getenv('RESEND_API_KEY', '').strip()
+RESEND_FROM_EMAIL = os.getenv('RESEND_FROM_EMAIL', 'CRM Lite <onboarding@resend.dev>').strip()
+
 EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'aatralcollegemagazine@gmail.com')
 raw_email_password = os.getenv('EMAIL_HOST_PASSWORD', 'lmzz efbn ytkj cfso')
 EMAIL_HOST_PASSWORD = raw_email_password.replace(' ', '') if raw_email_password else ''
 
-EMAIL_BACKEND = os.getenv(
-    'EMAIL_BACKEND',
-    'django.core.mail.backends.smtp.EmailBackend' if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD else 'django.core.mail.backends.console.EmailBackend'
-)
+# Resend HTTPS backend sends via Port 443 (bypassing Render's SMTP port 587 block).
+# If RESEND_API_KEY is not set, it automatically falls back to SMTP.
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'common.email_backend.ResendEmailBackend')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 't')
 EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('true', '1', 't')
 EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', 15))
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', f'CRM Lite <{EMAIL_HOST_USER}>')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', RESEND_FROM_EMAIL if RESEND_API_KEY else f'CRM Lite <{EMAIL_HOST_USER}>')
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
 # ==============================================================================

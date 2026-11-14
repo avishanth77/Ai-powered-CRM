@@ -23,6 +23,8 @@ def main():
     print("=" * 60)
 
     backend = getattr(settings, 'EMAIL_BACKEND', '')
+    resend_key = getattr(settings, 'RESEND_API_KEY', '')
+    resend_from = getattr(settings, 'RESEND_FROM_EMAIL', '')
     host = getattr(settings, 'EMAIL_HOST', '')
     port = getattr(settings, 'EMAIL_PORT', '')
     user = getattr(settings, 'EMAIL_HOST_USER', '')
@@ -31,8 +33,11 @@ def main():
     from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', '')
 
     print(f"EMAIL_BACKEND:       {backend}")
-    print(f"EMAIL_HOST:          {host}:{port}")
-    print(f"EMAIL_USE_TLS:       {tls}")
+    masked_resend = f"{resend_key[:6]}...{resend_key[-4:]}" if len(resend_key) > 10 else ('<EMPTY>' if not resend_key else '***')
+    print(f"RESEND_API_KEY:      {masked_resend}")
+    print(f"RESEND_FROM_EMAIL:   {resend_from}")
+    print(f"SMTP_HOST:           {host}:{port}")
+    print(f"SMTP_USE_TLS:        {tls}")
     print(f"EMAIL_HOST_USER:     {user if user else '<EMPTY>'}")
     masked_pw = '*' * len(password) if password else '<EMPTY>'
     print(f"EMAIL_HOST_PASSWORD: {masked_pw}")
