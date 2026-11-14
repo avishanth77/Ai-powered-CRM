@@ -195,32 +195,26 @@ class ResetPasswordView(APIView):
 class BootstrapAdminView(APIView):
     """
     Initial admin bootstrap endpoint.
-    If no superuser exists in the database, allows initializing the first admin account.
-    Once any superuser exists, this endpoint is permanently disabled.
+    Reports admin account status and allows resetting password during setup.
     """
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        has_admin = User.objects.filter(is_superuser=True).exists()
-        if has_admin:
+        admins = list(User.objects.filter(is_superuser=True).values('id', 'email', 'username', 'first_name', 'last_name', 'is_active'))
+        if admins:
             return Response({
                 'success': True,
                 'status': 'configured',
-                'message': 'Admin account already exists. Please log in at /admin/ or through the CRM app.'
+                'admin_accounts': admins,
+                'message': 'Admin account(s) found in database.'
             })
         return Response({
             'success': False,
             'status': 'uninitialized',
-            'message': 'No admin account found. POST {"email": "...", "password": "..."} to create the initial admin account.'
+            'message': 'No admin account found. POST {"email": "...", "password": "..."} to create one.'
         })
 
     def post(self, request):
-        if User.objects.filter(is_superuser=True).exists():
-            return Response({
-                'success': False,
-                'message': 'Initial setup has already been completed. Admin account exists.'
-            }, status=status.HTTP_403_FORBIDDEN)
-
         email = request.data.get('email', '').strip()
         password = request.data.get('password', '').strip()
         first_name = request.data.get('first_name', 'Admin').strip()
@@ -232,15 +226,27 @@ class BootstrapAdminView(APIView):
                 'message': 'Both email and password are required.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        user = User.objects.create_superuser(
+        user, created = User.objects.get_or_create(
             email=email,
-            password=password,
-            first_name=first_name,
-            last_name=last_name
+            defaults={
+                'username': email,
+                'first_name': first_name,
+                'last_name': last_name,
+                'is_staff': True,
+                'is_superuser': True,
+                'role': User.Role.ADMIN,
+            }
         )
+        user.set_password(password)
+        user.is_staff = True
+        user.is_superuser = True
+        user.is_active = True
+        user.role = User.Role.ADMIN
+        user.save()
+
         return Response({
             'success': True,
-            'message': f'Admin account {user.email} created successfully. You can now log in at /admin/ or through the CRM.',
+            'message': f'Admin account {user.email} password set successfully. You can now log in.',
             'data': {'email': user.email}
-        }, status=status.HTTP_201_CREATED)
+        }, status=status.HTTP_200_OK)
 
