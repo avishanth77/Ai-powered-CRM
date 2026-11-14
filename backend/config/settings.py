@@ -92,7 +92,7 @@ if DATABASE_URL:
             default=DATABASE_URL,
             conn_max_age=600,
             conn_health_checks=True,
-            ssl_require=True if ('neon.tech' in DATABASE_URL or 'render.com' in DATABASE_URL) else False,
+            ssl_require=True if any(h in DATABASE_URL for h in ['neon.tech', 'render.com', 'supabase.co', 'supabase.com']) or 'sslmode=require' in DATABASE_URL else False,
         )
     }
 else:
