@@ -21,6 +21,7 @@ from accounts.views import (
     ChangePasswordView,
     ForgotPasswordView,
     ResetPasswordView,
+    BootstrapAdminView,
 )
 from accounts.views_targets import StaffTargetViewSet
 
@@ -56,6 +57,7 @@ urlpatterns = [
     path('api/auth/change-password/', ChangePasswordView.as_view(), name='auth-change-password'),
     path('api/auth/forgot-password/', ForgotPasswordView.as_view(), name='auth-forgot-password'),
     path('api/auth/reset-password/', ResetPasswordView.as_view(), name='auth-reset-password'),
+    path('api/auth/bootstrap-admin/', BootstrapAdminView.as_view(), name='auth-bootstrap-admin'),
 
     # Mention Suggestions & Comments
     path('api/users/mention-suggestions/', MentionSuggestionsView.as_view(), name='mention-suggestions'),
