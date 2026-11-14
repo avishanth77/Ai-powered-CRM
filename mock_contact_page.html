@@ -496,7 +496,7 @@
 
     <div class="endpoint-badge-box">
       <span class="http-method">POST</span>
-      <span class="endpoint-url" id="endpoint-display">http://localhost:8000/api/leads/web-to-lead/</span>
+      <span class="endpoint-url" id="endpoint-display">https://ai-powered-crm-uhrh.onrender.com/api/leads/web-to-lead/</span>
     </div>
   </header>
 
@@ -608,7 +608,7 @@
         Live Webhook Response
       </div>
       <div class="card-subtitle">
-        Real-time feedback returned by http://localhost:8000/api/leads/web-to-lead/
+        Real-time feedback returned by https://ai-powered-crm-uhrh.onrender.com/api/leads/web-to-lead/
       </div>
 
       <div id="response-container" style="flex:1;">
@@ -635,7 +635,7 @@
 </div>
 
 <script>
-  const API_ENDPOINT = 'http://localhost:8000/api/leads/web-to-lead/';
+  const API_ENDPOINT = 'https://ai-powered-crm-uhrh.onrender.com/api/leads/web-to-lead/';
   const CRM_FRONTEND_URL = 'http://localhost:5173';
 
   // Preset Data Library
@@ -857,7 +857,7 @@
         <p style="font-size:0.85rem; color:#991B1B; margin-bottom:0.75rem;">
           Could not reach backend server at ${API_ENDPOINT}.
         </p>
-        <pre class="json-box">${escapeHtml(err.toString())}\n\nMake sure your Django server is running on port 8000 (python manage.py runserver 8000).</pre>
+        <pre class="json-box">${escapeHtml(err.toString())}\n\nMake sure the backend is live and accessible at ${API_ENDPOINT}.</pre>
       </div>
     `;
   }
