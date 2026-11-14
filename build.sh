@@ -15,7 +15,7 @@ from django.contrib.auth import get_user_model
 User = get_user_model()
 email = os.getenv('DJANGO_SUPERUSER_EMAIL', 'admin@crm.com').strip()
 username = os.getenv('DJANGO_SUPERUSER_USERNAME', 'admin').strip()
-password = os.getenv('DJANGO_SUPERUSER_PASSWORD', 'AdminPassword123!').strip()
+password = os.getenv('DJANGO_SUPERUSER_PASSWORD', 'admin12345').strip()
 user = User.objects.filter(is_superuser=True).first()
 if not user:
     user = User.objects.create_superuser(email=email, username=username, password=password, first_name='Admin', last_name='User')
