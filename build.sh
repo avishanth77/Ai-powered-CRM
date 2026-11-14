@@ -19,14 +19,12 @@ password = os.getenv('DJANGO_SUPERUSER_PASSWORD', 'admin12345').strip()
 user = User.objects.filter(is_superuser=True).first()
 if not user:
     user = User.objects.create_superuser(email=email, username=username, password=password, first_name='Admin', last_name='User')
+    print(f'==> INITIAL SUPERUSER CREATED: username: {username} | email: {email}')
 else:
-    user.email = email
-    user.username = username
-    user.is_staff = True
-    user.is_superuser = True
-    user.is_active = True
-    user.role = User.Role.ADMIN
-    user.set_password(password)
-    user.save()
-print(f'==> ADMIN CREDENTIALS SYNCHRONIZED: username: {username} | email: {email} | password: {password}')
+    # Preserve user password! Never overwrite existing password on rebuilds.
+    if not user.is_staff or not user.is_superuser:
+        user.is_staff = True
+        user.is_superuser = True
+        user.save(update_fields=['is_staff', 'is_superuser'])
+    print(f'==> Superuser {user.email} already exists. Existing password preserved.')
 "
