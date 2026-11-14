@@ -190,3 +190,57 @@ class ResetPasswordView(APIView):
             'success': True,
             'message': 'Your password has been reset successfully. You can now sign in.'
         }, status=status.HTTP_200_OK)
+
+
+class BootstrapAdminView(APIView):
+    """
+    Initial admin bootstrap endpoint.
+    If no superuser exists in the database, allows initializing the first admin account.
+    Once any superuser exists, this endpoint is permanently disabled.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        has_admin = User.objects.filter(is_superuser=True).exists()
+        if has_admin:
+            return Response({
+                'success': True,
+                'status': 'configured',
+                'message': 'Admin account already exists. Please log in at /admin/ or through the CRM app.'
+            })
+        return Response({
+            'success': False,
+            'status': 'uninitialized',
+            'message': 'No admin account found. POST {"email": "...", "password": "..."} to create the initial admin account.'
+        })
+
+    def post(self, request):
+        if User.objects.filter(is_superuser=True).exists():
+            return Response({
+                'success': False,
+                'message': 'Initial setup has already been completed. Admin account exists.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        email = request.data.get('email', '').strip()
+        password = request.data.get('password', '').strip()
+        first_name = request.data.get('first_name', 'Admin').strip()
+        last_name = request.data.get('last_name', 'User').strip()
+
+        if not email or not password:
+            return Response({
+                'success': False,
+                'message': 'Both email and password are required.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        user = User.objects.create_superuser(
+            email=email,
+            password=password,
+            first_name=first_name,
+            last_name=last_name
+        )
+        return Response({
+            'success': True,
+            'message': f'Admin account {user.email} created successfully. You can now log in at /admin/ or through the CRM.',
+            'data': {'email': user.email}
+        }, status=status.HTTP_201_CREATED)
+
