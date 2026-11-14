@@ -157,17 +157,18 @@ STORAGES = {
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# CORS
-CORS_ALLOW_ALL_ORIGINS = DEBUG
+# CORS - Enable cross-origin requests for decoupled frontend, test portals, and public forms
+CORS_ALLOW_ALL_ORIGINS = True
 cors_origins_env = os.getenv(
     'CORS_ALLOWED_ORIGINS',
     'http://localhost:5173,http://127.0.0.1:5173,http://localhost:5174,http://127.0.0.1:5174,http://localhost:5175,http://127.0.0.1:5175,http://192.168.1.54:5173,http://192.168.1.54:5174'
 )
-CORS_ALLOWED_ORIGINS = [orig.strip() for orig in cors_origins_env.split(',') if orig.strip()]
+CORS_ALLOWED_ORIGINS = [orig.strip() for orig in cors_origins_env.split(',') if orig.strip()] + ['null']
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^http://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+)(:\d+)?$",
     r"^https:\/\/.*\.vercel\.app$",
     r"^https:\/\/.*\.onrender\.com$",
+    r"^null$",
 ]
 CORS_ALLOW_CREDENTIALS = True
 from corsheaders.defaults import default_headers
