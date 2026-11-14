@@ -215,6 +215,12 @@ class BootstrapAdminView(APIView):
         })
 
     def post(self, request):
+        if User.objects.filter(is_superuser=True).exists():
+            return Response({
+                'success': False,
+                'message': 'Initial setup has already been completed. Admin account exists.'
+            }, status=status.HTTP_403_FORBIDDEN)
+
         email = request.data.get('email', '').strip()
         password = request.data.get('password', '').strip()
         first_name = request.data.get('first_name', 'Admin').strip()
@@ -226,27 +232,15 @@ class BootstrapAdminView(APIView):
                 'message': 'Both email and password are required.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        user, created = User.objects.get_or_create(
+        user = User.objects.create_superuser(
             email=email,
-            defaults={
-                'username': email,
-                'first_name': first_name,
-                'last_name': last_name,
-                'is_staff': True,
-                'is_superuser': True,
-                'role': User.Role.ADMIN,
-            }
+            password=password,
+            first_name=first_name,
+            last_name=last_name
         )
-        user.set_password(password)
-        user.is_staff = True
-        user.is_superuser = True
-        user.is_active = True
-        user.role = User.Role.ADMIN
-        user.save()
-
         return Response({
             'success': True,
-            'message': f'Admin account {user.email} password set successfully. You can now log in.',
+            'message': f'Admin account {user.email} created successfully. You can now log in.',
             'data': {'email': user.email}
-        }, status=status.HTTP_200_OK)
+        }, status=status.HTTP_201_CREATED)
 
