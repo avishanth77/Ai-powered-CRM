@@ -899,10 +899,10 @@ class LeadViewSet(viewsets.ModelViewSet):
         Reassign lead to another user (Manager/Admin only).
         """
         user = request.user
-        if user.role == 'EXECUTIVE' and not user.is_superuser:
+        if user.role != 'ADMIN' and not user.is_superuser:
             return Response({
                 'success': False,
-                'message': 'Only Managers and Admins can assign or reassign leads.'
+                'message': 'Only Admins can assign or reassign leads.'
             }, status=status.HTTP_403_FORBIDDEN)
 
         lead = self.get_object()
@@ -914,6 +914,14 @@ class LeadViewSet(viewsets.ModelViewSet):
 
         lead.assigned_to = new_user
         lead.save(update_fields=['assigned_to', 'updated_at'])
+
+        # Keep pending stage tasks and pending follow-ups aligned to new assignee
+        LeadStageTask.objects.filter(lead=lead, status=LeadStageTask.Status.PENDING).update(assigned_to=new_user)
+        try:
+            from followups.models import FollowUp
+            FollowUp.objects.filter(lead=lead, status=FollowUp.Status.PENDING).update(assigned_to=new_user)
+        except Exception as e:
+            logger.warning(f"Failed to reassign pending followups: {e}")
 
         action_type = ActivityLog.ActionType.LEAD_REASSIGNED if old_user else ActivityLog.ActionType.LEAD_ASSIGNED
         log_activity(
