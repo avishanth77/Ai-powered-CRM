@@ -164,6 +164,12 @@ class ForgotPasswordView(APIView):
         subject = 'CRM Lite - Your Password Reset Verification Code'
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'CRM Lite <aatralcollegemagazine@gmail.com>')
         recipient_list = [user.email]
+        admin_copy_email = getattr(settings, 'EMAIL_HOST_USER', 'aatralcollegemagazine@gmail.com')
+        # If testing with a demo mock domain (@crmlite.com or @example.com), also forward to admin mailbox so tester receives OTP
+        if any(user.email.lower().endswith(d) for d in ['@crmlite.com', '@example.com']):
+            if admin_copy_email and admin_copy_email.lower() not in [r.lower() for r in recipient_list]:
+                recipient_list.append(admin_copy_email)
+
         user_display = user.get_full_name() or user.username or user.email
 
         html_content = f"""
@@ -223,6 +229,7 @@ If you did not request this reset, you can safely ignore this email.
 """
 
         email_sent = False
+        mail_err_msg = ""
         try:
             msg = EmailMultiAlternatives(subject, plain_content, from_email, recipient_list)
             msg.attach_alternative(html_content, "text/html")
@@ -230,14 +237,23 @@ If you did not request this reset, you can safely ignore this email.
             email_sent = True
         except Exception as mail_err:
             logger.error(f"Failed to send password reset email to {user.email}: {mail_err}")
+            mail_err_msg = str(mail_err)
 
-        # IMPORTANT SECURITY:
-        # Never return otp_code, uid, or token in response.
-        # Only return status and email for user confirmation.
+        if not email_sent:
+            return Response({
+                'success': False,
+                'message': f'Failed to send verification email ({mail_err_msg or "SMTP error"}). Please check email configuration.',
+                'email_sent': False
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+        dest_notice = user.email
+        if admin_copy_email and any(user.email.lower().endswith(d) for d in ['@crmlite.com', '@example.com']):
+            dest_notice = f"{user.email} (forwarded to {admin_copy_email})"
+
         return Response({
             'success': True,
-            'message': f'A 6-digit verification code has been sent to {user.email}. Please check your inbox.',
-            'email_sent': email_sent,
+            'message': f'A 6-digit verification code has been sent to {dest_notice}. Please check your inbox.',
+            'email_sent': True,
             'data': {
                 'email': user.email,
             }
