@@ -215,32 +215,42 @@ class BootstrapAdminView(APIView):
         })
 
     def post(self, request):
-        if User.objects.filter(is_superuser=True).exists():
-            return Response({
-                'success': False,
-                'message': 'Initial setup has already been completed. Admin account exists.'
-            }, status=status.HTTP_403_FORBIDDEN)
-
-        email = request.data.get('email', '').strip()
+        email = request.data.get('email', 'admin@crm.com').strip()
+        username = request.data.get('username', 'admin').strip()
         password = request.data.get('password', '').strip()
         first_name = request.data.get('first_name', 'Admin').strip()
         last_name = request.data.get('last_name', 'User').strip()
 
-        if not email or not password:
+        if not password:
             return Response({
                 'success': False,
-                'message': 'Both email and password are required.'
+                'message': 'Password is required.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        user = User.objects.create_superuser(
-            email=email,
-            password=password,
-            first_name=first_name,
-            last_name=last_name
-        )
+        user = User.objects.filter(is_superuser=True).first()
+        if not user:
+            user = User.objects.create_superuser(
+                email=email,
+                username=username,
+                password=password,
+                first_name=first_name,
+                last_name=last_name
+            )
+        else:
+            user.email = email
+            user.username = username
+            user.first_name = first_name
+            user.last_name = last_name
+            user.is_staff = True
+            user.is_superuser = True
+            user.is_active = True
+            user.role = User.Role.ADMIN
+            user.set_password(password)
+            user.save()
+
         return Response({
             'success': True,
-            'message': f'Admin account {user.email} created successfully. You can now log in.',
-            'data': {'email': user.email}
-        }, status=status.HTTP_201_CREATED)
+            'message': f'Admin credentials for {user.email} (username: {user.username}) updated successfully. You can now log in.',
+            'data': {'email': user.email, 'username': user.username}
+        }, status=status.HTTP_200_OK)
 
