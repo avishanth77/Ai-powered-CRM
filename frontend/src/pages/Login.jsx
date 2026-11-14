@@ -76,7 +76,7 @@ export const Login = () => {
         setResetTokenData({ uid: res.data.uid, token: res.data.token });
       }
       setForgotStep(2);
-      showToast('Verification token generated. Please enter your new password.', 'info');
+      showToast(`Password reset email sent to ${resetEmail.trim()}! Please check your inbox.`, 'success');
     } catch (err) {
       setResetError(extractErrorMessage(err, 'Could not find an account with that email.'));
     } finally {
@@ -261,8 +261,8 @@ export const Login = () => {
             <div className="modal-body">
               <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
                 {forgotStep === 1
-                  ? 'Enter the email address registered with your CRM account to initiate a secure password reset.'
-                  : `Enter and confirm a new password for ${resetEmail}.`}
+                  ? 'Enter the email address registered with your CRM account. We will send a secure password reset email directly to your inbox.'
+                  : `A reset verification email has been sent to ${resetEmail}. Enter your new password below to complete the reset.`}
               </p>
 
               {resetError && (
@@ -304,7 +304,7 @@ export const Login = () => {
                       className="btn btn-primary"
                       disabled={resetLoading || !resetEmail.trim()}
                     >
-                      {resetLoading ? 'Validating...' : 'Continue'}
+                      {resetLoading ? 'Sending email...' : 'Send Reset Email'}
                     </button>
                   </div>
                 </form>

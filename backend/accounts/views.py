@@ -1,3 +1,6 @@
+import logging
+from django.conf import settings
+from django.core.mail import EmailMultiAlternatives
 from rest_framework import generics, viewsets, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -8,6 +11,8 @@ from django.contrib.auth.tokens import default_token_generator
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from drf_spectacular.utils import extend_schema, OpenApiParameter
+
+logger = logging.getLogger(__name__)
 
 from .serializers import (
     CustomTokenObtainPairSerializer,
@@ -130,7 +135,7 @@ class ChangePasswordView(APIView):
 
 
 class ForgotPasswordView(APIView):
-    """Generates password reset token for a registered email address."""
+    """Generates password reset token and dispatches an email to the user."""
     permission_classes = [permissions.AllowAny]
 
     @extend_schema(request=ForgotPasswordSerializer, responses={200: dict})
@@ -138,15 +143,88 @@ class ForgotPasswordView(APIView):
         serializer = ForgotPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        email = serializer.validated_data['email']
-        user = User.objects.get(email__iexact=email)
+        email = serializer.validated_data['email'].strip()
+        user = User.objects.filter(email__iexact=email).first()
+
+        if not user:
+            return Response({
+                'success': False,
+                'message': 'No registered account found with that email address.'
+            }, status=status.HTTP_404_NOT_FOUND)
 
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         token = default_token_generator.make_token(user)
 
+        subject = 'CRM Lite - Password Reset Request'
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'CRM Lite <aatralcollegemagazine@gmail.com>')
+        recipient_list = [user.email]
+        user_display = user.get_full_name() or user.username or user.email
+
+        html_content = f"""
+        <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
+            <div style="text-align: center; margin-bottom: 28px;">
+                <div style="display: inline-block; background: #2563eb; color: #ffffff; font-weight: bold; font-size: 14px; padding: 6px 14px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase;">
+                    CRM Lite
+                </div>
+                <h2 style="color: #0f172a; margin: 16px 0 6px 0; font-size: 22px;">Password Reset Request</h2>
+                <p style="color: #64748b; font-size: 14px; margin: 0;">Follow the instructions below to reset your password.</p>
+            </div>
+
+            <p style="color: #334155; font-size: 15px; line-height: 1.6;">
+                Hello <strong>{user_display}</strong>,
+            </p>
+            <p style="color: #334155; font-size: 14px; line-height: 1.6;">
+                We received a request to reset the password for your CRM Lite account (<strong>{user.email}</strong>).
+            </p>
+
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin: 24px 0; text-align: center;">
+                <div style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px;">
+                    Your Security Verification Token
+                </div>
+                <div style="font-family: 'Courier New', Courier, monospace; font-size: 18px; font-weight: bold; color: #1e293b; background: #ffffff; border: 1px dashed #94a3b8; padding: 12px; border-radius: 6px; word-break: break-all;">
+                    {token}
+                </div>
+            </div>
+
+            <p style="color: #334155; font-size: 14px; line-height: 1.6;">
+                If you have the reset screen open in your browser, you can directly enter your new password now to complete the reset.
+            </p>
+
+            <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 28px 0;" />
+
+            <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0;">
+                If you did not request this password reset, please ignore this email. Your account credentials remain unchanged.
+            </p>
+        </div>
+        """
+
+        plain_content = f"""CRM Lite - Password Reset Request
+
+Hello {user_display},
+
+We received a request to reset the password for your CRM Lite account ({user.email}).
+
+Your Reset Verification Token:
+{token}
+
+If you have the reset screen open in your browser, you can directly enter your new password now.
+
+If you did not request this reset, you can safely ignore this email.
+"""
+
+        email_sent = False
+        try:
+            msg = EmailMultiAlternatives(subject, plain_content, from_email, recipient_list)
+            msg.attach_alternative(html_content, "text/html")
+            msg.send(fail_silently=False)
+            email_sent = True
+        except Exception as mail_err:
+            logger.error(f"Failed to send password reset email to {user.email}: {mail_err}")
+
         return Response({
             'success': True,
-            'message': 'Password reset verification code generated.',
+            'message': f'Password reset verification code sent to {user.email}. Please check your inbox.',
+            'email_sent': email_sent,
             'data': {
                 'uid': uid,
                 'token': token,
@@ -185,6 +263,16 @@ class ResetPasswordView(APIView):
 
         user.set_password(new_password)
         user.save()
+
+        # Send confirmation email
+        try:
+            confirm_subj = 'CRM Lite - Password Successfully Changed'
+            confirm_body = f"Hello {user.get_full_name() or user.username},\n\nYour CRM Lite account password was successfully updated.\n\nIf you did not make this change, please contact your system administrator immediately."
+            from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'CRM Lite <aatralcollegemagazine@gmail.com>')
+            msg = EmailMultiAlternatives(confirm_subj, confirm_body, from_email, [user.email])
+            msg.send(fail_silently=True)
+        except Exception:
+            pass
 
         return Response({
             'success': True,
