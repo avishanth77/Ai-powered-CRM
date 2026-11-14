@@ -162,13 +162,15 @@ class ForgotPasswordView(APIView):
         user.save(update_fields=['reset_otp', 'reset_otp_expires_at'])
 
         subject = 'CRM Lite - Your Password Reset Verification Code'
-        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'CRM Lite <aatralcollegemagazine@gmail.com>')
-        recipient_list = [user.email]
+        from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'CRM Lite <onboarding@resend.dev>')
         admin_copy_email = getattr(settings, 'EMAIL_HOST_USER', 'aatralcollegemagazine@gmail.com')
-        # If testing with a demo mock domain (@crmlite.com or @example.com), also forward to admin mailbox so tester receives OTP
+
+        # If testing with a demo mock domain (@crmlite.com or @example.com), route to the real admin mailbox
+        # so Resend test mode delivers successfully to the verified inbox instead of rejecting the fake domain.
         if any(user.email.lower().endswith(d) for d in ['@crmlite.com', '@example.com']):
-            if admin_copy_email and admin_copy_email.lower() not in [r.lower() for r in recipient_list]:
-                recipient_list.append(admin_copy_email)
+            recipient_list = [admin_copy_email]
+        else:
+            recipient_list = [user.email]
 
         user_display = user.get_full_name() or user.username or user.email
 

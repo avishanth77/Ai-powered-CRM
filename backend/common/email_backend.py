@@ -3,6 +3,7 @@ Custom Email Backend for CRM Lite with Resend HTTPS API support.
 Bypasses cloud firewall restrictions on outbound SMTP ports (25, 465, 587) on platforms like Render.
 """
 import logging
+import os
 import requests
 from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
@@ -19,8 +20,8 @@ class ResendEmailBackend(BaseEmailBackend):
 
     def __init__(self, fail_silently=False, **kwargs):
         super().__init__(fail_silently=fail_silently, **kwargs)
-        self.api_key = getattr(settings, 'RESEND_API_KEY', '').strip()
-        self.resend_from = getattr(settings, 'RESEND_FROM_EMAIL', 'CRM Lite <onboarding@resend.dev>').strip()
+        self.api_key = (getattr(settings, 'RESEND_API_KEY', '') or os.environ.get('RESEND_API_KEY', '')).strip()
+        self.resend_from = (getattr(settings, 'RESEND_FROM_EMAIL', '') or os.environ.get('RESEND_FROM_EMAIL', 'CRM Lite <onboarding@resend.dev>')).strip()
         # Initialize standard SMTP backend as fallback
         self.smtp_fallback = SmtpEmailBackend(fail_silently=fail_silently, **kwargs)
 
@@ -28,10 +29,35 @@ class ResendEmailBackend(BaseEmailBackend):
         if not email_messages:
             return 0
 
-        # If Resend API key is not configured, delegate to standard SMTP backend
+        # Dynamically refresh key if not yet set
         if not self.api_key:
-            logger.debug("RESEND_API_KEY not configured; falling back to SMTP EmailBackend.")
-            return self.smtp_fallback.send_messages(email_messages)
+            self.api_key = (getattr(settings, 'RESEND_API_KEY', '') or os.environ.get('RESEND_API_KEY', '')).strip()
+
+        # If Resend API key is not configured:
+        if not self.api_key:
+            is_render = getattr(settings, 'IS_RENDER', False) or os.environ.get('RENDER', '').lower() in ('true', '1')
+            if is_render:
+                err_msg = (
+                    "RESEND_API_KEY is missing from Render Environment Variables. "
+                    "Render blocks SMTP port 587 on its free tier. "
+                    "Please add RESEND_API_KEY in Render Dashboard -> Environment to send emails."
+                )
+                logger.error(err_msg)
+                if not self.fail_silently:
+                    raise RuntimeError(err_msg)
+                return 0
+
+            logger.debug("RESEND_API_KEY not configured; attempting fallback to local SMTP EmailBackend.")
+            try:
+                return self.smtp_fallback.send_messages(email_messages)
+            except OSError as err:
+                err_str = str(err)
+                if '101' in err_str or 'unreachable' in err_str.lower() or 'timed out' in err_str.lower():
+                    raise RuntimeError(
+                        "SMTP Port 587 is blocked by firewall (Errno 101). "
+                        "Please set RESEND_API_KEY to send emails via HTTPS port 443."
+                    ) from err
+                raise
 
         num_sent = 0
         endpoint = "https://api.resend.com/emails"

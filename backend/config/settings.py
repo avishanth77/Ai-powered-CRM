@@ -261,15 +261,23 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'aatralcollegemagazine@gmail.com'
 raw_email_password = os.getenv('EMAIL_HOST_PASSWORD', 'lmzz efbn ytkj cfso')
 EMAIL_HOST_PASSWORD = raw_email_password.replace(' ', '') if raw_email_password else ''
 
-# Resend HTTPS backend sends via Port 443 (bypassing Render's SMTP port 587 block).
-# If RESEND_API_KEY is not set, it automatically falls back to SMTP.
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'common.email_backend.ResendEmailBackend')
+IS_RENDER = os.getenv('RENDER', '').lower() in ('true', '1')
+
+# CRITICAL FIX FOR RENDER:
+# Render blocks outbound SMTP ports 25, 465, and 587 on its free tier.
+# Therefore, on Render or when RESEND_API_KEY is provided, ALWAYS use ResendEmailBackend.
+# Do NOT allow an env var 'EMAIL_BACKEND=...smtp...' to force blocked SMTP on Render.
+if RESEND_API_KEY or IS_RENDER:
+    EMAIL_BACKEND = 'common.email_backend.ResendEmailBackend'
+else:
+    EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'common.email_backend.ResendEmailBackend')
+
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 't')
 EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('true', '1', 't')
 EMAIL_TIMEOUT = int(os.getenv('EMAIL_TIMEOUT', 15))
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', RESEND_FROM_EMAIL if RESEND_API_KEY else f'CRM Lite <{EMAIL_HOST_USER}>')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', RESEND_FROM_EMAIL if (RESEND_API_KEY or IS_RENDER) else f'CRM Lite <{EMAIL_HOST_USER}>')
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
 
 # ==============================================================================
