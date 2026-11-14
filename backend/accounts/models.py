@@ -40,6 +40,8 @@ class User(AbstractUser):
     email = models.EmailField('email address', unique=True, db_index=True)
     phone = models.CharField(max_length=25, blank=True, null=True, db_index=True)
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.EXECUTIVE, db_index=True)
+    reset_otp = models.CharField(max_length=10, blank=True, null=True)
+    reset_otp_expires_at = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

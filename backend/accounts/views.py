@@ -1,4 +1,7 @@
 import logging
+import random
+from datetime import timedelta
+from django.utils import timezone
 from django.conf import settings
 from django.core.mail import EmailMultiAlternatives
 from rest_framework import generics, viewsets, status, permissions
@@ -135,7 +138,7 @@ class ChangePasswordView(APIView):
 
 
 class ForgotPasswordView(APIView):
-    """Generates password reset token and dispatches an email to the user."""
+    """Generates password reset 6-digit OTP code and dispatches an email to the user."""
     permission_classes = [permissions.AllowAny]
 
     @extend_schema(request=ForgotPasswordSerializer, responses={200: dict})
@@ -152,10 +155,13 @@ class ForgotPasswordView(APIView):
                 'message': 'No registered account found with that email address.'
             }, status=status.HTTP_404_NOT_FOUND)
 
-        uid = urlsafe_base64_encode(force_bytes(user.pk))
-        token = default_token_generator.make_token(user)
+        # Generate 6-digit OTP and set 15 min expiry
+        otp_code = f"{random.randint(100000, 999999)}"
+        user.reset_otp = otp_code
+        user.reset_otp_expires_at = timezone.now() + timedelta(minutes=15)
+        user.save(update_fields=['reset_otp', 'reset_otp_expires_at'])
 
-        subject = 'CRM Lite - Password Reset Request'
+        subject = 'CRM Lite - Your Password Reset Verification Code'
         from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'CRM Lite <aatralcollegemagazine@gmail.com>')
         recipient_list = [user.email]
         user_display = user.get_full_name() or user.username or user.email
@@ -164,10 +170,10 @@ class ForgotPasswordView(APIView):
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 580px; margin: 0 auto; padding: 32px 24px; background: #ffffff; border: 1px solid #e2e8f0; border-radius: 12px;">
             <div style="text-align: center; margin-bottom: 28px;">
                 <div style="display: inline-block; background: #2563eb; color: #ffffff; font-weight: bold; font-size: 14px; padding: 6px 14px; border-radius: 20px; letter-spacing: 0.5px; text-transform: uppercase;">
-                    CRM Lite
+                    CRM Lite Security
                 </div>
-                <h2 style="color: #0f172a; margin: 16px 0 6px 0; font-size: 22px;">Password Reset Request</h2>
-                <p style="color: #64748b; font-size: 14px; margin: 0;">Follow the instructions below to reset your password.</p>
+                <h2 style="color: #0f172a; margin: 16px 0 6px 0; font-size: 22px;">Password Reset Code</h2>
+                <p style="color: #64748b; font-size: 14px; margin: 0;">Use the 6-digit verification code below to reset your password.</p>
             </div>
 
             <p style="color: #334155; font-size: 15px; line-height: 1.6;">
@@ -177,37 +183,41 @@ class ForgotPasswordView(APIView):
                 We received a request to reset the password for your CRM Lite account (<strong>{user.email}</strong>).
             </p>
 
-            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 20px; margin: 24px 0; text-align: center;">
-                <div style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 8px;">
-                    Your Security Verification Token
+            <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; padding: 24px; margin: 24px 0; text-align: center;">
+                <div style="font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px; color: #64748b; margin-bottom: 10px;">
+                    Your 6-Digit Verification Code
                 </div>
-                <div style="font-family: 'Courier New', Courier, monospace; font-size: 18px; font-weight: bold; color: #1e293b; background: #ffffff; border: 1px dashed #94a3b8; padding: 12px; border-radius: 6px; word-break: break-all;">
-                    {token}
+                <div style="font-family: 'Courier New', Courier, monospace; font-size: 32px; font-weight: 800; letter-spacing: 8px; color: #2563eb; background: #ffffff; border: 2px dashed #93c5fd; padding: 14px; border-radius: 8px; display: inline-block; min-width: 220px;">
+                    {otp_code}
+                </div>
+                <div style="color: #64748b; font-size: 13px; margin-top: 12px;">
+                    Valid for <strong>15 minutes</strong>. Do not share this code with anyone.
                 </div>
             </div>
 
             <p style="color: #334155; font-size: 14px; line-height: 1.6;">
-                If you have the reset screen open in your browser, you can directly enter your new password now to complete the reset.
+                Enter this 6-digit verification code in the CRM login window along with your new password to complete the reset.
             </p>
 
             <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 28px 0;" />
 
             <p style="color: #94a3b8; font-size: 12px; line-height: 1.5; margin: 0;">
-                If you did not request this password reset, please ignore this email. Your account credentials remain unchanged.
+                If you did not request this password reset, please ignore this email. Your password will not change unless this code is provided.
             </p>
         </div>
         """
 
-        plain_content = f"""CRM Lite - Password Reset Request
+        plain_content = f"""CRM Lite - Password Reset Verification Code
 
 Hello {user_display},
 
 We received a request to reset the password for your CRM Lite account ({user.email}).
 
-Your Reset Verification Token:
-{token}
+Your 6-Digit Verification Code is:
+{otp_code}
 
-If you have the reset screen open in your browser, you can directly enter your new password now.
+This code is valid for 15 minutes.
+Enter this code in your CRM login window to set a new password.
 
 If you did not request this reset, you can safely ignore this email.
 """
@@ -221,20 +231,21 @@ If you did not request this reset, you can safely ignore this email.
         except Exception as mail_err:
             logger.error(f"Failed to send password reset email to {user.email}: {mail_err}")
 
+        # IMPORTANT SECURITY:
+        # Never return otp_code, uid, or token in response.
+        # Only return status and email for user confirmation.
         return Response({
             'success': True,
-            'message': f'Password reset verification code sent to {user.email}. Please check your inbox.',
+            'message': f'A 6-digit verification code has been sent to {user.email}. Please check your inbox.',
             'email_sent': email_sent,
             'data': {
-                'uid': uid,
-                'token': token,
                 'email': user.email,
             }
         }, status=status.HTTP_200_OK)
 
 
 class ResetPasswordView(APIView):
-    """Verifies token and resets user password."""
+    """Verifies 6-digit code (or token) and resets user password."""
     permission_classes = [permissions.AllowAny]
 
     @extend_schema(request=ResetPasswordSerializer, responses={200: dict})
@@ -242,37 +253,76 @@ class ResetPasswordView(APIView):
         serializer = ResetPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        uid = serializer.validated_data['uid']
-        token = serializer.validated_data['token']
+        code = serializer.validated_data.get('code', '').strip()
+        email = serializer.validated_data.get('email', '').strip()
+        uid = serializer.validated_data.get('uid', '').strip()
+        token = serializer.validated_data.get('token', '').strip()
         new_password = serializer.validated_data['new_password']
 
-        try:
-            user_id = force_str(urlsafe_base64_decode(uid))
-            user = User.objects.get(pk=user_id)
-        except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+        # Primary authentication: 6-digit verification code + email
+        if code and email:
+            user = User.objects.filter(email__iexact=email).first()
+            if not user or not user.reset_otp:
+                return Response({
+                    'success': False,
+                    'message': 'Invalid verification request or no code pending for this email.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if user.reset_otp != code:
+                return Response({
+                    'success': False,
+                    'message': 'Invalid verification code. Please check your email and try again.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if user.reset_otp_expires_at and timezone.now() > user.reset_otp_expires_at:
+                return Response({
+                    'success': False,
+                    'message': 'Verification code has expired (15-minute limit). Please request a new one.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+        # Fallback / Link-based authentication: uid + token
+        elif uid and token:
+            try:
+                user_id = force_str(urlsafe_base64_decode(uid))
+                user = User.objects.get(pk=user_id)
+            except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+                return Response({
+                    'success': False,
+                    'message': 'Invalid reset link or user not found.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            if not default_token_generator.check_token(user, token):
+                return Response({
+                    'success': False,
+                    'message': 'Password reset token has expired or is invalid.'
+                }, status=status.HTTP_400_BAD_REQUEST)
+        else:
             return Response({
                 'success': False,
-                'message': 'Invalid reset link or user not found.'
+                'message': 'Please provide the 6-digit verification code and your email address.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        if not default_token_generator.check_token(user, token):
-            return Response({
-                'success': False,
-                'message': 'Password reset token has expired or is invalid.'
-            }, status=status.HTTP_400_BAD_REQUEST)
-
+        # Update password and invalidate OTP code
         user.set_password(new_password)
+        user.reset_otp = None
+        user.reset_otp_expires_at = None
         user.save()
 
         # Send confirmation email
         try:
             confirm_subj = 'CRM Lite - Password Successfully Changed'
-            confirm_body = f"Hello {user.get_full_name() or user.username},\n\nYour CRM Lite account password was successfully updated.\n\nIf you did not make this change, please contact your system administrator immediately."
+            confirm_body = (
+                f"Hello {user.get_full_name() or user.username},\n\n"
+                "Your CRM Lite account password was successfully updated.\n\n"
+                "If you did not make this change, please contact your system administrator immediately."
+            )
             from_email = getattr(settings, 'DEFAULT_FROM_EMAIL', 'CRM Lite <aatralcollegemagazine@gmail.com>')
             msg = EmailMultiAlternatives(confirm_subj, confirm_body, from_email, [user.email])
             msg.send(fail_silently=True)
-        except Exception:
-            pass
+        except Exception as mail_err:
+            logger.warning(f"Could not send password change confirmation: {mail_err}")
 
         return Response({
             'success': True,

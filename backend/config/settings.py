@@ -252,23 +252,19 @@ SPECTACULAR_SETTINGS = {
 }
 
 # ==============================================================================
-# EMAIL CONFIGURATION (SMTP Enabled)
+# EMAIL CONFIGURATION
 # ==============================================================================
+# Default is console backend (safe for development, prints emails to terminal).
+# To send real emails, set EMAIL_BACKEND to smtp and provide credentials in .env:
+# EMAIL_BACKEND = django.core.mail.backends.smtp.EmailBackend
+EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
 EMAIL_HOST = os.getenv('EMAIL_HOST', 'smtp.gmail.com')
 EMAIL_PORT = int(os.getenv('EMAIL_PORT', 587))
 EMAIL_USE_TLS = os.getenv('EMAIL_USE_TLS', 'True').lower() in ('true', '1', 't')
 EMAIL_USE_SSL = os.getenv('EMAIL_USE_SSL', 'False').lower() in ('true', '1', 't')
-EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', 'aatralcollegemagazine@gmail.com')
-EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', 'lmzz efbn ytkj cfso')
-DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', f"CRM Lite <{EMAIL_HOST_USER}>")
-
-# Automatically use SMTP backend if credentials are provided, fallback to console
-default_email_backend = (
-    'django.core.mail.backends.smtp.EmailBackend'
-    if EMAIL_HOST_USER and EMAIL_HOST_PASSWORD
-    else 'django.core.mail.backends.console.EmailBackend'
-)
-EMAIL_BACKEND = os.getenv('EMAIL_BACKEND', default_email_backend)
+EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD', '')
+DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER )
 
 # ==============================================================================
 # AI SERVICE CONFIGURATION

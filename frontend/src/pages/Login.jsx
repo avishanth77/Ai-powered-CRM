@@ -17,6 +17,7 @@ export const Login = () => {
   const [forgotModalOpen, setForgotModalOpen] = useState(false);
   const [forgotStep, setForgotStep] = useState(1); // 1: request code, 2: set new password
   const [resetEmail, setResetEmail] = useState('');
+  const [resetCode, setResetCode] = useState('');
   const [resetTokenData, setResetTokenData] = useState({ uid: '', token: '' });
   const [newPassword, setNewPassword] = useState('');
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
@@ -73,10 +74,11 @@ export const Login = () => {
     try {
       const res = await authApi.forgotPassword(resetEmail.trim());
       if (res.data) {
-        setResetTokenData({ uid: res.data.uid, token: res.data.token });
+        setResetTokenData({ uid: res.data.uid || '', token: res.data.token || '' });
       }
+      setResetCode('');
       setForgotStep(2);
-      showToast(`Password reset email sent to ${resetEmail.trim()}! Please check your inbox.`, 'success');
+      showToast(res.message || `Password reset code sent to ${resetEmail.trim()}! Please check your inbox.`, 'success');
     } catch (err) {
       setResetError(extractErrorMessage(err, 'Could not find an account with that email.'));
     } finally {
@@ -86,6 +88,10 @@ export const Login = () => {
 
   const handleResetSubmit = async (e) => {
     e.preventDefault();
+    if (!resetCode.trim()) {
+      setResetError('Please enter the 6-digit verification code sent to your email.');
+      return;
+    }
     if (newPassword !== confirmNewPassword) {
       setResetError('Passwords do not match.');
       return;
@@ -97,22 +103,28 @@ export const Login = () => {
     setResetLoading(true);
     setResetError('');
     try {
-      const res = await authApi.resetPassword({
-        uid: resetTokenData.uid,
-        token: resetTokenData.token,
+      const payload = {
+        email: resetEmail.trim(),
+        code: resetCode.trim(),
         new_password: newPassword,
         confirm_new_password: confirmNewPassword,
-      });
+      };
+      if (resetTokenData.uid && resetTokenData.token) {
+        payload.uid = resetTokenData.uid;
+        payload.token = resetTokenData.token;
+      }
+      const res = await authApi.resetPassword(payload);
       showToast(res.message || 'Password reset successfully! You can now log in.', 'success');
       setEmail(resetEmail);
       setPassword('');
       setForgotModalOpen(false);
       setForgotStep(1);
       setResetEmail('');
+      setResetCode('');
       setNewPassword('');
       setConfirmNewPassword('');
     } catch (err) {
-      setResetError(extractErrorMessage(err, 'Failed to reset password.'));
+      setResetError(extractErrorMessage(err, 'Failed to reset password. Please verify the code and try again.'));
     } finally {
       setResetLoading(false);
     }
@@ -261,8 +273,8 @@ export const Login = () => {
             <div className="modal-body">
               <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '1.25rem' }}>
                 {forgotStep === 1
-                  ? 'Enter the email address registered with your CRM account. We will send a secure password reset email directly to your inbox.'
-                  : `A reset verification email has been sent to ${resetEmail}. Enter your new password below to complete the reset.`}
+                  ? 'Enter the email address registered with your CRM account. We will send a secure 6-digit verification code directly to your inbox.'
+                  : `A 6-digit verification code has been sent to ${resetEmail}. Enter the code and your new password below.`}
               </p>
 
               {resetError && (
@@ -304,12 +316,34 @@ export const Login = () => {
                       className="btn btn-primary"
                       disabled={resetLoading || !resetEmail.trim()}
                     >
-                      {resetLoading ? 'Sending email...' : 'Send Reset Email'}
+                      {resetLoading ? 'Sending code...' : 'Send Verification Code'}
                     </button>
                   </div>
                 </form>
               ) : (
                 <form onSubmit={handleResetSubmit} className="form-layout">
+                  <div className="form-group">
+                    <label className="form-label" htmlFor="reset-code">6-Digit Verification Code</label>
+                    <div className="search-bar-container" style={{ width: '100%' }}>
+                      <KeyRound size={18} className="search-icon" />
+                      <input
+                        id="reset-code"
+                        type="text"
+                        className="search-input"
+                        placeholder="e.g. 123456"
+                        value={resetCode}
+                        onChange={(e) => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                        maxLength={6}
+                        required
+                        autoFocus
+                        style={{ letterSpacing: '4px', fontWeight: 'bold' }}
+                      />
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '4px', display: 'block' }}>
+                      Check your email ({resetEmail}) for the 6-digit code. Valid for 15 minutes.
+                    </span>
+                  </div>
+
                   <div className="form-group">
                     <label className="form-label" htmlFor="reset-new-password">New Password</label>
                     <div className="search-bar-container" style={{ width: '100%' }}>
@@ -323,7 +357,6 @@ export const Login = () => {
                         onChange={(e) => setNewPassword(e.target.value)}
                         required
                         minLength={6}
-                        autoFocus
                       />
                     </div>
                   </div>
@@ -356,7 +389,7 @@ export const Login = () => {
                     <button
                       type="submit"
                       className="btn btn-primary"
-                      disabled={resetLoading || !newPassword || !confirmNewPassword}
+                      disabled={resetLoading || resetCode.length < 6 || !newPassword || !confirmNewPassword}
                     >
                       {resetLoading ? 'Resetting...' : 'Reset Password'}
                     </button>

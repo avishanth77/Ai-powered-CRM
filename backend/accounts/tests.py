@@ -70,26 +70,45 @@ class AuthenticationTests(TestCase):
         self.assertFalse(response.data['success'])
 
     def test_forgot_and_reset_password_flow(self):
-        # 1. Request reset token
+        # 1. Request reset OTP (ensure no token/uid leaked in response)
         forgot_res = self.client.post('/api/auth/forgot-password/', {
             'email': 'testuser@crmlite.com'
         })
         self.assertEqual(forgot_res.status_code, status.HTTP_200_OK)
         self.assertTrue(forgot_res.data['success'])
-        uid = forgot_res.data['data']['uid']
-        token = forgot_res.data['data']['token']
+        self.assertNotIn('token', forgot_res.data.get('data', {}))
+        self.assertNotIn('uid', forgot_res.data.get('data', {}))
 
-        # 2. Reset password using uid and token
+        # 2. Verify OTP was set in database
+        self.user.refresh_from_db()
+        self.assertTrue(self.user.reset_otp)
+        self.assertEqual(len(self.user.reset_otp), 6)
+        otp = self.user.reset_otp
+
+        # 3. Test wrong code fails
+        wrong_code_res = self.client.post('/api/auth/reset-password/', {
+            'email': 'testuser@crmlite.com',
+            'code': '000000',
+            'new_password': 'ResetPassword@789',
+            'confirm_new_password': 'ResetPassword@789'
+        })
+        self.assertEqual(wrong_code_res.status_code, status.HTTP_400_BAD_REQUEST)
+
+        # 4. Reset password using valid 6-digit OTP code and email
         reset_res = self.client.post('/api/auth/reset-password/', {
-            'uid': uid,
-            'token': token,
+            'email': 'testuser@crmlite.com',
+            'code': otp,
             'new_password': 'ResetPassword@789',
             'confirm_new_password': 'ResetPassword@789'
         })
         self.assertEqual(reset_res.status_code, status.HTTP_200_OK)
         self.assertTrue(reset_res.data['success'])
 
-        # 3. Verify user can log in with reset password
+        # 5. Verify OTP was invalidated after reset
+        self.user.refresh_from_db()
+        self.assertIsNone(self.user.reset_otp)
+
+        # 6. Verify user can log in with new password
         login_res = self.client.post('/api/auth/login/', {
             'email': 'testuser@crmlite.com',
             'password': 'ResetPassword@789'

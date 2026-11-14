@@ -127,14 +127,22 @@ class ForgotPasswordSerializer(serializers.Serializer):
 
 
 class ResetPasswordSerializer(serializers.Serializer):
-    uid = serializers.CharField(required=True)
-    token = serializers.CharField(required=True)
+    email = serializers.EmailField(required=False)
+    code = serializers.CharField(required=False, allow_blank=True)
+    uid = serializers.CharField(required=False, allow_blank=True)
+    token = serializers.CharField(required=False, allow_blank=True)
     new_password = serializers.CharField(required=True, write_only=True, validators=[validate_password])
     confirm_new_password = serializers.CharField(required=True, write_only=True)
 
     def validate(self, attrs):
         if attrs['new_password'] != attrs['confirm_new_password']:
             raise serializers.ValidationError({'confirm_new_password': "Passwords do not match."})
+
+        has_code = bool(attrs.get('code') and attrs.get('email'))
+        has_token = bool(attrs.get('uid') and attrs.get('token'))
+        if not has_code and not has_token:
+            raise serializers.ValidationError({'code': "Verification code and account email are required."})
+
         return attrs
 
 
