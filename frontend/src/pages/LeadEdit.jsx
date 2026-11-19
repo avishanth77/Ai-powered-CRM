@@ -130,7 +130,7 @@ export const LeadEdit = () => {
         win_probability_override: leadRes.win_probability_override !== null && leadRes.win_probability_override !== undefined ? leadRes.win_probability_override : '',
         win_probability_reason: leadRes.win_probability_reason || '',
         product_ids: leadRes.product_ids || leadRes.products?.map((p) => p.id) || [],
-        product_items: leadRes.products?.map((p) => ({ product_id: p.id, quantity: p.quantity || 1 })) || [],
+        product_items: leadRes.products?.map((p) => ({ product_id: p.id, quantity: p.quantity || 1, unit_price: p.unit_price })) || [],
       };
       setFormData(loaded);
       setInitialData(loaded);
@@ -184,6 +184,59 @@ export const LeadEdit = () => {
         return next;
       });
     }
+  };
+
+  const handleProductPriceChange = (productId, newPrice) => {
+    const parsed = newPrice === '' ? 0 : Math.max(0, parseFloat(newPrice) || 0);
+    const updatedItems = (formData.product_items || []).map((item) => {
+      if (item.product_id === productId) {
+        return {
+          ...item,
+          unit_price: parsed,
+          is_custom: Math.abs(parsed - (item.default_price || 0)) > 0.001,
+        };
+      }
+      return item;
+    });
+
+    const newTotal = updatedItems.reduce(
+      (sum, item) => sum + (parseFloat(item.unit_price) || 0) * (item.quantity || 1),
+      0
+    );
+
+    setFormData((prev) => ({
+      ...prev,
+      product_items: updatedItems,
+      expected_value: Number(newTotal).toFixed(2),
+    }));
+
+    if (errors.expected_value) {
+      setErrors((prev) => ({ ...prev, expected_value: '' }));
+    }
+  };
+
+  const handleResetProductPrice = (productId) => {
+    const updatedItems = (formData.product_items || []).map((item) => {
+      if (item.product_id === productId) {
+        return {
+          ...item,
+          unit_price: item.default_price || 0,
+          is_custom: false,
+        };
+      }
+      return item;
+    });
+
+    const newTotal = updatedItems.reduce(
+      (sum, item) => sum + (parseFloat(item.unit_price) || 0) * (item.quantity || 1),
+      0
+    );
+
+    setFormData((prev) => ({
+      ...prev,
+      product_items: updatedItems,
+      expected_value: Number(newTotal).toFixed(2),
+    }));
   };
 
   const selectedStageObj = stages.find((s) => s.id === parseInt(formData.stage));
@@ -751,8 +804,158 @@ export const LeadEdit = () => {
               </div>
             </div>
 
-            <div className="form-group">
-              <label className="form-label" htmlFor="lead-value">Expected Deal Value (₹)</label>
+            <div className="form-group" style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <label className="form-label" htmlFor="lead-value" style={{ marginBottom: 0 }}>
+                  Expected Deal Value (₹)
+                </label>
+                {formData.product_items?.length > 0 && (
+                  <span
+                    style={{
+                      fontSize: '0.72rem',
+                      fontWeight: 600,
+                      color: 'var(--primary)',
+                      background: 'rgba(99, 102, 241, 0.1)',
+                      padding: '2px 8px',
+                      borderRadius: '12px',
+                    }}
+                  >
+                    {formData.product_items.length} Selected Product{formData.product_items.length > 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+
+              {/* Selected Products Breakdown: Default Price vs Changed Price */}
+              {formData.product_items?.length > 0 && (
+                <div
+                  style={{
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-md)',
+                    background: 'var(--bg-card-subtle, rgba(255,255,255,0.02))',
+                    padding: '0.65rem 0.75rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '0.5rem',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.71rem', color: 'var(--text-dim)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.35rem' }}>
+                    <span>Selected Products Pricing</span>
+                    <span>Default vs Changed</span>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.45rem' }}>
+                    {formData.product_items.map((item) => {
+                      const defPrice = parseFloat(item.default_price || 0);
+                      const curPrice = parseFloat(item.unit_price !== undefined ? item.unit_price : defPrice);
+                      const isCustom = Math.abs(curPrice - defPrice) > 0.001;
+                      const lineTotal = curPrice * (item.quantity || 1);
+
+                      return (
+                        <div
+                          key={item.product_id}
+                          style={{
+                            background: 'var(--bg-surface)',
+                            border: isCustom ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+                            borderRadius: 'var(--radius-sm)',
+                            padding: '0.55rem 0.65rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: '0.35rem',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 600, fontSize: '0.8125rem', color: 'var(--text-main)' }}>
+                              {item.name || `Product #${item.product_id}`} {item.code ? <span style={{ color: 'var(--text-dim)', fontSize: '0.7rem', fontWeight: 500 }}>({item.code})</span> : null}
+                            </span>
+                            <span style={{ fontSize: '0.77rem', fontWeight: 700, color: 'var(--primary)' }}>
+                              Subtotal: {formatCurrency(lineTotal)}
+                            </span>
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.3fr auto', gap: '0.65rem', alignItems: 'center' }}>
+                            {/* Default Price Column */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <span style={{ fontSize: '0.67rem', fontWeight: 600, color: 'var(--text-dim)' }}>
+                                Default Price:
+                              </span>
+                              <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--warning, #f59e0b)' }}>
+                                {formatCurrency(defPrice)}
+                              </span>
+                            </div>
+
+                            {/* Changed Price Column */}
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <span style={{ fontSize: '0.67rem', fontWeight: 600, color: isCustom ? 'var(--primary)' : 'var(--text-dim)' }}>
+                                  Changed Price (₹):
+                                </span>
+                                {isCustom && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleResetProductPrice(item.product_id)}
+                                    style={{
+                                      background: 'transparent',
+                                      border: 'none',
+                                      padding: 0,
+                                      fontSize: '0.65rem',
+                                      color: 'var(--text-dim)',
+                                      cursor: 'pointer',
+                                      textDecoration: 'underline',
+                                    }}
+                                    title="Reset to default price"
+                                  >
+                                    Reset
+                                  </button>
+                                )}
+                              </div>
+                              <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="form-control"
+                                value={item.unit_price !== undefined ? item.unit_price : defPrice}
+                                onChange={(e) => handleProductPriceChange(item.product_id, e.target.value)}
+                                style={{
+                                  padding: '2px 6px',
+                                  fontSize: '0.8rem',
+                                  fontWeight: 700,
+                                  height: '28px',
+                                  borderColor: isCustom ? 'var(--primary)' : undefined,
+                                  color: isCustom ? 'var(--primary)' : 'var(--text-main)',
+                                }}
+                                title="Change unit price for this lead"
+                              />
+                            </div>
+
+                            {/* Quantity Column */}
+                            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px' }}>
+                              <span style={{ fontSize: '0.67rem', fontWeight: 600, color: 'var(--text-dim)' }}>
+                                Qty:
+                              </span>
+                              <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)', padding: '2px 0' }}>
+                                x{item.quantity || 1}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Summary row */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '0.35rem', borderTop: '1px dashed var(--border-subtle)', fontSize: '0.73rem' }}>
+                    <span style={{ color: 'var(--text-dim)' }}>
+                      Catalog Default Total: <strong style={{ color: 'var(--text-muted)' }}>
+                        {formatCurrency(formData.product_items.reduce((sum, it) => sum + (parseFloat(it.default_price || 0) * (it.quantity || 1)), 0))}
+                      </strong>
+                    </span>
+                    <span style={{ color: 'var(--primary)', fontWeight: 700 }}>
+                      Effective Deal Total: {formatCurrency(formData.expected_value || 0)}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <input
                 id="lead-value"
                 name="expected_value"
@@ -801,13 +1004,26 @@ export const LeadEdit = () => {
           <ProductSelector
             selectedProductIds={formData.product_ids || []}
             productItems={formData.product_items || []}
-            onChange={(ids, items) =>
+            onChange={(ids, items, totalValue) => {
               setFormData((prev) => ({
                 ...prev,
                 product_ids: ids,
                 product_items: items,
-              }))
-            }
+                expected_value: totalValue !== undefined ? Number(totalValue).toFixed(2) : prev.expected_value,
+              }));
+              if (errors.expected_value) {
+                setErrors((prev) => ({ ...prev, expected_value: '' }));
+              }
+            }}
+            onTotalValueChange={(total) => {
+              setFormData((prev) => ({
+                ...prev,
+                expected_value: Number(total).toFixed(2),
+              }));
+              if (errors.expected_value) {
+                setErrors((prev) => ({ ...prev, expected_value: '' }));
+              }
+            }}
           />
         </div>
 
@@ -987,6 +1203,22 @@ export const LeadEdit = () => {
                 </span>
               )}
             </div>
+
+            {formData.product_items?.length > 0 && (
+              <div style={{ marginTop: '0.5rem', paddingTop: '0.5rem', borderTop: '1px dashed var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '0.25rem', fontSize: '0.72rem' }}>
+                <span style={{ color: 'var(--text-dim)', fontWeight: 600 }}>Selected Deal Items:</span>
+                {formData.product_items.map((it) => (
+                  <div key={it.product_id} style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px' }}>
+                      {it.name || `Product #${it.product_id}`} (x{it.quantity || 1})
+                    </span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)', flexShrink: 0 }}>
+                      {formatCurrency((parseFloat(it.unit_price) || 0) * (it.quantity || 1))}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem', marginTop: '1.25rem' }}>

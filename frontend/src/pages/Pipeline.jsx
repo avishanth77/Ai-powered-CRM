@@ -626,7 +626,7 @@ export const Pipeline = () => {
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.8125rem', color: 'var(--text-dim)' }}>
             <span>Cards/Page:</span>
             <select
-              className="pipeline-move-select"
+              className="pipeline-move-select pipeline-pager-select"
               value={cardsPerPage}
               onChange={(e) => setCardsPerPage(Number(e.target.value))}
               aria-label="Cards per column page"
@@ -877,7 +877,7 @@ export const Pipeline = () => {
                             {formatCurrency(lead.expected_value)}
                           </span>
 
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                          <div className="pipeline-card-actions">
                             <div
                               className="pipeline-assignee-avatar"
                               title={`Assigned to ${lead.assigned_to_details?.full_name || 'Unassigned'}`}
@@ -892,6 +892,7 @@ export const Pipeline = () => {
                               onChange={(e) => handleMoveStage(lead.id, e.target.value, currentLeadStageKey)}
                               onClick={(e) => e.stopPropagation()}
                               aria-label={`Move ${lead.name} to another stage`}
+                              title={lead.stage_details?.name ? `Current stage: ${lead.stage_details.name}. Change stage` : 'Move stage'}
                             >
                               <option value="" disabled>Move to...</option>
                               {allStages.map((s) => {
@@ -947,7 +948,7 @@ export const Pipeline = () => {
                               }}
                               title="Click to view stage tasks for this deal"
                             >
-                              {lead.stage_task_summary.completed_mandatory_tasks}/{lead.stage_task_summary.mandatory_tasks} Tasks →
+                              {(lead.stage_task_summary.mandatory_completed ?? lead.stage_task_summary.completed ?? 0)}/{(lead.stage_task_summary.mandatory_total ?? lead.stage_task_summary.total ?? 0)} Tasks →
                             </Link>
                           </div>
                         )}

@@ -123,9 +123,11 @@
 
   .main-sidebar.mobile-open .sidebar-section-title {
     opacity: 1;
-    height: auto;
-    padding: 0.5rem 0.75rem;
-    margin-top: 0.5rem;
+    max-height: 32px;
+    margin-top: 0.6rem;
+    margin-bottom: 0.2rem;
+    padding: 0.25rem 0.75rem;
+    overflow: visible;
   }
 
   .main-sidebar.mobile-open .sidebar-submenu {

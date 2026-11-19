@@ -24,6 +24,7 @@ import {
   Globe,
   UserCheck,
   Send,
+  MessageSquare,
 } from 'lucide-react';
 
 export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
@@ -42,9 +43,12 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
   } = useAuth();
 
   const asideRef = useRef(null);
+  const [isHovered, setIsHovered] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(
     () => typeof window !== 'undefined' && window.matchMedia('(max-width: 768px)').matches
   );
+
+  const isExpanded = isHovered || isMobileOpen;
 
   const isSettingsActive = location.pathname.startsWith('/settings');
   const searchParams = new URLSearchParams(location.search);
@@ -139,6 +143,12 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
       show: true,
     },
     {
+      label: 'Team Chat',
+      path: '/chat',
+      icon: MessageSquare,
+      show: true,
+    },
+    {
       label: 'AI Center',
       path: '/ai',
       icon: Bot,
@@ -175,7 +185,13 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
       label: 'Stage Tasks & Rules',
       tab: 'tasks',
       icon: Sparkles,
-      show: canManageTaskRules || canManagePld || isAdmin || isManager,
+      show: canManageTaskRules || isAdmin || isManager,
+    },
+    {
+      label: 'PLD Discovery Rules',
+      tab: 'pld',
+      icon: Layers,
+      show: canManagePld || isAdmin || isManager,
     },
     {
       label: 'Web-to-Lead API',
@@ -225,6 +241,8 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
         ref={asideRef}
         className={`main-sidebar ${isMobileOpen ? 'mobile-open' : ''}`}
         inert={isMobileViewport && !isMobileOpen ? true : undefined}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
         <div className="sidebar-brand">
           <div className="brand-logo-icon">
@@ -253,7 +271,7 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
                     `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
                   }
                   onClick={onCloseMobile}
-                  title={item.label}
+                  title={isExpanded ? undefined : item.label}
                 >
                   <Icon size={19} className="nav-icon" />
                   <span className="sidebar-link-text">{item.label}</span>
@@ -262,7 +280,7 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
             })}
 
           {/* Settings Section Header */}
-          <div className="sidebar-section-title" style={{ marginTop: '0.75rem' }}>Configuration</div>
+          <div className="sidebar-section-title">Configuration</div>
 
           {/* Settings Dropdown Accordion */}
           <div className="sidebar-dropdown-group">
@@ -272,7 +290,7 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
               onClick={handleToggleSettings}
               aria-expanded={settingsOpen}
               aria-controls="sidebar-settings-submenu"
-              title="Settings & Configuration"
+              title={isExpanded ? undefined : 'Settings'}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                 <Settings size={19} className="nav-icon" />
@@ -304,7 +322,7 @@ export const Sidebar = ({ isMobileOpen, onCloseMobile }) => {
                       className={`sidebar-sublink ${isSubActive ? 'sidebar-sublink-active' : ''}`}
                       onClick={onCloseMobile}
                       role="menuitem"
-                      title={subItem.label}
+                      title={isExpanded ? undefined : subItem.label}
                     >
                       <SubIcon size={14} className="sublink-icon" />
                       <span className="sidebar-sublink-text">{subItem.label}</span>

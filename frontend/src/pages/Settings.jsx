@@ -8,6 +8,7 @@ import { extractErrorMessage } from '../utils/validation';
 import { useDialogA11y } from '../hooks/useDialogA11y';
 import { ROLE_LABELS } from '../utils/constants';
 import { IcpQuestionsManager } from '../components/IcpQuestionsManager';
+import { PldSettingsManager } from '../components/PldSettingsManager';
 import { StageTasksManager } from '../components/StageTasksManager';
 import WinProbabilityFunnel from '../components/WinProbabilityFunnel';
 import { WebToLeadManager } from '../components/WebToLeadManager';
@@ -540,16 +541,29 @@ export const Settings = () => {
 
 
 
-        {(canManageTaskRules || canManagePld) && (
+        {canManageTaskRules && (
           <button
             type="button"
             role="tab"
-            aria-selected={activeTab === 'tasks' || activeTab === 'pld'}
-            className={`tab-btn ${activeTab === 'tasks' || activeTab === 'pld' ? 'tab-btn-active' : ''}`}
+            aria-selected={activeTab === 'tasks'}
+            className={`tab-btn ${activeTab === 'tasks' ? 'tab-btn-active' : ''}`}
             onClick={() => handleTabChange('tasks')}
           >
             <Sparkles size={16} />
-            <span>Stage Tasks & Progression Rules</span>
+            <span>Stage Tasks & Rules</span>
+          </button>
+        )}
+
+        {canManagePld && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'pld'}
+            className={`tab-btn ${activeTab === 'pld' ? 'tab-btn-active' : ''}`}
+            onClick={() => handleTabChange('pld')}
+          >
+            <Layers size={16} />
+            <span>PLD Discovery Rules</span>
           </button>
         )}
 
@@ -1526,8 +1540,13 @@ export const Settings = () => {
       {activeTab === 'icp' && canManageIcp && <IcpQuestionsManager />}
 
       {/* TAB: STAGE TASKS & PROGRESSION RULES (Admin / Manager) */}
-      {(activeTab === 'tasks' || activeTab === 'pld') && (canManageTaskRules || canManagePld) && (
+      {activeTab === 'tasks' && canManageTaskRules && (
         <StageTasksManager onStageUpdated={fetchStages} />
+      )}
+
+      {/* TAB: PLD DISCOVERY & PROBLEM QUALIFICATION RULES (Admin / Manager) */}
+      {activeTab === 'pld' && canManagePld && (
+        <PldSettingsManager />
       )}
 
       {/* TAB: WEB-TO-LEAD / WEBSITE CONTACT INTEGRATION */}

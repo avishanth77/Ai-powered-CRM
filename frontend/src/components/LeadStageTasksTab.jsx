@@ -1151,15 +1151,15 @@ export default function LeadStageTasksTab({
               </button>
             </div>
 
-            <form onSubmit={handleCreateTask} style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
-              <div>
-                <label className="input-label" htmlFor="new-task-title">
-                  Task Title *
+            <form onSubmit={handleCreateTask} style={{ padding: '1.25rem 1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="form-group">
+                <label className="form-label" htmlFor="new-task-title">
+                  Task Title <span style={{ color: 'var(--danger)' }}>*</span>
                 </label>
                 <input
                   id="new-task-title"
                   type="text"
-                  className="input-field"
+                  className="form-control"
                   placeholder="e.g. Schedule Executive Demo with VP of Sales"
                   value={newTaskData.title}
                   onChange={(e) => setNewTaskData({ ...newTaskData, title: e.target.value })}
@@ -1167,13 +1167,13 @@ export default function LeadStageTasksTab({
                 />
               </div>
 
-              <div>
-                <label className="input-label" htmlFor="new-task-desc">
+              <div className="form-group">
+                <label className="form-label" htmlFor="new-task-desc">
                   Description / Action Items
                 </label>
                 <textarea
                   id="new-task-desc"
-                  className="input-field"
+                  className="form-control"
                   rows={2}
                   placeholder="Details of what needs to be verified or accomplished..."
                   value={newTaskData.description}
@@ -1181,14 +1181,14 @@ export default function LeadStageTasksTab({
                 />
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label className="input-label" htmlFor="new-task-priority">
+              <div className="form-grid-2" style={{ gap: '0.875rem' }}>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="new-task-priority">
                     Priority
                   </label>
                   <select
                     id="new-task-priority"
-                    className="input-field"
+                    className="form-control"
                     value={newTaskData.priority}
                     onChange={(e) => setNewTaskData({ ...newTaskData, priority: e.target.value })}
                   >
@@ -1199,13 +1199,13 @@ export default function LeadStageTasksTab({
                   </select>
                 </div>
 
-                <div>
-                  <label className="input-label" htmlFor="new-task-purpose">
+                <div className="form-group">
+                  <label className="form-label" htmlFor="new-task-purpose">
                     Channel / Purpose
                   </label>
                   <select
                     id="new-task-purpose"
-                    className="input-field"
+                    className="form-control"
                     value={newTaskData.purpose}
                     onChange={(e) => setNewTaskData({ ...newTaskData, purpose: e.target.value })}
                   >
@@ -1219,14 +1219,14 @@ export default function LeadStageTasksTab({
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                <div>
-                  <label className="input-label" htmlFor="new-task-assignee">
+              <div className="form-grid-2" style={{ gap: '0.875rem' }}>
+                <div className="form-group">
+                  <label className="form-label" htmlFor="new-task-assignee">
                     Assigned To
                   </label>
                   <select
                     id="new-task-assignee"
-                    className="input-field"
+                    className="form-control"
                     value={newTaskData.assigned_to}
                     onChange={(e) => setNewTaskData({ ...newTaskData, assigned_to: e.target.value })}
                   >
@@ -1239,27 +1239,27 @@ export default function LeadStageTasksTab({
                   </select>
                 </div>
 
-                <div>
-                  <label className="input-label" htmlFor="new-task-due">
+                <div className="form-group">
+                  <label className="form-label" htmlFor="new-task-due">
                     Due Date
                   </label>
                   <input
                     id="new-task-due"
                     type="date"
-                    className="input-field"
+                    className="form-control"
                     value={newTaskData.due_date}
                     onChange={(e) => setNewTaskData({ ...newTaskData, due_date: e.target.value })}
                   />
                 </div>
               </div>
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', marginTop: '0.25rem' }}>
                 <input
                   id="new-task-mandatory"
                   type="checkbox"
                   checked={newTaskData.is_mandatory}
                   onChange={(e) => setNewTaskData({ ...newTaskData, is_mandatory: e.target.checked })}
-                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                  style={{ width: '17px', height: '17px', cursor: 'pointer', accentColor: 'var(--primary)' }}
                 />
                 <label htmlFor="new-task-mandatory" style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', cursor: 'pointer' }}>
                   Mandatory Checkpoint (Required to advance stage)
@@ -1343,13 +1343,13 @@ export default function LeadStageTasksTab({
                 Please provide any brief outcome notes, customer responses, or audit observations from completing this stage checkpoint.
               </p>
 
-              <div>
-                <label className="input-label" htmlFor="outcome-notes-input">
+              <div className="form-group">
+                <label className="form-label" htmlFor="outcome-notes-input">
                   Outcome Notes (Optional)
                 </label>
                 <textarea
                   id="outcome-notes-input"
-                  className="input-field"
+                  className="form-control"
                   rows={3}
                   placeholder="e.g. Conducted 45-min demo with VP; decision makers confirmed budget approval."
                   value={outcomeNotes}

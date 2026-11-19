@@ -67,6 +67,10 @@ class ReportSummaryView(APIView):
 
         # Financials & Conversion
         total_expected_value = leads_qs.aggregate(total=Sum('expected_value'))['total'] or Decimal('0.00')
+        new_leads_val = float(leads_qs.filter(stage__slug='new').aggregate(s=Sum('expected_value'))['s'] or 0)
+        qualified_leads_val = float(leads_qs.filter(stage__slug='qualified').aggregate(s=Sum('expected_value'))['s'] or 0)
+        high_priority_leads_val = float(leads_qs.filter(priority__in=['HIGH', 'URGENT']).aggregate(s=Sum('expected_value'))['s'] or 0)
+        high_priority_leads = leads_qs.filter(priority__in=['HIGH', 'URGENT']).count()
         closed_leads = won_leads + lost_leads
         conversion_rate = round((won_leads / closed_leads * 100), 1) if closed_leads > 0 else (
             round((won_leads / total_leads * 100), 1) if total_leads > 0 else 0.0
@@ -109,8 +113,15 @@ class ReportSummaryView(APIView):
         # 3. Leads by priority
         priority_data = []
         for pr_key, pr_label in Lead.Priority.choices:
-            cnt = leads_qs.filter(priority=pr_key).count()
-            priority_data.append({'priority': pr_key, 'label': pr_label, 'count': cnt})
+            pr_leads = leads_qs.filter(priority=pr_key)
+            cnt = pr_leads.count()
+            val = float(pr_leads.aggregate(s=Sum('expected_value'))['s'] or 0)
+            priority_data.append({
+                'priority': pr_key,
+                'label': pr_label,
+                'count': cnt,
+                'total_value': val
+            })
 
         # Products breakdown
         product_data = []
@@ -206,6 +217,10 @@ class ReportSummaryView(APIView):
                     'today_followups': today_followups,
                     'overdue_followups': overdue_followups,
                     'expected_sales_value': float(total_expected_value),
+                    'new_leads_value': new_leads_val,
+                    'qualified_leads_value': qualified_leads_val,
+                    'high_priority_leads': high_priority_leads,
+                    'high_priority_value': high_priority_leads_val,
                     'conversion_rate': conversion_rate,
                     'followup_completion_rate': followup_completion_rate,
                 },

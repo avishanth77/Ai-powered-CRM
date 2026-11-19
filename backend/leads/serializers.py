@@ -797,22 +797,34 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
                         qty = max(1, int(item.get('quantity', 1)))
                     except (ValueError, TypeError):
                         qty = 1
-                    items_map[int(pid)] = qty
+                    custom_price = item.get('unit_price')
+                    items_map[int(pid)] = {
+                        'quantity': qty,
+                        'unit_price': custom_price,
+                    }
         elif product_ids:
             for pid in product_ids:
-                items_map[int(pid)] = 1
+                items_map[int(pid)] = {'quantity': 1, 'unit_price': None}
 
         if items_map:
             from products.models import Product, LeadProduct
             from django.db.models import Sum
-            for pid, qty in items_map.items():
+            from decimal import Decimal, InvalidOperation
+            for pid, item_info in items_map.items():
                 p = Product.objects.filter(id=pid, is_active=True).first()
                 if p:
+                    u_price = p.unit_price
+                    custom_p = item_info.get('unit_price')
+                    if custom_p is not None:
+                        try:
+                            u_price = Decimal(str(custom_p))
+                        except (InvalidOperation, TypeError, ValueError):
+                            u_price = p.unit_price
                     LeadProduct.objects.create(
                         lead=lead,
                         product=p,
-                        unit_price=p.unit_price,
-                        quantity=qty
+                        unit_price=u_price,
+                        quantity=item_info.get('quantity', 1)
                     )
             # Only auto-fill expected_value if user DID NOT pass expected_value in payload at all
             if not has_explicit_expected_val:
@@ -836,6 +848,7 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
 
         if product_items is not None or product_ids is not None:
             from products.models import Product, LeadProduct
+            from decimal import Decimal, InvalidOperation
             items_map = {}
             if product_items is not None:
                 for item in product_items:
@@ -845,30 +858,56 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
                             qty = max(1, int(item.get('quantity', 1)))
                         except (ValueError, TypeError):
                             qty = 1
-                        items_map[int(pid)] = qty
+                        custom_price = item.get('unit_price')
+                        items_map[int(pid)] = {
+                            'quantity': qty,
+                            'unit_price': custom_price,
+                        }
             elif product_ids is not None:
                 for pid in product_ids:
                     existing_lp = lead.lead_products.filter(product_id=pid).first()
-                    items_map[int(pid)] = existing_lp.quantity if existing_lp else 1
+                    items_map[int(pid)] = {
+                        'quantity': existing_lp.quantity if existing_lp else 1,
+                        'unit_price': existing_lp.unit_price if existing_lp else None,
+                    }
 
             target_pids = set(items_map.keys())
             # Remove removed products
             lead.lead_products.exclude(product_id__in=target_pids).delete()
 
-            # Update existing quantities or create new ones
-            for pid, qty in items_map.items():
+            # Update existing quantities/prices or create new ones
+            for pid, item_info in items_map.items():
+                qty = item_info.get('quantity', 1)
+                custom_p = item_info.get('unit_price')
                 lp = lead.lead_products.filter(product_id=pid).first()
                 if lp:
+                    changed = False
                     if lp.quantity != qty:
                         lp.quantity = qty
+                        changed = True
+                    if custom_p is not None:
+                        try:
+                            new_price = Decimal(str(custom_p))
+                            if lp.unit_price != new_price:
+                                lp.unit_price = new_price
+                                changed = True
+                        except (InvalidOperation, TypeError, ValueError):
+                            pass
+                    if changed:
                         lp.save()
                 else:
                     p = Product.objects.filter(id=pid, is_active=True).first()
                     if p:
+                        u_price = p.unit_price
+                        if custom_p is not None:
+                            try:
+                                u_price = Decimal(str(custom_p))
+                            except (InvalidOperation, TypeError, ValueError):
+                                u_price = p.unit_price
                         LeadProduct.objects.create(
                             lead=lead,
                             product=p,
-                            unit_price=p.unit_price,
+                            unit_price=u_price,
                             quantity=qty
                         )
             # Never overwrite lead.expected_value on product updates

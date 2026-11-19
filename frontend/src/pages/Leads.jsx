@@ -978,24 +978,64 @@ export const Leads = () => {
   const leadStageKey = (l) => normalizeStageKey(l.stage_details?.slug || l.status);
   const newLeadsCount = kpiData.new_leads ?? leads.filter((l) => leadStageKey(l) === 'NEW').length;
   const qualifiedLeadsCount = kpiData.qualified_leads ?? leads.filter((l) => leadStageKey(l) === 'QUALIFIED').length;
+  const highPriorityObj = priorityCharts.find((p) => p.priority === 'HIGH');
+  const urgentPriorityObj = priorityCharts.find((p) => p.priority === 'URGENT');
   const highPriorityCount =
-    priorityCharts.find((p) => p.priority === 'HIGH')?.count ??
-    leads.filter((l) => l.priority === 'HIGH').length;
+    priorityCharts.length > 0
+      ? (highPriorityObj?.count || 0) + (urgentPriorityObj?.count || 0)
+      : leads.filter((l) => l.priority === 'HIGH' || l.priority === 'URGENT').length;
   const conversionRate = kpiData.conversion_rate ?? 0;
 
-  // Pipeline stage counts
+  // Pipeline Financial Values (Sum of expected monetary values)
+  const totalLeadsValue =
+    kpiData.expected_sales_value !== undefined
+      ? Number(kpiData.expected_sales_value)
+      : leads.reduce((sum, l) => sum + (parseFloat(l.expected_value) || 0), 0);
+
+  const newLeadsValue =
+    kpiData.new_leads_value !== undefined
+      ? Number(kpiData.new_leads_value)
+      : (statusCharts.find((s) => s.status === 'NEW')?.total_value ??
+         leads.filter((l) => leadStageKey(l) === 'NEW').reduce((sum, l) => sum + (parseFloat(l.expected_value) || 0), 0));
+
+  const qualifiedLeadsValue =
+    kpiData.qualified_leads_value !== undefined
+      ? Number(kpiData.qualified_leads_value)
+      : (statusCharts.find((s) => s.status === 'QUALIFIED')?.total_value ??
+         leads.filter((l) => leadStageKey(l) === 'QUALIFIED').reduce((sum, l) => sum + (parseFloat(l.expected_value) || 0), 0));
+
+  const highPriorityValue =
+    kpiData.high_priority_value !== undefined
+      ? Number(kpiData.high_priority_value)
+      : (priorityCharts.length > 0
+          ? (highPriorityObj?.total_value || 0) + (urgentPriorityObj?.total_value || 0)
+          : leads.filter((l) => l.priority === 'HIGH' || l.priority === 'URGENT').reduce((sum, l) => sum + (parseFloat(l.expected_value) || 0), 0));
+
+  const wonLeadsValue =
+    statusCharts.find((s) => s.status === 'WON')?.total_value ??
+    leads.filter((l) => leadStageKey(l) === 'WON').reduce((sum, l) => sum + (parseFloat(l.expected_value) || 0), 0);
+
+  // Pipeline stage counts & values
   const getStageCount = (stageKey) => {
     const found = statusCharts.find((s) => s.status === stageKey);
     if (found) return found.count;
     return leads.filter((l) => leadStageKey(l) === stageKey).length;
   };
 
+  const getStageValue = (stageKey) => {
+    const found = statusCharts.find((s) => s.status === stageKey);
+    if (found?.total_value !== undefined) return Number(found.total_value);
+    return leads
+      .filter((l) => leadStageKey(l) === stageKey)
+      .reduce((sum, l) => sum + (parseFloat(l.expected_value) || 0), 0);
+  };
+
   const pipelineStages = [
-    { key: 'NEW', label: 'New', count: getStageCount('NEW'), sub: 'Inbound intake' },
-    { key: 'CONTACTED', label: 'Contacted', count: getStageCount('CONTACTED'), sub: 'Initial call/chat' },
-    { key: 'QUALIFIED', label: 'Qualified', count: getStageCount('QUALIFIED'), sub: 'Needs verified' },
-    { key: 'NEGOTIATION', label: 'Proposal', count: getStageCount('NEGOTIATION'), sub: 'Pricing review' },
-    { key: 'WON', label: 'Converted', count: getStageCount('WON'), sub: 'Customer created' },
+    { key: 'NEW', label: 'New', count: getStageCount('NEW'), value: getStageValue('NEW'), sub: 'Inbound intake' },
+    { key: 'CONTACTED', label: 'Contacted', count: getStageCount('CONTACTED'), value: getStageValue('CONTACTED'), sub: 'Initial call/chat' },
+    { key: 'QUALIFIED', label: 'Qualified', count: getStageCount('QUALIFIED'), value: getStageValue('QUALIFIED'), sub: 'Needs verified' },
+    { key: 'NEGOTIATION', label: 'Proposal', count: getStageCount('NEGOTIATION'), value: getStageValue('NEGOTIATION'), sub: 'Pricing review' },
+    { key: 'WON', label: 'Converted', count: getStageCount('WON'), value: getStageValue('WON'), sub: 'Customer created' },
   ];
 
   const getActivityIcon = (action) => {
@@ -1075,7 +1115,15 @@ export const Leads = () => {
               <Users size={16} />
             </div>
           </div>
-          <div className="summary-card-value">{totalLeadsCount}</div>
+          <div className="summary-card-metric-row">
+            <div className="summary-card-value">{totalLeadsCount}</div>
+            <div className="summary-card-amount-pill" style={{ borderColor: 'rgba(16, 185, 129, 0.25)', background: 'rgba(16, 185, 129, 0.08)' }}>
+              <span className="summary-card-amount-label">Total Value</span>
+              <span className="summary-card-amount-number" style={{ color: '#10b981' }}>
+                {formatCurrency(totalLeadsValue)}
+              </span>
+            </div>
+          </div>
           <div className="summary-card-sub">
             <span style={{ color: '#10b981', fontWeight: 600 }}>Active Database</span>
             <span>• All sources</span>
@@ -1090,7 +1138,15 @@ export const Leads = () => {
               <Sparkles size={16} />
             </div>
           </div>
-          <div className="summary-card-value">{newLeadsCount}</div>
+          <div className="summary-card-metric-row">
+            <div className="summary-card-value">{newLeadsCount}</div>
+            <div className="summary-card-amount-pill" style={{ borderColor: 'rgba(6, 182, 212, 0.25)', background: 'rgba(6, 182, 212, 0.08)' }}>
+              <span className="summary-card-amount-label">Total Value</span>
+              <span className="summary-card-amount-number" style={{ color: '#06b6d4' }}>
+                {formatCurrency(newLeadsValue)}
+              </span>
+            </div>
+          </div>
           <div className="summary-card-sub">
             <span style={{ color: '#06b6d4', fontWeight: 600 }}>Fresh Leads</span>
             <span>• Awaiting outreach</span>
@@ -1105,7 +1161,15 @@ export const Leads = () => {
               <CheckCircle2 size={16} />
             </div>
           </div>
-          <div className="summary-card-value">{qualifiedLeadsCount}</div>
+          <div className="summary-card-metric-row">
+            <div className="summary-card-value">{qualifiedLeadsCount}</div>
+            <div className="summary-card-amount-pill" style={{ borderColor: 'rgba(59, 130, 246, 0.25)', background: 'rgba(59, 130, 246, 0.08)' }}>
+              <span className="summary-card-amount-label">Total Value</span>
+              <span className="summary-card-amount-number" style={{ color: '#3b82f6' }}>
+                {formatCurrency(qualifiedLeadsValue)}
+              </span>
+            </div>
+          </div>
           <div className="summary-card-sub">
             <span style={{ color: '#3b82f6', fontWeight: 600 }}>Sales Ready</span>
             <span>• Conversion-eligible</span>
@@ -1120,7 +1184,15 @@ export const Leads = () => {
               <Flame size={16} />
             </div>
           </div>
-          <div className="summary-card-value">{highPriorityCount}</div>
+          <div className="summary-card-metric-row">
+            <div className="summary-card-value">{highPriorityCount}</div>
+            <div className="summary-card-amount-pill" style={{ borderColor: 'rgba(245, 158, 11, 0.25)', background: 'rgba(245, 158, 11, 0.08)' }}>
+              <span className="summary-card-amount-label">Total Value</span>
+              <span className="summary-card-amount-number" style={{ color: '#f59e0b' }}>
+                {formatCurrency(highPriorityValue)}
+              </span>
+            </div>
+          </div>
           <div className="summary-card-sub">
             <span style={{ color: '#f59e0b', fontWeight: 600 }}>Urgent Focus</span>
             <span>• Immediate response</span>
@@ -1135,7 +1207,15 @@ export const Leads = () => {
               <TrendingUp size={16} />
             </div>
           </div>
-          <div className="summary-card-value">{conversionRate}%</div>
+          <div className="summary-card-metric-row">
+            <div className="summary-card-value">{conversionRate}%</div>
+            <div className="summary-card-amount-pill" style={{ borderColor: 'rgba(139, 92, 246, 0.25)', background: 'rgba(139, 92, 246, 0.08)' }}>
+              <span className="summary-card-amount-label">Total Won</span>
+              <span className="summary-card-amount-number" style={{ color: '#8b5cf6' }}>
+                {formatCurrency(wonLeadsValue)}
+              </span>
+            </div>
+          </div>
           <div className="summary-card-sub">
             <span style={{ color: '#8b5cf6', fontWeight: 600 }}>Win Velocity</span>
             <span>• Lead-to-customer</span>

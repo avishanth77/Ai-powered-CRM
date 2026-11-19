@@ -27,6 +27,7 @@ import { Notifications } from './pages/Notifications';
 import { Calendar } from './pages/Calendar';
 import { AiCenter } from './pages/AiCenter';
 import { AiCallSummaryPage } from './pages/AiCallSummaryPage';
+import { Chat } from './pages/Chat';
 import { Bot } from 'lucide-react';
 import { AiAssistantDrawer } from './components/AiAssistantDrawer';
 import { NotFound } from './pages/NotFound';
@@ -47,6 +48,7 @@ import './styles/pld.css';
 import './styles/stage_tasks.css';
 import './styles/funnel.css';
 import './styles/targets.css';
+import './styles/chat.css';
 
 
 const AppLayout = () => {
@@ -152,6 +154,8 @@ export default function App() {
                 />
                 <Route path="settings" element={<Settings />} />
                 <Route path="notifications" element={<Notifications />} />
+                <Route path="chat" element={<Chat />} />
+                <Route path="chat/:userId" element={<Chat />} />
                 <Route path="ai" element={<AiCenter />} />
                 <Route path="ai/call-summary" element={<AiCallSummaryPage />} />
                 <Route path="*" element={<NotFound />} />

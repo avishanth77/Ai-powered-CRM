@@ -65,3 +65,13 @@ PROJECT_QUESTIONS_AND_ANSWERS.txt
 generate_crm_*.py
 NEON_DATABASE_CLEAR_GUIDE.md
 
+# Video recordings & raw media
+demo_videos/
+CRM.mov
+*.mp4
+*.webm
+*.mov
+*.avi
+*.mkv
+
+

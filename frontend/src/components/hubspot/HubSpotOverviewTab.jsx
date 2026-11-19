@@ -24,10 +24,12 @@ import {
   ChevronDown,
   ChevronUp,
   Package,
+  Layers,
   Plus,
   Minus,
 } from 'lucide-react';
 import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatters';
+import { PldStatusBadge } from '../PldStatusBadge';
 
 export const HubSpotOverviewTab = ({
   lead,
@@ -35,6 +37,7 @@ export const HubSpotOverviewTab = ({
   onUpdateCustomProperty,
   onViewTasksTab,
   onViewActivitiesTab,
+  onViewPldTab,
   onCompleteTask,
   onScheduleFollowup,
   onOpenAiSummary,
@@ -707,6 +710,36 @@ export const HubSpotOverviewTab = ({
                 onClick={onViewTasksTab}
               >
                 <span>View All Tasks & Rules</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* PLD Discovery Status Card */}
+        <div className="hs-card">
+          <div className="hs-card-header">
+            <h3 className="hs-card-title">
+              <Layers size={16} color="var(--primary, #6366f1)" />
+              <span>Problem-Led Discovery (PLD)</span>
+            </h3>
+            <PldStatusBadge status={lead.pld_status} size="sm" />
+          </div>
+          <div className="hs-card-body">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.75rem' }}>
+              <span style={{ fontSize: '0.8125rem', color: 'var(--text-dim)' }}>
+                Discovery Pain Score
+              </span>
+              <strong style={{ fontSize: '1rem', color: lead.pld_status === 'QUALIFIED_PLD' ? 'var(--success)' : 'var(--warning)' }}>
+                {lead.pld_score ?? 0} pts
+              </strong>
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                className="btn btn-secondary btn-sm"
+                onClick={onViewPldTab}
+              >
+                <span>{lead.pld_status && lead.pld_status !== 'NOT_ASSESSED' ? 'View Discovery & History' : 'Run PLD Assessment'}</span>
               </button>
             </div>
           </div>

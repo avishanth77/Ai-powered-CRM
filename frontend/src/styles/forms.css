@@ -27,7 +27,9 @@
   width: 100%;
 }
 
-.form-label {
+.form-label,
+.input-label {
+  display: block;
   font-size: 0.8125rem;
   font-weight: 600;
   color: var(--text-muted);
@@ -41,7 +43,8 @@
 .form-control,
 .form-input,
 .form-select,
-.form-textarea {
+.form-textarea,
+.input-field {
   width: 100%;
   box-sizing: border-box;
   min-width: 0;
@@ -57,7 +60,8 @@
 .form-control:focus,
 .form-input:focus,
 .form-select:focus,
-.form-textarea:focus {
+.form-textarea:focus,
+.input-field:focus {
   outline: none;
   border-color: var(--border-focus);
   box-shadow: 0 0 0 2px var(--primary-glow);
@@ -67,14 +71,35 @@
 .form-control::placeholder,
 .form-input::placeholder,
 .form-select::placeholder,
-.form-textarea::placeholder {
+.form-textarea::placeholder,
+.input-field::placeholder {
   color: var(--text-dim);
 }
 
 textarea.form-control,
-textarea.form-textarea {
-  min-height: 90px;
+textarea.form-textarea,
+textarea.input-field {
+  min-height: 80px;
   resize: vertical;
+}
+
+select.form-control,
+select.form-select,
+select.input-field {
+  cursor: pointer;
+}
+
+input[type="date"].form-control,
+input[type="date"].form-input,
+input[type="date"].input-field {
+  color-scheme: dark;
+  cursor: pointer;
+}
+
+[data-theme="light"] input[type="date"].form-control,
+[data-theme="light"] input[type="date"].form-input,
+[data-theme="light"] input[type="date"].input-field {
+  color-scheme: light;
 }
 
 .form-control[aria-invalid="true"],

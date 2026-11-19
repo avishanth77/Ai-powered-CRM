@@ -3,15 +3,40 @@ import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { getInitials } from '../utils/formatters';
 import { ROLE_LABELS } from '../utils/constants';
-import { LogOut, User as UserIcon, Menu, Shield, Clock, Sun, Moon, Bot } from 'lucide-react';
+import { LogOut, User as UserIcon, Menu, Shield, Clock, Sun, Moon, Bot, MessageSquare } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { NotificationBell } from './NotificationBell';
+import { chatApi } from '../api/chatApi';
 
 export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0, mobileSidebarOpen = false, onOpenAi, isAiOpen = false }) => {
   const { user, logout } = useAuth();
   const { theme, isDark, toggleTheme } = useTheme();
   const [showDropdown, setShowDropdown] = useState(false);
+  const [unreadChatCount, setUnreadChatCount] = useState(0);
   const profileMenuRef = useRef(null);
+
+  // Poll for unread direct chat messages
+  useEffect(() => {
+    let isMounted = true;
+    const fetchUnread = () => {
+      if (!user) return;
+      chatApi
+        .getUnreadCount()
+        .then((res) => {
+          if (isMounted && res && typeof res.unread_count === 'number') {
+            setUnreadChatCount(res.unread_count);
+          }
+        })
+        .catch(() => {});
+    };
+
+    fetchUnread();
+    const interval = setInterval(fetchUnread, 8000);
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [user]);
 
   // Close the profile menu on click outside or Escape
   useEffect(() => {
@@ -80,6 +105,21 @@ export const Navbar = ({ onToggleMobileSidebar, overdueCount = 0, mobileSidebarO
 
         {/* Live Notification Center Bell */}
         <NotificationBell />
+
+        {/* 1-on-1 Team Direct Chat Button */}
+        <Link
+          to="/chat"
+          className="navbar-alert-link navbar-chat-link"
+          title="Team Direct Chat"
+          aria-label={unreadChatCount > 0 ? `${unreadChatCount} unread direct messages` : 'Team Direct Chat'}
+        >
+          <MessageSquare size={18} />
+          {unreadChatCount > 0 && (
+            <span className="alert-count-pill chat-pill">
+              {unreadChatCount > 99 ? '99+' : unreadChatCount}
+            </span>
+          )}
+        </Link>
 
         {/* Overdue follow-ups alert */}
         {overdueCount > 0 && (

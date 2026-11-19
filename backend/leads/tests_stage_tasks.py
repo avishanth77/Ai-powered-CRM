@@ -29,7 +29,7 @@ class StageTaskAutomationTests(APITestCase):
             role='MANAGER'
         )
         self.executive = User.objects.create_user(
-            email='exec_tasks@example.com',
+            email='exec_tasks@example.com', 
             password='Password123!',
             first_name='Executive',
             last_name='User',
