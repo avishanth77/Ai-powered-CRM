@@ -616,6 +616,10 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
         required=False,
         write_only=True
     )
+    stage_custom_properties = serializers.DictField(
+        required=False,
+        write_only=True
+    )
 
     class Meta:
         model = Lead
@@ -831,6 +835,7 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
         product_ids = validated_data.pop('product_ids', None)
         product_items = validated_data.pop('product_items', None)
         custom_props = validated_data.pop('custom_properties', None)
+        stage_custom_props = validated_data.pop('stage_custom_properties', None)
         has_explicit_expected_val = 'expected_value' in validated_data
         request = self.context.get('request')
         if 'stage' not in validated_data or not validated_data['stage']:
@@ -853,6 +858,8 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
 
         if custom_props:
             _save_custom_properties(lead, custom_props)
+        if stage_custom_props:
+            _save_custom_properties(lead, stage_custom_props)
 
         # Parse product items and quantities (number of product needed)
         items_map = {}
@@ -908,10 +915,13 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
         product_ids = validated_data.pop('product_ids', None)
         product_items = validated_data.pop('product_items', None)
         custom_props = validated_data.pop('custom_properties', None)
+        stage_custom_props = validated_data.pop('stage_custom_properties', None)
         lead = super().update(instance, validated_data)
 
         if custom_props is not None:
             _save_custom_properties(lead, custom_props)
+        if stage_custom_props is not None:
+            _save_custom_properties(lead, stage_custom_props)
 
         if product_items is not None or product_ids is not None:
             from products.models import Product, LeadProduct
