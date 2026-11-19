@@ -33,6 +33,7 @@ class LeadSourceSerializer(serializers.ModelSerializer):
 class LeadStageSerializer(serializers.ModelSerializer):
     leads_count = serializers.IntegerField(read_only=True, default=0)
     task_rules_count = serializers.IntegerField(read_only=True, default=0)
+    custom_fields_count = serializers.SerializerMethodField(read_only=True)
 
     class Meta:
         model = LeadStage
@@ -52,8 +53,12 @@ class LeadStageSerializer(serializers.ModelSerializer):
             'updated_at',
             'leads_count',
             'task_rules_count',
+            'custom_fields_count',
         ]
-        read_only_fields = ['id', 'slug', 'created_at', 'updated_at', 'leads_count', 'task_rules_count']
+        read_only_fields = ['id', 'slug', 'created_at', 'updated_at', 'leads_count', 'task_rules_count', 'custom_fields_count']
+
+    def get_custom_fields_count(self, obj):
+        return obj.custom_properties.filter(is_active=True).count()
 
     def validate_name(self, value):
         name = value.strip()
@@ -140,6 +145,9 @@ class LeadStageSerializer(serializers.ModelSerializer):
 
 
 class CustomPropertyDefinitionSerializer(serializers.ModelSerializer):
+    name = serializers.SlugField(max_length=60, required=False, allow_blank=True)
+    stage_details = LeadStageSerializer(source='stage', read_only=True)
+
     class Meta:
         model = CustomPropertyDefinition
         fields = [
@@ -148,6 +156,8 @@ class CustomPropertyDefinitionSerializer(serializers.ModelSerializer):
             'label',
             'field_type',
             'section',
+            'stage',
+            'stage_details',
             'options',
             'is_mandatory',
             'is_active',
@@ -157,19 +167,42 @@ class CustomPropertyDefinitionSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         ]
-        read_only_fields = ['id', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'created_at', 'updated_at', 'stage_details']
 
-    def validate_name(self, value):
+    def validate(self, attrs):
         from django.utils.text import slugify
-        val = slugify(value.strip()).replace('-', '_')
+        label = attrs.get('label', getattr(self.instance, 'label', ''))
+        name = attrs.get('name', getattr(self.instance, 'name', ''))
+        stage = attrs.get('stage', getattr(self.instance, 'stage', None))
+
+        if not name or not str(name).strip():
+            # Auto-generate name from stage + label
+            stage_prefix = f"stage_{stage.id}_" if stage else ""
+            val = slugify(f"{stage_prefix}{label.strip()}").replace('-', '_')[:60]
+        else:
+            val = slugify(str(name).strip()).replace('-', '_')[:60]
+
         if not val:
-            raise serializers.ValidationError("Field machine key must contain valid alphanumeric characters.")
+            raise serializers.ValidationError({"name": "Field machine key must contain valid alphanumeric characters."})
+
+        # Ensure unique name
         qs = CustomPropertyDefinition.objects.filter(name=val)
         if self.instance:
             qs = qs.exclude(id=self.instance.id)
         if qs.exists():
-            raise serializers.ValidationError(f"A property with key '{val}' already exists.")
-        return val
+            # Auto-suffix if collision
+            for i in range(2, 100):
+                candidate = f"{val[:56]}_{i}"
+                if not CustomPropertyDefinition.objects.filter(name=candidate).exclude(id=getattr(self.instance, 'id', None)).exists():
+                    val = candidate
+                    break
+            else:
+                raise serializers.ValidationError({"name": f"A property with key '{val}' already exists."})
+
+        attrs['name'] = val
+        if stage and attrs.get('section') in (CustomPropertyDefinition.Section.CUSTOM, None):
+            attrs['section'] = CustomPropertyDefinition.Section.STAGE
+        return attrs
 
 
 class CustomPropertyValueSerializer(serializers.ModelSerializer):
@@ -368,6 +401,7 @@ class LeadDetailSerializer(serializers.ModelSerializer):
     products = serializers.SerializerMethodField(read_only=True)
     product_ids = serializers.SerializerMethodField(read_only=True)
     custom_properties = serializers.SerializerMethodField(read_only=True)
+    stage_custom_properties = serializers.SerializerMethodField(read_only=True)
 
     def get_custom_properties(self, obj):
         defs = CustomPropertyDefinition.objects.filter(is_active=True).order_by('section', 'display_order', 'id')
@@ -384,6 +418,37 @@ class LeadDetailSerializer(serializers.ModelSerializer):
                 'label': prop_def.label,
                 'field_type': prop_def.field_type,
                 'section': prop_def.section,
+                'stage': prop_def.stage_id,
+                'stage_name': prop_def.stage.name if prop_def.stage else None,
+                'options': prop_def.options,
+                'is_mandatory': prop_def.is_mandatory,
+                'placeholder': prop_def.placeholder,
+                'help_text': prop_def.help_text,
+                'value_text': val_txt,
+                'value_json': val_json,
+                'display_value': disp,
+            })
+        return res
+
+    def get_stage_custom_properties(self, obj):
+        if not obj.stage_id:
+            return []
+        defs = CustomPropertyDefinition.objects.filter(is_active=True, stage_id=obj.stage_id).order_by('display_order', 'id')
+        val_map = {val.property_def_id: val for val in obj.custom_property_values.all()}
+        res = []
+        for prop_def in defs:
+            v = val_map.get(prop_def.id)
+            val_txt = v.value_text if v else ''
+            val_json = v.value_json if v else None
+            disp = val_txt if val_txt else (json.dumps(val_json) if val_json is not None else '')
+            res.append({
+                'id': prop_def.id,
+                'name': prop_def.name,
+                'label': prop_def.label,
+                'field_type': prop_def.field_type,
+                'section': prop_def.section,
+                'stage': prop_def.stage_id,
+                'stage_name': prop_def.stage.name if prop_def.stage else None,
                 'options': prop_def.options,
                 'is_mandatory': prop_def.is_mandatory,
                 'placeholder': prop_def.placeholder,
@@ -490,6 +555,7 @@ class LeadDetailSerializer(serializers.ModelSerializer):
             'product_ids',
             # Dynamic Custom Properties
             'custom_properties',
+            'stage_custom_properties',
         ]
 
 
@@ -602,6 +668,7 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
             'product_items',
             # Dynamic Custom Properties
             'custom_properties',
+            'stage_custom_properties',
         ]
 
     def to_internal_value(self, data):

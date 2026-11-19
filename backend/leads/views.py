@@ -88,9 +88,19 @@ class LeadStageViewSet(viewsets.ModelViewSet):
             self.request.query_params.get('all') == 'true' or
             self.request.query_params.get('include_inactive') == 'true'
         )
-        if include_all:
-            return qs
-        return qs.filter(is_active=True)
+        if not include_all:
+            qs = qs.filter(is_active=True)
+
+        stage_param = self.request.query_params.get('stage') or self.request.query_params.get('stage_id')
+        if stage_param is not None:
+            if str(stage_param).lower() in ('', 'null', 'none', 'global'):
+                qs = qs.filter(stage__isnull=True)
+            elif str(stage_param).lower() != 'all':
+                try:
+                    qs = qs.filter(stage_id=int(stage_param))
+                except (ValueError, TypeError):
+                    pass
+        return qs
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -351,7 +361,7 @@ class CustomPropertyDefinitionViewSet(viewsets.ModelViewSet):
     serializer_class = CustomPropertyDefinitionSerializer
     permission_classes = [CustomPropertyPermission]
     search_fields = ['name', 'label', 'help_text', 'section']
-    filterset_fields = ['section', 'field_type', 'is_mandatory', 'is_active']
+    filterset_fields = ['section', 'field_type', 'is_mandatory', 'is_active', 'stage']
 
     def get_queryset(self):
         user = self.request.user

@@ -880,11 +880,20 @@ class CustomPropertyDefinition(models.Model):
         QUALIFICATION = 'qualification', 'Lead Qualification'
         SALES = 'sales', 'Sales Information'
         CUSTOM = 'custom', 'Custom Properties'
+        STAGE = 'stage', 'Stage-Specific Properties'
 
     name = models.SlugField(max_length=60, unique=True, help_text='Machine-safe key (e.g. region_tier)')
     label = models.CharField(max_length=100, help_text='User-facing label')
     field_type = models.CharField(max_length=30, choices=FieldType.choices, default=FieldType.TEXT)
     section = models.CharField(max_length=30, choices=Section.choices, default=Section.CUSTOM)
+    stage = models.ForeignKey(
+        'leads.LeadStage',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='custom_properties',
+        help_text='If set, this field belongs specifically to this pipeline stage'
+    )
     options = models.JSONField(blank=True, default=list, help_text='Dropdown / multi-select options list')
     is_mandatory = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)

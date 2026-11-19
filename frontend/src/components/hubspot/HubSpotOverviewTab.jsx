@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatters';
 import { IcpOverviewCard } from './IcpOverviewCard';
+import { StageCustomFieldsCard } from './StageCustomFieldsCard';
 
 export const HubSpotOverviewTab = ({
   lead,
@@ -664,6 +665,14 @@ export const HubSpotOverviewTab = ({
           <IcpOverviewCard
             lead={lead}
             onIcpCompleted={onIcpCompleted}
+            onLeadUpdated={onLeadUpdated}
+          />
+        )}
+
+        {/* Stage-Specific Custom Fields Card (Configured by Admin per Stage) */}
+        {lead.stage_custom_properties && lead.stage_custom_properties.length > 0 && (
+          <StageCustomFieldsCard
+            lead={lead}
             onLeadUpdated={onLeadUpdated}
           />
         )}

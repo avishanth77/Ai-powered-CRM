@@ -15,6 +15,7 @@ import { WebToLeadManager } from '../components/WebToLeadManager';
 import ProductsManager from '../components/ProductsManager';
 import { LeadAssignmentManager } from '../components/LeadAssignmentManager';
 import { TelegramManager } from '../components/TelegramManager';
+import { StageCustomFieldsManager } from '../components/StageCustomFieldsManager';
 import {
   Settings as SettingsIcon,
   Plus,
@@ -36,6 +37,7 @@ import {
   Gauge,
   X,
   Sparkles,
+  Sliders,
   Globe,
   Package,
   UserCheck,
@@ -64,6 +66,7 @@ export const Settings = () => {
   const [activeTab, setActiveTab] = useState(
     tabParam || (canManageStages ? 'stages' : 'profile')
   );
+  const [selectedStageForFields, setSelectedStageForFields] = useState(null);
 
   useEffect(() => {
     if (tabParam) {
@@ -501,6 +504,19 @@ export const Settings = () => {
           </button>
         )}
 
+        {canManageStages && (
+          <button
+            type="button"
+            role="tab"
+            aria-selected={activeTab === 'stage-fields'}
+            className={`tab-btn ${activeTab === 'stage-fields' ? 'tab-btn-active' : ''}`}
+            onClick={() => handleTabChange('stage-fields')}
+          >
+            <Sliders size={16} />
+            <span>Stage Custom Fields</span>
+          </button>
+        )}
+
         <button
           type="button"
           role="tab"
@@ -679,6 +695,7 @@ export const Settings = () => {
                   <th>Active</th>
                   <th>Leads Count</th>
                   <th>Auto Tasks</th>
+                  <th>Custom Fields</th>
                   <th>System</th>
                   <th className="table-action-col">Actions</th>
                 </tr>
@@ -686,7 +703,7 @@ export const Settings = () => {
               <tbody>
                 {loadingStages ? (
                   <tr>
-                    <td colSpan={11} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-dim)' }}>
+                    <td colSpan={12} style={{ textAlign: 'center', padding: '2rem', color: 'var(--text-dim)' }}>
                       Loading lead stages...
                     </td>
                   </tr>
@@ -758,6 +775,21 @@ export const Settings = () => {
                       >
                         <Sparkles size={12} color="var(--primary)" />
                         {st.task_rules_count || 0} tasks
+                      </button>
+                    </td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-secondary"
+                        style={{ fontSize: '0.75rem', padding: '0.2rem 0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                        onClick={() => {
+                          setSelectedStageForFields(st.id);
+                          handleTabChange('stage-fields');
+                        }}
+                        title="Configure Custom Input Fields for this stage"
+                      >
+                        <Sliders size={12} color="var(--primary)" />
+                        {st.custom_fields_count || 0} fields
                       </button>
                     </td>
                     <td>
@@ -1534,6 +1566,14 @@ export const Settings = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* TAB: STAGE CUSTOM FIELDS (Admin / Manager) */}
+      {activeTab === 'stage-fields' && canManageStages && (
+        <StageCustomFieldsManager
+          initialStageId={selectedStageForFields}
+          onStageUpdated={fetchStages}
+        />
       )}
 
       {/* TAB: ICP QUALIFICATION QUESTIONS (Admin / Manager) */}
