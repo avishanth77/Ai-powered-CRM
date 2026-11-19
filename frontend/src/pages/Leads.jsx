@@ -11,9 +11,8 @@ import { useToast } from '../context/ToastContext';
 import { formatCurrency, formatDate, formatDateTime, toLocalDateTimeInput } from '../utils/formatters';
 import { extractErrorMessage } from '../utils/validation';
 import { useDialogA11y } from '../hooks/useDialogA11y';
-import { LEAD_STATUS, LEAD_PRIORITY, FOLLOWUP_PURPOSES, ICP_STATUS_CONFIG, PLD_STATUS, PLD_STATUS_CONFIG } from '../utils/constants';
+import { LEAD_STATUS, LEAD_PRIORITY, FOLLOWUP_PURPOSES, ICP_STATUS_CONFIG } from '../utils/constants';
 import { IcpStatusBadge } from '../components/IcpStatusBadge';
-import { PldStatusBadge } from '../components/PldStatusBadge';
 
 import { StatusBadge } from '../components/StatusBadge';
 import { PriorityBadge } from '../components/PriorityBadge';
@@ -189,14 +188,13 @@ export const Leads = () => {
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
   const [icpStatusFilter, setIcpStatusFilter] = useState('');
-  const [pldStatusFilter, setPldStatusFilter] = useState('');
   const [sourceFilter, setSourceFilter] = useState('');
   const [assignedToFilter, setAssignedToFilter] = useState('');
   const [productFilter, setProductFilter] = useState('');
   const [availableProducts, setAvailableProducts] = useState([]);
 
   const hasActiveFilters = Boolean(
-    search || statusFilter || priorityFilter || icpStatusFilter || pldStatusFilter || sourceFilter || assignedToFilter || productFilter
+    search || statusFilter || priorityFilter || icpStatusFilter || sourceFilter || assignedToFilter || productFilter
   );
 
   const handleResetAllFilters = () => {
@@ -204,7 +202,6 @@ export const Leads = () => {
     setStatusFilter('');
     setPriorityFilter('');
     setIcpStatusFilter('');
-    setPldStatusFilter('');
     setSourceFilter('');
     setAssignedToFilter('');
     setProductFilter('');
@@ -361,7 +358,6 @@ export const Leads = () => {
         status: statusFilter || undefined,
         priority: priorityFilter || undefined,
         icp_status: icpStatusFilter || undefined,
-        pld_status: pldStatusFilter || undefined,
         source: sourceFilter || undefined,
         assigned_to: assignedToFilter || undefined,
         product: productFilter || undefined,
@@ -382,7 +378,7 @@ export const Leads = () => {
     } finally {
       if (requestId === leadsRequestId.current) setLoading(false);
     }
-  }, [currentPage, search, statusFilter, priorityFilter, icpStatusFilter, pldStatusFilter, sourceFilter, assignedToFilter, productFilter, showToast]);
+  }, [currentPage, search, statusFilter, priorityFilter, icpStatusFilter, sourceFilter, assignedToFilter, productFilter, showToast]);
 
   useEffect(() => {
     fetchLeads();
@@ -405,11 +401,6 @@ export const Leads = () => {
 
   const handleIcpStatusChange = (e) => {
     setIcpStatusFilter(e.target.value);
-    setCurrentPage(1);
-  };
-
-  const handlePldStatusChange = (e) => {
-    setPldStatusFilter(e.target.value);
     setCurrentPage(1);
   };
 
@@ -1333,20 +1324,6 @@ export const Leads = () => {
 
           <select
             className="filter-select"
-            value={pldStatusFilter}
-            onChange={handlePldStatusChange}
-            aria-label="Filter by PLD Status"
-          >
-            <option value="">All PLD Status</option>
-            {Object.entries(PLD_STATUS_CONFIG).map(([key, cfg]) => (
-              <option key={key} value={key}>
-                {cfg.label}
-              </option>
-            ))}
-          </select>
-
-          <select
-            className="filter-select"
             value={productFilter}
             onChange={(e) => {
               setProductFilter(e.target.value);
@@ -1474,7 +1451,6 @@ export const Leads = () => {
                 <th>Status</th>
                 <th>Priority</th>
                 <th>ICP</th>
-                <th>PLD</th>
                 <th>Assigned To</th>
                 <th>Expected Value</th>
                 <th>Created</th>
@@ -1590,14 +1566,6 @@ export const Leads = () => {
                   </td>
                   <td>
                     <IcpStatusBadge status={lead.icp_status} size="sm" />
-                  </td>
-                  <td>
-                    {lead.pld_status && lead.pld_status !== PLD_STATUS.NOT_ASSESSED && (
-                      <span className="pld-score-chip" style={{ marginRight: '0.35rem' }}>
-                        {lead.pld_score ?? 0}
-                      </span>
-                    )}
-                    <PldStatusBadge status={lead.pld_status} size="sm" />
                   </td>
                   <td>
                     <span className="text-main font-semibold font-sm">

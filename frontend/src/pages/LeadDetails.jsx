@@ -27,10 +27,6 @@ import { InternalCommentsSection } from '../components/InternalCommentsSection';
 import { IcpQualificationHistory } from '../components/IcpQualificationHistory';
 import { IcpQualificationLauncher } from '../components/IcpQualificationTest';
 import { IcpStatusBadge } from '../components/IcpStatusBadge';
-import { PldAssessmentTest } from '../components/PldAssessmentTest';
-import { PldAssessmentHistory } from '../components/PldAssessmentHistory';
-import { PldNextAction } from '../components/PldNextAction';
-import { PldStatusBadge } from '../components/PldStatusBadge';
 import LeadStageTasksTab from '../components/LeadStageTasksTab';
 import StageTaskCheckpointModal from '../components/StageTaskCheckpointModal';
 import StageTransitionModal from '../components/StageTransitionModal';
@@ -105,11 +101,6 @@ export const LeadDetails = () => {
   // ICP Qualification state
   const [icpCount, setIcpCount] = useState(0);
   const [icpRefreshToken, setIcpRefreshToken] = useState(0);
-
-  // PLD state
-  const [pldModalOpen, setPldModalOpen] = useState(false);
-  const [pldRefreshToken, setPldRefreshToken] = useState(0);
-
 
   // Modals state
   const [convertModalOpen, setConvertModalOpen] = useState(false);
@@ -333,20 +324,6 @@ export const LeadDetails = () => {
       );
     }
   }, [fetchIcpHistory, fetchLeadDetails, showToast]);
-
-  const handlePldCompleted = useCallback((assessmentData) => {
-    setPldRefreshToken((prev) => prev + 1);
-    fetchLeadDetails();
-    fetchTimeline();
-    setPldModalOpen(false);
-    const isQual = assessmentData?.pld_status === 'QUALIFIED_PLD';
-    showToast(
-      isQual
-        ? `PLD Qualified! Lead scored ${assessmentData.pld_score ?? 0} points.`
-        : `Assessment saved. Current score: ${assessmentData.pld_score ?? 0} points.`,
-      isQual ? 'success' : 'info'
-    );
-  }, [fetchLeadDetails, fetchTimeline, showToast]);
 
 
     // Step 1: Open Stage Progression Checkpoint FIRST on stage change
@@ -891,25 +868,6 @@ export const LeadDetails = () => {
           {icpCount > 0 && <span className="hs-tab-pill">{icpCount}</span>}
         </button>
 
-        <button
-          type="button"
-          className={`hs-tab-btn ${activeTab === 'pld' ? 'active' : ''}`}
-          onClick={() => setActiveTab('pld')}
-        >
-          <span>PLD Discovery</span>
-          {lead?.pld_status && lead?.pld_status !== 'NOT_ASSESSED' && (
-            <span
-              className="hs-tab-pill"
-              style={{
-                backgroundColor: lead.pld_status === 'QUALIFIED_PLD' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(234, 179, 8, 0.2)',
-                color: lead.pld_status === 'QUALIFIED_PLD' ? 'var(--success)' : 'var(--warning)',
-              }}
-            >
-              {lead.pld_score ?? 0} pts
-            </span>
-          )}
-        </button>
-
         {(user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.is_superuser) && (
           <button
             type="button"
@@ -933,7 +891,6 @@ export const LeadDetails = () => {
             onUpdateProductQuantity={handleUpdateSingleProductQuantity}
             onViewTasksTab={() => setActiveTab('stage-tasks')}
             onViewActivitiesTab={() => setActiveTab('activities')}
-            onViewPldTab={() => setActiveTab('pld')}
             onScheduleFollowup={() => setScheduleModalOpen(true)}
             onOpenAiSummary={handleOpenAiSummary}
           />
@@ -1024,47 +981,6 @@ export const LeadDetails = () => {
               ICP Qualification History
             </h3>
             <IcpQualificationHistory leadId={lead.id} refreshToken={icpRefreshToken} />
-          </div>
-        )}
-
-        {activeTab === 'pld' && (
-          <div className="hs-card" style={{ padding: '1.25rem' }}>
-            <div className="pld-lead-panel-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid var(--border)' }}>
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.25rem' }}>
-                  <span style={{ fontSize: '0.8125rem', color: 'var(--text-dim)', textTransform: 'uppercase', letterSpacing: '0.5px', fontWeight: 600 }}>
-                    Problem-Led Discovery (PLD)
-                  </span>
-                  <PldStatusBadge status={lead.pld_status} />
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.875rem', color: 'var(--text-sub)' }}>
-                  <span>Qualification Score:</span>
-                  <strong style={{ fontSize: '1.125rem', color: lead.pld_status === 'QUALIFIED_PLD' ? 'var(--success)' : 'var(--warning)' }}>
-                    {lead.pld_score ?? 0} pts
-                  </strong>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => setPldModalOpen(true)}
-              >
-                <ClipboardList size={16} />
-                <span>{lead.pld_status && lead.pld_status !== 'NOT_ASSESSED' ? 'Retake PLD Assessment' : 'Start PLD Assessment'}</span>
-              </button>
-            </div>
-
-            {/* Next Recommended Action */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <PldNextAction lead={lead} onRunAssessment={() => setPldModalOpen(true)} />
-            </div>
-
-            {/* Assessment History */}
-            <h3 style={{ fontSize: '1.125rem', margin: '0 0 0.75rem 0' }}>
-              Discovery Assessment History
-            </h3>
-            <PldAssessmentHistory leadId={lead.id} refreshToken={pldRefreshToken} />
           </div>
         )}
       </div>
@@ -2087,21 +2003,6 @@ export const LeadDetails = () => {
         onClose={() => setCustomPropsModalOpen(false)}
         onPropertiesChanged={() => fetchLeadDetails()}
       />
-
-      {/* PLD Assessment Modal */}
-      {pldModalOpen && (
-        <PldAssessmentTest
-          isOpen={pldModalOpen}
-          leadId={lead.id}
-          leadName={lead.name}
-          companyName={lead.company_name}
-          initialStageId={lead.stage?.id || lead.stage}
-          stages={stages}
-          onClose={() => setPldModalOpen(false)}
-          onCompleted={handlePldCompleted}
-          onMoveStage={handleStageChange}
-        />
-      )}
     </div>
   );
 };
