@@ -893,6 +893,11 @@ export const LeadDetails = () => {
             onViewActivitiesTab={() => setActiveTab('activities')}
             onScheduleFollowup={() => setScheduleModalOpen(true)}
             onOpenAiSummary={handleOpenAiSummary}
+            onIcpCompleted={handleIcpCompleted}
+            onLeadUpdated={() => {
+              fetchLeadDetails();
+              fetchTimeline();
+            }}
           />
         )}
 

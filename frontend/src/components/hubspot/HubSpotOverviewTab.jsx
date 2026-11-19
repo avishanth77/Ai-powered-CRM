@@ -28,6 +28,7 @@ import {
   Minus,
 } from 'lucide-react';
 import { formatCurrency, formatDate, formatDateTime } from '../../utils/formatters';
+import { IcpOverviewCard } from './IcpOverviewCard';
 
 export const HubSpotOverviewTab = ({
   lead,
@@ -40,6 +41,8 @@ export const HubSpotOverviewTab = ({
   onOpenAiSummary,
   onManageProducts,
   onUpdateProductQuantity,
+  onIcpCompleted,
+  onLeadUpdated,
 }) => {
   const [collapsedSections, setCollapsedSections] = useState({});
 
@@ -51,6 +54,12 @@ export const HubSpotOverviewTab = ({
   };
 
   if (!lead) return null;
+
+  const isIcpStage = Boolean(
+    lead?.stage_details?.slug?.toLowerCase() === 'icp' ||
+    lead?.stage_details?.name?.toLowerCase() === 'icp' ||
+    lead?.status?.toLowerCase() === 'icp'
+  );
 
   const stageTaskSummary = lead.stage_task_summary || {
     total: 0,
@@ -650,6 +659,15 @@ export const HubSpotOverviewTab = ({
 
       {/* Right Column: Actionable Pulse & Highlights */}
       <div className="hs-right-column">
+        {/* ICP Qualification Questions Card (Visible when in ICP Stage) */}
+        {isIcpStage && (
+          <IcpOverviewCard
+            lead={lead}
+            onIcpCompleted={onIcpCompleted}
+            onLeadUpdated={onLeadUpdated}
+          />
+        )}
+
         {/* Stage Progression Gate Card */}
         <div className="hs-card" style={{ borderColor: stageTaskSummary.can_progress ? 'rgba(16, 185, 129, 0.3)' : 'rgba(234, 179, 8, 0.4)' }}>
           <div className="hs-card-header" style={{ background: stageTaskSummary.can_progress ? 'rgba(16, 185, 129, 0.05)' : 'rgba(234, 179, 8, 0.05)' }}>
@@ -670,6 +688,15 @@ export const HubSpotOverviewTab = ({
           </div>
 
           <div className="hs-card-body">
+            {isIcpStage && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'rgba(99, 102, 241, 0.08)', padding: '0.6rem 0.75rem', borderRadius: 'var(--radius-sm, 6px)', fontSize: '0.8125rem', color: 'var(--text-main)', border: '1px solid rgba(99, 102, 241, 0.2)' }}>
+                <Target size={15} color="var(--primary, #6366f1)" style={{ flexShrink: 0 }} />
+                <span>
+                  <strong>ICP Stage Active:</strong> Complete the ICP qualification questions above to qualify this lead and advance to the next pipeline stage.
+                </span>
+              </div>
+            )}
+
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
               <span style={{ fontSize: '0.8125rem', color: 'var(--text-dim)' }}>
                 Mandatory Stage Tasks

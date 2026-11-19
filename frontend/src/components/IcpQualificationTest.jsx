@@ -7,13 +7,13 @@ import { extractErrorMessage, normalizeServerErrors } from '../utils/validation'
 import { ICP_STATUS_CONFIG, getIcpQuestionType } from '../utils/constants';
 import { LoadingSpinner } from './LoadingSpinner';
 
-const isBlank = (value) =>
+export const isBlank = (value) =>
   value === undefined ||
   value === null ||
   (Array.isArray(value) && value.length === 0) ||
   (typeof value === 'string' && value.trim() === '');
 
-const QuestionControl = ({ question, value, onChange, error }) => {
+export const QuestionControl = ({ question, value, onChange, error, namePrefix = 'question' }) => {
   const options = question.options || [];
 
   if (question.question_type === 'TEXT') {
@@ -100,7 +100,7 @@ const QuestionControl = ({ question, value, onChange, error }) => {
             <label className={`icp-choice-item ${checked ? 'icp-choice-item-selected' : ''}`} key={option.id}>
               <input
                 type="radio"
-                name={`question-${question.id}`}
+                name={`${namePrefix}-${question.id}`}
                 checked={checked}
                 onChange={() => onChange(option.id)}
               />
