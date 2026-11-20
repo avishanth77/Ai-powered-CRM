@@ -110,6 +110,68 @@ class UserViewSet(viewsets.ModelViewSet):
         response = super().list(request, *args, **kwargs)
         return response
 
+    def destroy(self, request, *args, **kwargs):
+        """
+        Permanently remove a user from the CRM.
+        Restricted exclusively to Admins.
+        Includes self-deletion guard and automatic lead reassignment or unlinking.
+        """
+        if not (request.user and request.user.is_authenticated and (request.user.role == 'ADMIN' or request.user.is_superuser)):
+            return Response(
+                {'success': False, 'message': 'Only administrators can remove users from the CRM.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        instance = self.get_object()
+
+        # Prevent self-deletion
+        if instance.id == request.user.id:
+            return Response(
+                {'success': False, 'message': 'You cannot delete your own logged-in account.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Prevent deleting the only remaining active administrator
+        if instance.role == 'ADMIN' and User.objects.filter(role='ADMIN', is_active=True).count() <= 1:
+            return Response(
+                {'success': False, 'message': 'Cannot delete the only remaining active administrator in the CRM.'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        user_email = instance.email
+        user_name = instance.get_full_name() or user_email
+
+        reassign_to_id = request.data.get('reassign_to') or request.query_params.get('reassign_to')
+        reassign_user = None
+        if reassign_to_id:
+            reassign_user = User.objects.filter(id=reassign_to_id, is_active=True).exclude(id=instance.id).first()
+
+        from django.db import transaction
+        from leads.models import Lead, LeadHandover
+        from accounts.models import StaffTarget
+
+        with transaction.atomic():
+            leads_qs = Lead.objects.filter(assigned_to=instance)
+            leads_count = leads_qs.count()
+            if reassign_user:
+                leads_qs.update(assigned_to=reassign_user)
+            else:
+                leads_qs.update(assigned_to=None)
+
+            LeadHandover.objects.filter(new_assignee=instance).delete()
+            StaffTarget.objects.filter(user=instance).delete()
+
+            instance.delete()
+
+        logger.info(f"User '{user_name}' ({user_email}) deleted by admin {request.user.email}. {leads_count} leads reallocated.")
+
+        return Response({
+            'success': True,
+            'message': f"User '{user_name}' ({user_email}) has been permanently removed from the CRM.",
+            'reassigned_leads_count': leads_count if reassign_user else 0,
+            'unassigned_leads_count': leads_count if not reassign_user else 0
+        }, status=status.HTTP_200_OK)
+
 
 class ChangePasswordView(APIView):
     """Allows an authenticated user to change their current password."""

@@ -57,14 +57,19 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
 class UserSerializer(serializers.ModelSerializer):
     full_name = serializers.CharField(source='get_full_name', read_only=True)
+    assigned_leads_count = serializers.SerializerMethodField(read_only=True)
+
+    def get_assigned_leads_count(self, obj):
+        return obj.assigned_leads.count() if hasattr(obj, 'assigned_leads') else 0
 
     class Meta:
         model = User
         fields = [
             'id', 'email', 'first_name', 'last_name', 'full_name',
-            'phone', 'role', 'is_active', 'created_at', 'updated_at'
+            'phone', 'role', 'is_active', 'created_at', 'updated_at',
+            'assigned_leads_count'
         ]
-        read_only_fields = ['id', 'email', 'role', 'is_active', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'email', 'role', 'is_active', 'created_at', 'updated_at', 'assigned_leads_count']
 
 
 class CurrentUserProfileSerializer(serializers.ModelSerializer):

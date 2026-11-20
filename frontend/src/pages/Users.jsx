@@ -27,10 +27,14 @@ import {
   PhoneCall,
   IndianRupee,
   Settings,
+  Trash2,
+  AlertTriangle,
+  X,
+  UserX,
 } from 'lucide-react';
 
 export const Users = () => {
-  const { isAdmin, isManagerOrAdmin } = useAuth();
+  const { user, isAdmin, isManagerOrAdmin } = useAuth();
   const { showToast } = useToast();
 
   const getCurrentMonthStr = () => {
@@ -73,6 +77,40 @@ export const Users = () => {
   const [errors, setErrors] = useState({});
 
   const inviteDialogRef = useDialogA11y(modalOpen, () => setModalOpen(false));
+
+  // Delete User Modal State (Admin Only)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
+  const [reassignToUserId, setReassignToUserId] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  const deleteDialogRef = useDialogA11y(deleteModalOpen, () => {
+    if (!deleting) setDeleteModalOpen(false);
+  });
+
+  const handleOpenDeleteModal = (targetUser) => {
+    setUserToDelete(targetUser);
+    setReassignToUserId('');
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!userToDelete) return;
+    setDeleting(true);
+    try {
+      const res = await userApi.deleteUser(userToDelete.id, {
+        reassign_to: reassignToUserId || undefined,
+      });
+      showToast(res?.message || `User '${userToDelete.full_name || userToDelete.email}' has been removed from the CRM.`, 'success');
+      setDeleteModalOpen(false);
+      setUserToDelete(null);
+      fetchUsers(currentPage);
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Failed to remove user'), 'error');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const fetchUsers = async (page = 1) => {
     setLoading(true);
@@ -263,9 +301,10 @@ export const Users = () => {
                     <th>Email</th>
                     <th>Phone</th>
                     <th>Role</th>
+                    <th>Assigned Leads</th>
                     <th>Status</th>
                     <th>Joined</th>
-                    {isManagerOrAdmin && <th style={{ textAlign: 'right' }}>Target Management</th>}
+                    {isManagerOrAdmin && <th style={{ textAlign: 'right' }}>Management</th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -303,6 +342,11 @@ export const Users = () => {
                         </span>
                       </td>
                       <td>
+                        <span className="font-sm" style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                          {u.assigned_leads_count || 0} leads
+                        </span>
+                      </td>
+                      <td>
                         {u.is_active ? (
                           <span className="text-success font-semibold font-sm" style={{ color: 'var(--success)' }}>
                             Active
@@ -316,15 +360,47 @@ export const Users = () => {
                       </td>
                       {isManagerOrAdmin && (
                         <td style={{ textAlign: 'right' }}>
-                          <button
-                            type="button"
-                            className="btn btn-secondary btn-xs"
-                            onClick={() => handleOpenTargetModal(u)}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
-                          >
-                            <Target size={13} color="var(--primary)" />
-                            <span>Set Target</span>
-                          </button>
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem', justifyContent: 'flex-end' }}>
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-xs"
+                              onClick={() => handleOpenTargetModal(u)}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}
+                              title="Configure Monthly & Daily Sales Targets"
+                            >
+                              <Target size={13} color="var(--primary)" />
+                              <span>Target</span>
+                            </button>
+
+                            {isAdmin && (
+                              u.id === user?.id ? (
+                                <span
+                                  className="badge badge-secondary"
+                                  style={{ fontSize: '0.7rem', padding: '0.2rem 0.5rem', opacity: 0.7 }}
+                                  title="You cannot delete your own logged-in account"
+                                >
+                                  You
+                                </span>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="btn btn-secondary btn-xs"
+                                  style={{
+                                    color: 'var(--danger)',
+                                    borderColor: 'rgba(239, 68, 68, 0.3)',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '0.35rem',
+                                  }}
+                                  onClick={() => handleOpenDeleteModal(u)}
+                                  title={`Remove ${u.email} from CRM`}
+                                >
+                                  <Trash2 size={13} />
+                                  <span>Remove</span>
+                                </button>
+                              )
+                            )}
+                          </div>
                         </td>
                       )}
                     </tr>
@@ -641,6 +717,158 @@ export const Users = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE USER CONFIRMATION MODAL (Admin Only) */}
+      {deleteModalOpen && userToDelete && (
+        <div className="modal-backdrop" onClick={() => !deleting && setDeleteModalOpen(false)}>
+          <div
+            className="modal-container"
+            ref={deleteDialogRef}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Remove User Account"
+            onClick={(e) => e.stopPropagation()}
+            style={{ maxWidth: '520px' }}
+          >
+            <div className="modal-header">
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <div style={{
+                  width: '36px',
+                  height: '36px',
+                  borderRadius: '50%',
+                  background: 'rgba(239, 68, 68, 0.15)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: 'var(--danger, #ef4444)'
+                }}>
+                  <UserX size={20} />
+                </div>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: '1.15rem' }}>Remove User from CRM</h3>
+                  <span className="text-dim font-xs">Admin Access Only</span>
+                </div>
+              </div>
+              <button
+                type="button"
+                className="modal-close-btn"
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={deleting}
+                aria-label="Close dialog"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="modal-body form-layout" style={{ padding: '1.25rem' }}>
+              <div style={{
+                background: 'rgba(239, 68, 68, 0.08)',
+                border: '1px solid rgba(239, 68, 68, 0.25)',
+                padding: '0.85rem 1rem',
+                borderRadius: 'var(--radius-md, 8px)',
+                marginBottom: '1rem',
+                display: 'flex',
+                alignItems: 'flex-start',
+                gap: '0.75rem'
+              }}>
+                <AlertTriangle size={18} color="var(--danger)" style={{ flexShrink: 0, marginTop: '2px' }} />
+                <div style={{ fontSize: '0.85rem', color: 'var(--text-main)' }}>
+                  Are you sure you want to permanently remove <strong>{userToDelete.full_name || userToDelete.email}</strong>?
+                  This will revoke their CRM access and remove their account permanently.
+                </div>
+              </div>
+
+              {/* User Profile Summary */}
+              <div style={{
+                background: 'var(--bg-surface-elevated, #1e293b)',
+                border: '1px solid var(--border-subtle, rgba(255,255,255,0.1))',
+                borderRadius: 'var(--radius-md, 8px)',
+                padding: '1rem',
+                marginBottom: '1.25rem'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                  <span className="font-semibold text-main" style={{ fontSize: '0.95rem' }}>
+                    {userToDelete.full_name || 'No Name Set'}
+                  </span>
+                  <span
+                    className={`badge ${
+                      userToDelete.role === 'ADMIN'
+                        ? 'badge-purple'
+                        : userToDelete.role === 'MANAGER'
+                        ? 'badge-primary'
+                        : 'badge-success'
+                    }`}
+                  >
+                    <Shield size={12} />
+                    {ROLE_LABELS[userToDelete.role] || userToDelete.role}
+                  </span>
+                </div>
+                <div className="text-dim font-sm" style={{ display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <div><Mail size={12} style={{ display: 'inline', marginRight: '6px' }} /> {userToDelete.email}</div>
+                  {userToDelete.phone && (
+                    <div><Phone size={12} style={{ display: 'inline', marginRight: '6px' }} /> {userToDelete.phone}</div>
+                  )}
+                  <div>Joined on {formatDate(userToDelete.created_at)}</div>
+                </div>
+              </div>
+
+              {/* Assigned Leads Handling */}
+              {userToDelete.assigned_leads_count > 0 ? (
+                <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+                  <label className="form-label" style={{ fontWeight: 600, display: 'flex', justifyContent: 'space-between' }}>
+                    <span>Reassign Active Leads</span>
+                    <span className="badge badge-primary" style={{ fontSize: '0.7rem' }}>
+                      {userToDelete.assigned_leads_count} lead{userToDelete.assigned_leads_count > 1 ? 's' : ''} affected
+                    </span>
+                  </label>
+                  <select
+                    className="form-control"
+                    value={reassignToUserId}
+                    onChange={(e) => setReassignToUserId(e.target.value)}
+                  >
+                    <option value="">-- Unassign leads (Leave leads unassigned) --</option>
+                    {users
+                      .filter((other) => other.id !== userToDelete.id && other.is_active)
+                      .map((other) => (
+                        <option key={other.id} value={other.id}>
+                          Reassign to: {other.full_name || other.email} ({ROLE_LABELS[other.role] || other.role})
+                        </option>
+                      ))}
+                  </select>
+                  <span className="text-dim font-xs" style={{ marginTop: '0.35rem', display: 'block' }}>
+                    Select a team member to take over these {userToDelete.assigned_leads_count} leads, or leave unassigned.
+                  </span>
+                </div>
+              ) : (
+                <p className="text-dim font-xs" style={{ margin: 0 }}>
+                  This user currently has 0 active leads assigned.
+                </p>
+              )}
+            </div>
+
+            <div className="modal-footer" style={{ borderTop: '1px solid var(--border-subtle)', padding: '1rem 1.25rem' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setDeleteModalOpen(false)}
+                disabled={deleting}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={handleConfirmDelete}
+                disabled={deleting}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}
+              >
+                <Trash2 size={15} />
+                <span>{deleting ? 'Removing User...' : 'Permanently Remove User'}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}

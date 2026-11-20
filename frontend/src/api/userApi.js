@@ -16,8 +16,8 @@ export const userApi = {
     return response.data;
   },
 
-  deleteUser: async (id) => {
-    const response = await api.delete(`/api/users/${id}/`);
+  deleteUser: async (id, data = {}) => {
+    const response = await api.delete(`/api/users/${id}/`, { data, params: data });
     return response.data;
   },
 };
