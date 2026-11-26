@@ -18,9 +18,81 @@ class LeadSource(models.Model):
         return self.name
 
 
+class Pipeline(models.Model):
+    """
+    Sales Pipeline model supporting both the Default Global Pipeline and
+    completely custom product-specific pipelines with independent stages,
+    win probabilities, custom fields, and task automation rules.
+    """
+    name = models.CharField(max_length=120)
+    slug = models.SlugField(max_length=140, unique=True)
+    description = models.TextField(blank=True, default='')
+    product = models.OneToOneField(
+        'products.Product',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='custom_pipeline',
+        help_text='Optional product that owns this custom pipeline.'
+    )
+    is_default = models.BooleanField(
+        default=False,
+        db_index=True,
+        help_text='Marks the default global pipeline used when no product custom pipeline applies.'
+    )
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-is_default', 'name', 'id']
+        verbose_name = 'Pipeline'
+        verbose_name_plural = 'Pipelines'
+
+    def __str__(self):
+        if self.product_id:
+            return f"{self.name} ({self.product.name})"
+        return self.name
+
+    @classmethod
+    def get_default(cls):
+        default = cls.objects.filter(is_default=True).first()
+        if not default:
+            default, _ = cls.objects.get_or_create(
+                slug='default',
+                defaults={
+                    'name': 'Default Pipeline',
+                    'description': 'Standard sales pipeline used across all products without a custom pipeline.',
+                    'is_default': True,
+                    'is_active': True,
+                }
+            )
+            if not default.is_default:
+                default.is_default = True
+                default.save(update_fields=['is_default'])
+        return default
+
+    @classmethod
+    def get_for_product(cls, product_or_id):
+        pid = getattr(product_or_id, 'id', product_or_id)
+        if pid:
+            custom = cls.objects.filter(product_id=pid, is_active=True).first()
+            if custom:
+                return custom
+        return cls.get_default()
+
+
 class LeadStage(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    slug = models.SlugField(max_length=120, unique=True)
+    pipeline = models.ForeignKey(
+        Pipeline,
+        on_delete=models.CASCADE,
+        related_name='stages',
+        null=True,
+        blank=True,
+        db_index=True
+    )
+    name = models.CharField(max_length=100)
+    slug = models.SlugField(max_length=120)
     description = models.TextField(blank=True, null=True)
     color = models.CharField(max_length=30, default='#6366F1')
     display_order = models.PositiveIntegerField(default=1)
@@ -44,13 +116,26 @@ class LeadStage(models.Model):
         ordering = ['display_order', 'id']
         verbose_name = 'Lead Stage'
         verbose_name_plural = 'Lead Stages'
+        unique_together = [('pipeline', 'name'), ('pipeline', 'slug')]
+
+    def save(self, *args, **kwargs):
+        if not self.pipeline_id:
+            self.pipeline = Pipeline.get_default()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
 
 
-def get_default_stage():
-    stage = LeadStage.objects.filter(is_system=True, slug='new').first() or LeadStage.objects.order_by('display_order').first()
+def get_default_stage(pipeline=None):
+    target_pipeline = pipeline or Pipeline.get_default()
+    qs = LeadStage.objects.filter(pipeline=target_pipeline, is_active=True)
+    stage = (
+        qs.filter(is_system=True, slug='new').first()
+        or qs.filter(slug='new').first()
+        or qs.order_by('display_order', 'id').first()
+        or LeadStage.objects.filter(pipeline=target_pipeline).order_by('display_order', 'id').first()
+    )
     return stage.id if stage else None
 
 
@@ -139,6 +224,14 @@ class Lead(models.Model):
         null=True,
         blank=True,
         related_name='leads'
+    )
+    pipeline = models.ForeignKey(
+        Pipeline,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='leads',
+        db_index=True
     )
     stage = models.ForeignKey(
         LeadStage,
@@ -290,6 +383,7 @@ class Lead(models.Model):
         indexes = [
             models.Index(fields=['phone']),
             models.Index(fields=['email']),
+            models.Index(fields=['pipeline']),
             models.Index(fields=['stage']),
             models.Index(fields=['assigned_to']),
             models.Index(fields=['created_at']),
@@ -303,15 +397,23 @@ class Lead(models.Model):
     def status(self, value):
         if isinstance(value, LeadStage):
             self.stage = value
+            if value.pipeline_id:
+                self.pipeline_id = value.pipeline_id
         elif isinstance(value, str):
             val = value.strip()
-            stage = LeadStage.objects.filter(
+            target_pipeline = self.pipeline if self.pipeline_id else Pipeline.get_default()
+            stage_q = (
                 models.Q(slug__iexact=val.lower().replace('_', '-')) |
                 models.Q(slug__iexact=val) |
                 models.Q(name__iexact=val)
-            ).first()
+            )
+            stage = LeadStage.objects.filter(pipeline=target_pipeline).filter(stage_q).first()
+            if not stage:
+                stage = LeadStage.objects.filter(stage_q).first()
             if stage:
                 self.stage = stage
+                if stage.pipeline_id:
+                    self.pipeline_id = stage.pipeline_id
 
     @property
     def effective_win_probability(self):
@@ -399,10 +501,24 @@ class Lead(models.Model):
 
     def save(self, *args, **kwargs):
         from django.utils import timezone
+        if self.stage_id and self.stage and self.stage.pipeline_id:
+            self.pipeline_id = self.stage.pipeline_id
+        elif not self.pipeline_id:
+            self.pipeline = Pipeline.get_default()
+
         if not self.stage_id:
-            default_stage = LeadStage.objects.filter(is_system=True, slug='new').first() or LeadStage.objects.order_by('display_order').first()
+            target_pipeline = self.pipeline or Pipeline.get_default()
+            default_stage = (
+                LeadStage.objects.filter(pipeline=target_pipeline, is_system=True, slug='new').first()
+                or LeadStage.objects.filter(pipeline=target_pipeline, slug='new').first()
+                or LeadStage.objects.filter(pipeline=target_pipeline).order_by('display_order', 'id').first()
+                or LeadStage.objects.filter(is_system=True, slug='new').first()
+                or LeadStage.objects.order_by('display_order', 'id').first()
+            )
             if default_stage:
                 self.stage = default_stage
+                if default_stage.pipeline_id:
+                    self.pipeline_id = default_stage.pipeline_id
 
         # Stage change tracking
         if self.pk:

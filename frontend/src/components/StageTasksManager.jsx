@@ -91,9 +91,11 @@ const emptyRuleForm = (defaultStageId = '') => ({
   is_active: true,
 });
 
-export const StageTasksManager = ({ initialStageId = null, onStageUpdated = null }) => {
+export const StageTasksManager = ({ initialStageId = null, initialPipelineId = null, onStageUpdated = null }) => {
   const { showToast } = useToast();
 
+  const [pipelines, setPipelines] = useState([]);
+  const [selectedPipelineId, setSelectedPipelineId] = useState(initialPipelineId ? String(initialPipelineId) : '');
   const [rules, setRules] = useState([]);
   const [stages, setStages] = useState([]);
   const [users, setUsers] = useState([]);
@@ -137,9 +139,22 @@ export const StageTasksManager = ({ initialStageId = null, onStageUpdated = null
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
+      const pipeRes = await leadApi.getPipelines({ all: 'true' }).catch(() => []);
+      const pipeList = pipeRes?.results || (Array.isArray(pipeRes) ? pipeRes : []);
+      setPipelines(pipeList);
+      let activePid = selectedPipelineId;
+      if (!activePid && pipeList.length > 0) {
+        const def = pipeList.find((p) => p.is_default) || pipeList[0];
+        activePid = String(def.id);
+        setSelectedPipelineId(activePid);
+      }
+
+      const stageParams = { all: 'true' };
+      if (activePid) stageParams.pipeline = activePid;
+
       const [rulesRes, stagesRes, usersRes] = await Promise.all([
         leadApi.getStageTaskRules(),
-        leadApi.getStages({ all: 'true' }),
+        leadApi.getStages(stageParams),
         userApi.getUsers(),
       ]);
 
@@ -157,7 +172,7 @@ export const StageTasksManager = ({ initialStageId = null, onStageUpdated = null
     } finally {
       setLoading(false);
     }
-  }, [showToast]);
+  }, [showToast, selectedPipelineId]);
 
   useEffect(() => {
     loadData();
@@ -363,8 +378,12 @@ export const StageTasksManager = ({ initialStageId = null, onStageUpdated = null
     return text;
   };
 
-  // Filtered rules
+  // Filtered rules (scoped to active pipeline stages)
+  const pipelineStageIds = new Set(stages.map((s) => String(s.id)));
   const filteredRules = rules.filter((rule) => {
+    if (pipelineStageIds.size > 0 && !pipelineStageIds.has(String(rule.stage))) {
+      return false;
+    }
     if (selectedStageFilter && String(rule.stage) !== String(selectedStageFilter)) {
       return false;
     }
@@ -426,6 +445,26 @@ export const StageTasksManager = ({ initialStageId = null, onStageUpdated = null
           border: '1px solid var(--border-color)',
         }}
       >
+        {pipelines.length > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>Pipeline:</span>
+            <select
+              className="form-control"
+              value={selectedPipelineId}
+              onChange={(e) => {
+                setSelectedPipelineId(e.target.value);
+                setSelectedStageFilter('');
+              }}
+              style={{ width: 'auto', minWidth: '200px' }}
+            >
+              {pipelines.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}{p.product_name ? ` (${p.product_name})` : ' (Global)'}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', minWidth: '220px' }}>
           <Layers size={16} color="var(--text-muted)" />
           <span style={{ fontSize: '0.875rem', fontWeight: 600 }}>Filter by Stage:</span>

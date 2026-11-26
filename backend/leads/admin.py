@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import LeadSource, LeadStage, Lead, LeadNote, LeadHandover
+from .models import LeadSource, Pipeline, LeadStage, Lead, LeadNote, LeadHandover
 
 class LeadNoteInline(admin.TabularInline):
     model = LeadNote
@@ -12,17 +12,23 @@ class LeadSourceAdmin(admin.ModelAdmin):
     list_filter = ('is_active',)
     search_fields = ('name', 'description')
 
+@admin.register(Pipeline)
+class PipelineAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'product', 'is_default', 'is_active', 'created_at')
+    list_filter = ('is_default', 'is_active')
+    search_fields = ('name', 'slug', 'product__name')
+
 @admin.register(LeadStage)
 class LeadStageAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'color', 'display_order', 'is_active', 'is_system', 'created_at')
-    list_filter = ('is_active', 'is_system')
+    list_display = ('name', 'pipeline', 'slug', 'color', 'display_order', 'is_active', 'is_system', 'created_at')
+    list_filter = ('pipeline', 'is_active', 'is_system')
     search_fields = ('name', 'slug', 'description')
-    ordering = ('display_order',)
+    ordering = ('pipeline', 'display_order')
 
 @admin.register(Lead)
 class LeadAdmin(admin.ModelAdmin):
-    list_display = ('name', 'company_name', 'phone', 'email', 'stage', 'priority', 'assigned_to', 'expected_value', 'created_at')
-    list_filter = ('stage', 'priority', 'source', 'assigned_to')
+    list_display = ('name', 'company_name', 'phone', 'email', 'pipeline', 'stage', 'priority', 'assigned_to', 'expected_value', 'created_at')
+    list_filter = ('pipeline', 'stage', 'priority', 'source', 'assigned_to')
     search_fields = ('name', 'phone', 'email', 'company_name')
     readonly_fields = ('created_at', 'updated_at', 'converted_at')
     inlines = [LeadNoteInline]

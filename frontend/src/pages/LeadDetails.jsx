@@ -240,25 +240,27 @@ export const LeadDetails = () => {
     }
   };
 
+  const fetchStages = useCallback(async (pipelineId = null) => {
+    try {
+      const params = pipelineId ? { pipeline: pipelineId } : {};
+      const res = await leadApi.getStages(params);
+      setStages(res.results || (Array.isArray(res) ? res : []));
+    } catch {}
+  }, []);
+
   const fetchLeadDetails = useCallback(async () => {
     try {
       const res = await leadApi.getLeadById(id);
       setLead(res);
       setSelectedAssignee(res.assigned_to || '');
+      fetchStages(res.pipeline || null);
     } catch (err) {
       showToast(extractErrorMessage(err, 'Failed to load lead profile'), 'error');
       navigate('/leads');
     } finally {
       setLoading(false);
     }
-  }, [id, navigate, showToast]);
-
-  const fetchStages = useCallback(async () => {
-    try {
-      const res = await leadApi.getStages();
-      setStages(res.results || (Array.isArray(res) ? res : []));
-    } catch {}
-  }, []);
+  }, [id, navigate, showToast, fetchStages]);
 
   // Normalize list-shaped responses; a non-array payload must not blank the page.
   const asList = (value) => (Array.isArray(value) ? value : []);
@@ -301,7 +303,6 @@ export const LeadDetails = () => {
 
   useEffect(() => {
     fetchLeadDetails();
-    fetchStages();
     fetchNotes();
     fetchTimeline();
     fetchFollowups();

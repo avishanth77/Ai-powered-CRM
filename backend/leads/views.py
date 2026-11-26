@@ -15,6 +15,7 @@ import json
 
 from .models import (
     Lead,
+    Pipeline,
     LeadStage,
     LeadSource,
     LeadNote,
@@ -28,6 +29,8 @@ from .models import (
 )
 from .serializers import (
     LeadSourceSerializer,
+    PipelineSerializer,
+    PipelineSimpleSerializer,
     LeadStageSerializer,
     LeadHandoverSerializer,
     LeadHandoverRequestSerializer,
@@ -46,6 +49,7 @@ from .serializers import (
 )
 from .permissions import (
     LeadPermission,
+    PipelinePermission,
     LeadSourcePermission,
     LeadStagePermission,
     StageTaskRulePermission,
@@ -64,21 +68,333 @@ from notifications.services import NotificationService
 User = get_user_model()
 
 
+def _resolve_pipeline_from_request(request):
+    """
+    Resolves a Pipeline from query parameters (`pipeline`, `pipeline_id`, `product`, `product_id`).
+    Falls back to the Default Global Pipeline if none is explicitly requested or product has no custom pipeline.
+    """
+    pipeline_param = request.query_params.get('pipeline') or request.query_params.get('pipeline_id')
+    if pipeline_param and str(pipeline_param).lower() not in ('', 'all', 'default'):
+        if str(pipeline_param).isdigit():
+            found = Pipeline.objects.filter(pk=int(pipeline_param)).first()
+            if found:
+                return found
+        found = Pipeline.objects.filter(slug__iexact=str(pipeline_param).strip()).first()
+        if found:
+            return found
+
+    prod_param = request.query_params.get('product') or request.query_params.get('product_id')
+    if prod_param and str(prod_param).lower() not in ('', 'all'):
+        if str(prod_param).isdigit():
+            cp = Pipeline.objects.filter(product_id=int(prod_param), is_active=True).first()
+            if cp:
+                return cp
+        else:
+            cp = Pipeline.objects.filter(product__code__iexact=str(prod_param).strip(), is_active=True).first()
+            if cp:
+                return cp
+
+    return Pipeline.get_default()
+
+
+def _clone_stages_into_pipeline(target_pipeline, source_pipeline=None, clone_rules=True, clone_fields=True, mode='clone', initial_stages=None):
+    """
+    Seeds stages into a newly created or empty Pipeline.
+    Supports:
+    - mode='custom' with `initial_stages` list
+    - mode='minimal' (New, Won, Lost)
+    - mode='clone' (clones active/all stages from `source_pipeline` or Default Pipeline)
+    """
+    from django.utils.text import slugify
+
+    if mode == 'custom' and isinstance(initial_stages, list) and len(initial_stages) > 0:
+        created_stages = []
+        used_slugs = set()
+        for idx, item in enumerate(initial_stages, start=1):
+            name = str(item.get('name') or f"Stage {idx}").strip()
+            raw_slug = item.get('slug') or slugify(name) or f"stage-{idx}"
+            slug = raw_slug
+            c = 1
+            while slug in used_slugs:
+                slug = f"{raw_slug}-{c}"
+                c += 1
+            used_slugs.add(slug)
+
+            is_sys = bool(item.get('is_system', slug in ('new', 'won', 'lost')))
+            win_prob = item.get('win_probability')
+            if win_prob is None:
+                win_prob = 100 if slug == 'won' else (0 if slug == 'lost' else min(90, idx * 15))
+            color = item.get('color') or ('#0d9488' if slug == 'won' else ('#e11d48' if slug == 'lost' else '#6366F1'))
+
+            stg = LeadStage.objects.create(
+                pipeline=target_pipeline,
+                name=name,
+                slug=slug,
+                description=item.get('description', ''),
+                color=color,
+                display_order=idx,
+                is_active=bool(item.get('is_active', True)),
+                is_system=is_sys,
+                require_manager_approval=bool(item.get('require_manager_approval', False)),
+                win_probability=max(0, min(100, int(win_prob))),
+                win_probability_reason=item.get('win_probability_reason', ''),
+            )
+            created_stages.append(stg)
+        return created_stages
+
+    if mode == 'minimal':
+        minimal_defs = [
+            {'name': 'New', 'slug': 'new', 'color': '#0284c7', 'display_order': 1, 'is_system': True, 'win_probability': 10, 'description': 'Newly created lead'},
+            {'name': 'Won', 'slug': 'won', 'color': '#0d9488', 'display_order': 2, 'is_system': True, 'win_probability': 100, 'description': 'Deal won / converted'},
+            {'name': 'Lost', 'slug': 'lost', 'color': '#e11d48', 'display_order': 3, 'is_system': True, 'win_probability': 0, 'description': 'Deal lost or archived'},
+        ]
+        return [
+            LeadStage.objects.create(pipeline=target_pipeline, is_active=True, **st)
+            for st in minimal_defs
+        ]
+
+    src = source_pipeline or Pipeline.get_default()
+    src_stages = list(LeadStage.objects.filter(pipeline=src).order_by('display_order', 'id'))
+    if not src_stages:
+        return _clone_stages_into_pipeline(target_pipeline, mode='minimal')
+
+    created_stages = []
+    stage_map = {}
+    for idx, st in enumerate(src_stages, start=1):
+        new_st = LeadStage.objects.create(
+            pipeline=target_pipeline,
+            name=st.name,
+            slug=st.slug,
+            description=st.description,
+            color=st.color,
+            display_order=idx,
+            is_active=st.is_active,
+            is_system=st.is_system,
+            require_manager_approval=st.require_manager_approval,
+            win_probability=st.win_probability,
+            win_probability_reason=st.win_probability_reason,
+        )
+        stage_map[st.id] = new_st
+        created_stages.append(new_st)
+
+    if clone_rules:
+        for old_st_id, new_st in stage_map.items():
+            rules = StageTaskRule.objects.filter(stage_id=old_st_id).order_by('order', 'id')
+            rule_map = {}
+            for r in rules:
+                new_rule = StageTaskRule.objects.create(
+                    stage=new_st,
+                    name=r.name,
+                    purpose=r.purpose,
+                    title=r.title,
+                    description_template=r.description_template,
+                    assignee_strategy=r.assignee_strategy,
+                    specific_user=r.specific_user,
+                    fallback_user=r.fallback_user,
+                    due_offset_value=r.due_offset_value,
+                    due_offset_unit=r.due_offset_unit,
+                    priority_filter=r.priority_filter,
+                    is_mandatory=r.is_mandatory,
+                    order=r.order,
+                    task_priority=r.task_priority,
+                    requires_approval=r.requires_approval,
+                    prevent_duplicate=r.prevent_duplicate,
+                    is_active=r.is_active,
+                    created_by=r.created_by,
+                )
+                if r.round_robin_users.exists():
+                    new_rule.round_robin_users.set(r.round_robin_users.all())
+                rule_map[r.id] = new_rule
+
+    if clone_fields:
+        for old_st_id, new_st in stage_map.items():
+            fields = CustomPropertyDefinition.objects.filter(stage_id=old_st_id).order_by('display_order', 'id')
+            for f in fields:
+                base_fname = f"{f.name}_p{target_pipeline.id}"
+                fname = base_fname[:60]
+                fc = 1
+                while CustomPropertyDefinition.objects.filter(name=fname).exists():
+                    fname = f"{base_fname[:55]}_{fc}"
+                    fc += 1
+                CustomPropertyDefinition.objects.create(
+                    name=fname,
+                    label=f.label,
+                    field_type=f.field_type,
+                    section=f.section,
+                    stage=new_st,
+                    options=f.options,
+                    is_mandatory=f.is_mandatory,
+                    is_active=f.is_active,
+                    display_order=f.display_order,
+                    placeholder=f.placeholder,
+                    help_text=f.help_text,
+                )
+
+    return created_stages
+
+
+class PipelineViewSet(viewsets.ModelViewSet):
+    """
+    CRUD and cloning API for Sales Pipelines (Default Global Pipeline + Per-Product Custom Pipelines).
+    """
+    queryset = Pipeline.objects.select_related('product').annotate(
+        stages_count=Count('stages', filter=Q(stages__is_active=True), distinct=True),
+        leads_count=Count('leads', distinct=True),
+    ).order_by('-is_default', 'name', 'id')
+    serializer_class = PipelineSerializer
+    permission_classes = [PipelinePermission]
+    search_fields = ['name', 'description', 'product__name', 'product__code']
+    filterset_fields = ['is_default', 'is_active', 'product']
+
+    def get_queryset(self):
+        user = self.request.user
+        if not user.is_authenticated:
+            return Pipeline.objects.none()
+        Pipeline.get_default()
+        qs = Pipeline.objects.select_related('product').annotate(
+            stages_count=Count('stages', filter=Q(stages__is_active=True), distinct=True),
+            leads_count=Count('leads', distinct=True),
+        ).order_by('-is_default', 'name', 'id')
+        include_all = (
+            user.role == 'ADMIN' or
+            user.is_superuser or
+            self.request.query_params.get('all') == 'true'
+        )
+        if not include_all:
+            qs = qs.filter(is_active=True)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        data = request.data.copy() if hasattr(request.data, 'copy') else dict(request.data)
+        mode = data.pop('mode', 'clone')
+        clone_from_id = data.pop('clone_from', None)
+        clone_rules = bool(data.pop('clone_rules', True))
+        clone_fields = bool(data.pop('clone_fields', False))
+        initial_stages = data.pop('initial_stages', None)
+
+        if not data.get('name') and data.get('product'):
+            from products.models import Product
+            prod = Product.objects.filter(pk=data['product']).first()
+            if prod:
+                data['name'] = f"{prod.name} Pipeline"
+
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+
+        source_pipeline = None
+        if clone_from_id:
+            source_pipeline = Pipeline.objects.filter(pk=clone_from_id).first()
+
+        with transaction.atomic():
+            pipeline = serializer.save()
+            _clone_stages_into_pipeline(
+                target_pipeline=pipeline,
+                source_pipeline=source_pipeline,
+                clone_rules=clone_rules,
+                clone_fields=clone_fields,
+                mode=mode,
+                initial_stages=initial_stages,
+            )
+
+        fresh = self.get_queryset().get(pk=pipeline.pk)
+        return Response({
+            'success': True,
+            'message': f"Pipeline '{fresh.name}' created with {fresh.stages.count()} stage(s).",
+            'data': PipelineSerializer(fresh).data,
+        }, status=status.HTTP_201_CREATED)
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance.is_default:
+            return Response({
+                'success': False,
+                'message': 'The Default Global Pipeline cannot be deleted.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        leads_count = instance.leads.count()
+        fallback = request.data.get('fallback_to_default') or request.query_params.get('fallback_to_default')
+        if leads_count > 0 and not str(fallback).lower() in ('true', '1', 'yes'):
+            return Response({
+                'success': False,
+                'message': f"This pipeline currently has {leads_count} lead(s). Confirm moving them back to the Default Pipeline before deleting.",
+                'leads_count': leads_count,
+                'requires_confirmation': True,
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        default_pipeline = Pipeline.get_default()
+        default_new = (
+            LeadStage.objects.filter(pipeline=default_pipeline, slug='new').first()
+            or LeadStage.objects.filter(pipeline=default_pipeline).order_by('display_order', 'id').first()
+        )
+        default_stages_by_slug = {st.slug: st for st in LeadStage.objects.filter(pipeline=default_pipeline)}
+
+        with transaction.atomic():
+            if leads_count > 0:
+                for ld in instance.leads.select_related('stage').all():
+                    slug = ld.stage.slug if ld.stage else 'new'
+                    target_stage = default_stages_by_slug.get(slug) or default_new
+                    ld.pipeline = default_pipeline
+                    if target_stage:
+                        ld.stage = target_stage
+                    ld.save(update_fields=['pipeline', 'stage', 'updated_at'])
+            pname = instance.name
+            instance.delete()
+
+        return Response({
+            'success': True,
+            'message': f"Custom pipeline '{pname}' deleted." + (f" Moved {leads_count} lead(s) to Default Pipeline." if leads_count else ""),
+        }, status=status.HTTP_200_OK)
+
+    @action(detail=True, methods=['post'], url_path='clone-stages')
+    def clone_stages(self, request, pk=None):
+        target_pipeline = self.get_object()
+        source_id = request.data.get('source_pipeline_id')
+        source_pipeline = Pipeline.objects.filter(pk=source_id).first() if source_id else Pipeline.get_default()
+        if target_pipeline.stages.exists() and not request.data.get('replace'):
+            return Response({
+                'success': False,
+                'message': 'This pipeline already has stages. Pass replace=true (only if no leads exist) to replace them.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        if target_pipeline.stages.exists() and target_pipeline.leads.exists():
+            return Response({
+                'success': False,
+                'message': 'Cannot replace stages while active leads exist in this pipeline.'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        with transaction.atomic():
+            if target_pipeline.stages.exists():
+                target_pipeline.stages.all().delete()
+            created = _clone_stages_into_pipeline(
+                target_pipeline=target_pipeline,
+                source_pipeline=source_pipeline,
+                clone_rules=bool(request.data.get('clone_rules', True)),
+                clone_fields=bool(request.data.get('clone_fields', False)),
+                mode='clone',
+            )
+
+        return Response({
+            'success': True,
+            'message': f"Cloned {len(created)} stage(s) into '{target_pipeline.name}'.",
+            'data': LeadStageSerializer(created, many=True).data,
+        })
+
+
 class LeadStageViewSet(viewsets.ModelViewSet):
     """
     CRUD and dynamic management API for Lead Stages.
     - Admin: Full management (Create, Update, Delete, Reorder, Toggle Active)
     - Others: Read-only access to active stages
     """
-    queryset = LeadStage.objects.annotate(leads_count=Count('leads', distinct=True), task_rules_count=Count('task_rules', filter=Q(task_rules__is_active=True), distinct=True)).order_by('display_order', 'id')
+    queryset = LeadStage.objects.select_related('pipeline', 'pipeline__product').annotate(leads_count=Count('leads', distinct=True), task_rules_count=Count('task_rules', filter=Q(task_rules__is_active=True), distinct=True)).order_by('display_order', 'id')
     serializer_class = LeadStageSerializer
     permission_classes = [LeadStagePermission]
     search_fields = ['name', 'description', 'slug']
-    filterset_fields = ['is_active', 'is_system']
+    filterset_fields = ['is_active', 'is_system', 'pipeline']
 
     def get_queryset(self):
         user = self.request.user
-        qs = LeadStage.objects.annotate(leads_count=Count('leads', distinct=True), task_rules_count=Count('task_rules', filter=Q(task_rules__is_active=True), distinct=True)).order_by('display_order', 'id')
+        qs = LeadStage.objects.select_related('pipeline', 'pipeline__product').annotate(leads_count=Count('leads', distinct=True), task_rules_count=Count('task_rules', filter=Q(task_rules__is_active=True), distinct=True)).order_by('display_order', 'id')
         if not user.is_authenticated:
             return qs.none()
 
@@ -91,15 +407,17 @@ class LeadStageViewSet(viewsets.ModelViewSet):
         if not include_all:
             qs = qs.filter(is_active=True)
 
-        stage_param = self.request.query_params.get('stage') or self.request.query_params.get('stage_id')
-        if stage_param is not None:
-            if str(stage_param).lower() in ('', 'null', 'none', 'global'):
-                qs = qs.filter(stage__isnull=True)
-            elif str(stage_param).lower() != 'all':
-                try:
-                    qs = qs.filter(stage_id=int(stage_param))
-                except (ValueError, TypeError):
-                    pass
+        if self.action in ('list', 'funnel'):
+            pipeline_param = self.request.query_params.get('pipeline') or self.request.query_params.get('pipeline_id')
+            prod_param = self.request.query_params.get('product') or self.request.query_params.get('product_id')
+            if pipeline_param and str(pipeline_param).lower() == 'all':
+                pass
+            elif pipeline_param or prod_param:
+                target_pipeline = _resolve_pipeline_from_request(self.request)
+                qs = qs.filter(pipeline=target_pipeline)
+            elif not self.request.query_params.get('all_pipelines'):
+                qs = qs.filter(pipeline=Pipeline.get_default())
+
         return qs
 
     def destroy(self, request, *args, **kwargs):
@@ -129,18 +447,19 @@ class LeadStageViewSet(viewsets.ModelViewSet):
                     'stage_name': instance.name,
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            target_stage = LeadStage.objects.filter(id=move_to_stage_id, is_active=True).first()
+            target_stage = LeadStage.objects.filter(id=move_to_stage_id, pipeline=instance.pipeline, is_active=True).first()
             if not target_stage or target_stage.id == instance.id:
                 return Response({
                     'success': False,
-                    'message': "Invalid replacement stage selected. Target stage must exist, be active, and differ from deleted stage."
+                    'message': "Invalid replacement stage selected. Target stage must belong to the same pipeline, be active, and differ from deleted stage."
                 }, status=status.HTTP_400_BAD_REQUEST)
 
             with transaction.atomic():
                 instance.leads.update(stage=target_stage)
                 stage_name = instance.name
+                stage_pipeline = instance.pipeline
                 instance.delete()
-                resequence_stages()
+                resequence_stages(pipeline=stage_pipeline)
 
             return Response({
                 'success': True,
@@ -149,8 +468,9 @@ class LeadStageViewSet(viewsets.ModelViewSet):
 
         with transaction.atomic():
             stage_name = instance.name
+            stage_pipeline = instance.pipeline
             instance.delete()
-            resequence_stages()
+            resequence_stages(pipeline=stage_pipeline)
 
         return Response({
             'success': True,
@@ -185,13 +505,14 @@ class LeadStageViewSet(viewsets.ModelViewSet):
 
         direction = request.data.get('direction')
         new_order = request.data.get('display_order')
+        stage_pipeline = instance.pipeline or Pipeline.get_default()
 
-        # First ensure all stages are cleanly sequenced 1..N
-        resequence_stages()
+        # First ensure all stages in this pipeline are cleanly sequenced 1..N
+        resequence_stages(pipeline=stage_pipeline)
         instance.refresh_from_db()
 
         if direction == 'up':
-            prev_stage = LeadStage.objects.filter(display_order__lt=instance.display_order).order_by('-display_order').first()
+            prev_stage = LeadStage.objects.filter(pipeline=stage_pipeline, display_order__lt=instance.display_order).order_by('-display_order').first()
             if prev_stage:
                 with transaction.atomic():
                     old_order = instance.display_order
@@ -199,10 +520,10 @@ class LeadStageViewSet(viewsets.ModelViewSet):
                     prev_stage.display_order = old_order
                     instance.save(update_fields=['display_order'])
                     prev_stage.save(update_fields=['display_order'])
-                    resequence_stages()
+                    resequence_stages(pipeline=stage_pipeline)
                     instance.refresh_from_db()
         elif direction == 'down':
-            next_stage = LeadStage.objects.filter(display_order__gt=instance.display_order).order_by('display_order').first()
+            next_stage = LeadStage.objects.filter(pipeline=stage_pipeline, display_order__gt=instance.display_order).order_by('display_order').first()
             if next_stage:
                 with transaction.atomic():
                     old_order = instance.display_order
@@ -210,7 +531,7 @@ class LeadStageViewSet(viewsets.ModelViewSet):
                     next_stage.display_order = old_order
                     instance.save(update_fields=['display_order'])
                     next_stage.save(update_fields=['display_order'])
-                    resequence_stages()
+                    resequence_stages(pipeline=stage_pipeline)
                     instance.refresh_from_db()
         elif new_order is not None:
             try:
@@ -233,7 +554,7 @@ class LeadStageViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['post'], url_path='reorder')
     def reorder(self, request):
         """
-        Bulk reorder stages. Expects:
+        Bulk reorder stages within a pipeline. Expects:
         {"order": [stage_id_1, stage_id_2, ...]}
         or
         {"order": [{"id": 1, "display_order": 1}, ...]}
@@ -246,6 +567,10 @@ class LeadStageViewSet(viewsets.ModelViewSet):
         if not isinstance(order_data, list):
             return Response({'success': False, 'message': 'order list is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        target_pipeline = None
+        if request.data.get('pipeline'):
+            target_pipeline = Pipeline.objects.filter(pk=request.data.get('pipeline')).first()
+
         with transaction.atomic():
             if order_data and isinstance(order_data[0], dict):
                 for item in order_data:
@@ -253,16 +578,27 @@ class LeadStageViewSet(viewsets.ModelViewSet):
                     dorder = item.get('display_order')
                     if sid and dorder:
                         LeadStage.objects.filter(id=sid).update(display_order=dorder)
+                        if not target_pipeline:
+                            st = LeadStage.objects.filter(id=sid).first()
+                            if st:
+                                target_pipeline = st.pipeline
             elif order_data:
                 for idx, sid in enumerate(order_data, start=1):
                     if isinstance(sid, int) or (isinstance(sid, str) and sid.isdigit()):
                         LeadStage.objects.filter(id=int(sid)).update(display_order=idx)
-            resequence_stages()
+                        if not target_pipeline:
+                            st = LeadStage.objects.filter(id=int(sid)).first()
+                            if st:
+                                target_pipeline = st.pipeline
+            resequence_stages(pipeline=target_pipeline)
 
+        qs = self.get_queryset()
+        if target_pipeline:
+            qs = qs.filter(pipeline=target_pipeline)
         return Response({
             'success': True,
             'message': 'Stages successfully reordered.',
-            'data': LeadStageSerializer(self.get_queryset(), many=True).data
+            'data': LeadStageSerializer(qs, many=True).data
         })
 
     @action(detail=True, methods=['get'], url_path='stats')
@@ -274,6 +610,7 @@ class LeadStageViewSet(viewsets.ModelViewSet):
                 'id': instance.id,
                 'name': instance.name,
                 'stage_name': instance.name,
+                'pipeline': instance.pipeline_id,
                 'is_active': instance.is_active,
                 'active_status': instance.is_active,
                 'number_of_leads': instance.leads.count(),
@@ -286,16 +623,23 @@ class LeadStageViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'], url_path='funnel')
     def funnel(self, request):
         """
-        Opportunity Stage Distribution & Win Probability Funnel data.
-        Returns stages ordered by display_order, with win probability %, reason,
-        active lead counts, pipeline distribution %, total value, and weighted forecast value.
+        Opportunity Stage Distribution & Win Probability Funnel data,
+        scoped to the requested Pipeline (or Product's custom pipeline, or Default Pipeline).
         """
         user = request.user
-        leads_qs = Lead.objects.all()
+        target_pipeline = _resolve_pipeline_from_request(request)
+        leads_qs = Lead.objects.filter(pipeline=target_pipeline)
+        prod_filter = request.query_params.get('product') or request.query_params.get('product_id')
+        if prod_filter:
+            if str(prod_filter).isdigit():
+                leads_qs = leads_qs.filter(lead_products__product_id=int(prod_filter)).distinct()
+            else:
+                leads_qs = leads_qs.filter(lead_products__product__code__iexact=prod_filter).distinct()
+
         if user.is_authenticated and user.role == 'EXECUTIVE' and not user.is_superuser:
             leads_qs = leads_qs.filter(Q(assigned_to=user) | Q(created_by=user))
 
-        stages = LeadStage.objects.filter(is_active=True).order_by('display_order', 'id')
+        stages = LeadStage.objects.filter(pipeline=target_pipeline, is_active=True).order_by('display_order', 'id')
         total_leads = leads_qs.count()
         total_pipeline_val = leads_qs.aggregate(s=Sum('expected_value'))['s'] or Decimal('0.00')
 
@@ -330,6 +674,7 @@ class LeadStageViewSet(viewsets.ModelViewSet):
         return Response({
             'success': True,
             'data': {
+                'pipeline': PipelineSimpleSerializer(target_pipeline).data,
                 'total_leads': total_leads,
                 'total_pipeline_value': float(total_pipeline_val),
                 'total_weighted_forecast': float(cumulative_weighted_forecast),
@@ -604,7 +949,7 @@ class LeadViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        qs = Lead.objects.select_related('source', 'stage', 'previous_stage', 'assigned_to', 'created_by') \
+        qs = Lead.objects.select_related('source', 'pipeline', 'pipeline__product', 'stage', 'previous_stage', 'assigned_to', 'created_by') \
                          .prefetch_related('lead_products__product', 'custom_property_values__property_def') \
                          .annotate(
                              notes_count=Count('notes', distinct=True),
@@ -842,7 +1187,13 @@ class LeadViewSet(viewsets.ModelViewSet):
                 'data': CustomerSerializer(lead.customer_profile).data
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        won_stage = LeadStage.objects.filter(slug='won').first() or LeadStage.objects.filter(name__iexact='won').first()
+        target_pipeline = lead.pipeline or Pipeline.get_default()
+        won_stage = (
+            LeadStage.objects.filter(pipeline=target_pipeline, slug='won').first()
+            or LeadStage.objects.filter(pipeline=target_pipeline, name__iexact='won').first()
+            or LeadStage.objects.filter(slug='won').first()
+            or LeadStage.objects.filter(name__iexact='won').first()
+        )
 
         # Atomic conversion
         with transaction.atomic():
@@ -1693,7 +2044,9 @@ class LeadViewSet(viewsets.ModelViewSet):
 
         if not target_stage:
             current_order = lead.stage.display_order if lead.stage else 0
+            lead_pipeline = lead.pipeline or (lead.stage.pipeline if lead.stage else None) or Pipeline.get_default()
             target_stage = LeadStage.objects.filter(
+                pipeline=lead_pipeline,
                 is_active=True,
                 display_order__gt=current_order
             ).exclude(slug__in=['lost', 'won']).order_by('display_order').first()
@@ -1726,16 +2079,21 @@ class LeadViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def pipeline(self, request):
         """
-        Visual pipeline view: dynamically loads stages from LeadStage ordered by display_order.
+        Visual pipeline view: dynamically loads stages from the requested Pipeline
+        (by ?pipeline=<id>, ?product=<id> custom pipeline, or Default Pipeline) ordered by display_order.
         """
         qs = self.filter_queryset(self.get_queryset())
+        target_pipeline = _resolve_pipeline_from_request(request)
+
         prod_filter = request.query_params.get('product') or request.query_params.get('product_id')
         if prod_filter:
             if str(prod_filter).isdigit():
                 qs = qs.filter(lead_products__product_id=int(prod_filter)).distinct()
             else:
                 qs = qs.filter(lead_products__product__code__iexact=prod_filter).distinct()
-        stages = LeadStage.objects.filter(is_active=True).order_by('display_order', 'id')
+
+        qs = qs.filter(pipeline=target_pipeline)
+        stages = LeadStage.objects.filter(pipeline=target_pipeline, is_active=True).order_by('display_order', 'id')
 
         pipeline_data = {}
         for stage in stages:
@@ -1754,6 +2112,7 @@ class LeadViewSet(viewsets.ModelViewSet):
 
         return Response({
             'success': True,
+            'pipeline': PipelineSimpleSerializer(target_pipeline).data,
             'data': pipeline_data
         })
 

@@ -22,8 +22,11 @@ def execute_stage_task_automations(lead, new_stage, old_stage=None, actor=None):
     if isinstance(new_stage, int):
         new_stage = LeadStage.objects.filter(pk=new_stage).first()
     elif isinstance(new_stage, str):
+        base_qs = LeadStage.objects.filter(pipeline_id=lead.pipeline_id) if getattr(lead, 'pipeline_id', None) else LeadStage.objects.all()
         new_stage = (
-            LeadStage.objects.filter(slug__iexact=new_stage).first()
+            base_qs.filter(slug__iexact=new_stage).first()
+            or base_qs.filter(name__iexact=new_stage).first()
+            or LeadStage.objects.filter(slug__iexact=new_stage).first()
             or LeadStage.objects.filter(name__iexact=new_stage).first()
         )
 

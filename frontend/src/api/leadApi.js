@@ -102,6 +102,37 @@ export const leadApi = {
     return response.data;
   },
 
+  // Dynamic Sales Pipelines APIs (Default + Product Custom Pipelines)
+  getPipelines: async (params = {}) => {
+    const response = await api.get('/api/pipelines/', { params });
+    return response.data;
+  },
+
+  getPipelineById: async (id) => {
+    const response = await api.get(`/api/pipelines/${id}/`);
+    return response.data;
+  },
+
+  createPipeline: async (data) => {
+    const response = await api.post('/api/pipelines/', data);
+    return response.data;
+  },
+
+  updatePipeline: async (id, data) => {
+    const response = await api.patch(`/api/pipelines/${id}/`, data);
+    return response.data;
+  },
+
+  deletePipeline: async (id, data = {}) => {
+    const response = await api.delete(`/api/pipelines/${id}/`, { data });
+    return response.data;
+  },
+
+  clonePipelineStages: async (id, data = {}) => {
+    const response = await api.post(`/api/pipelines/${id}/clone-stages/`, data);
+    return response.data;
+  },
+
   // Dynamic Lead Stages APIs
   getStages: async (params = {}) => {
     const response = await api.get('/api/lead-stages/', { params });
@@ -138,8 +169,8 @@ export const leadApi = {
     return response.data;
   },
 
-  getWinProbabilityFunnel: async () => {
-    const response = await api.get('/api/lead-stages/funnel/');
+  getWinProbabilityFunnel: async (params = {}) => {
+    const response = await api.get('/api/lead-stages/funnel/', { params });
     return response.data;
   },
 

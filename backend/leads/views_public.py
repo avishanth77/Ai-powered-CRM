@@ -118,14 +118,17 @@ class PublicContactLeadView(APIView):
                 'message': 'Please provide a valid email address.'
             }, status=status.HTTP_400_BAD_REQUEST)
 
-        # 4. Resolve Stage (Target: "New" or lowest order active stage)
+        # 4. Resolve Stage (Target: Default Pipeline "New" or lowest order active stage)
+        from .models import Pipeline
+        default_pipeline = Pipeline.get_default()
         initial_stage = (
-            LeadStage.objects.filter(slug='new', is_active=True).first()
-            or LeadStage.objects.filter(name__iexact='new', is_active=True).first()
-            or LeadStage.objects.filter(is_active=True).order_by('display_order', 'id').first()
+            LeadStage.objects.filter(pipeline=default_pipeline, slug='new', is_active=True).first()
+            or LeadStage.objects.filter(pipeline=default_pipeline, name__iexact='new', is_active=True).first()
+            or LeadStage.objects.filter(pipeline=default_pipeline, is_active=True).order_by('display_order', 'id').first()
         )
         if not initial_stage:
             initial_stage, _ = LeadStage.objects.get_or_create(
+                pipeline=default_pipeline,
                 slug='new',
                 defaults={'name': 'New', 'display_order': 1, 'is_active': True}
             )
@@ -262,6 +265,16 @@ class PublicContactLeadView(APIView):
                             except (ValueError, TypeError):
                                 qty_val = 1
                         LeadProduct.objects.create(lead=lead, product=prod, unit_price=prod.unit_price, quantity=qty_val)
+                        custom_pipe = Pipeline.objects.filter(product=prod, is_active=True).first()
+                        if custom_pipe:
+                            custom_init_stage = (
+                                LeadStage.objects.filter(pipeline=custom_pipe, slug='new', is_active=True).first()
+                                or LeadStage.objects.filter(pipeline=custom_pipe, is_active=True).order_by('display_order', 'id').first()
+                            )
+                            if custom_init_stage:
+                                lead.pipeline = custom_pipe
+                                lead.stage = custom_init_stage
+                                lead.save(update_fields=['pipeline', 'stage', 'updated_at'])
                 except Exception as ex:
                     logger.warning(f"Could not link web-to-lead product: {ex}")
 

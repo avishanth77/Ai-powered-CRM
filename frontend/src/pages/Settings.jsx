@@ -16,6 +16,7 @@ import ProductsManager from '../components/ProductsManager';
 import { LeadAssignmentManager } from '../components/LeadAssignmentManager';
 import { TelegramManager } from '../components/TelegramManager';
 import { StageCustomFieldsManager } from '../components/StageCustomFieldsManager';
+import ProductPipelineModal from '../components/ProductPipelineModal';
 import {
   Settings as SettingsIcon,
   Plus,
@@ -25,6 +26,7 @@ import {
   Eye,
   EyeOff,
   Kanban,
+  GitBranch,
   Edit,
   Trash2,
   ArrowUp,
@@ -49,6 +51,7 @@ import {
 export const Settings = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
+  const pipelineParam = searchParams.get('pipeline');
 
   const {
     user,
@@ -148,7 +151,10 @@ export const Settings = () => {
   const [newSourceDesc, setNewSourceDesc] = useState('');
   const [addingSource, setAddingSource] = useState(false);
 
-  // Lead Stages State
+  // Pipelines & Lead Stages State
+  const [pipelines, setPipelines] = useState([]);
+  const [selectedPipelineId, setSelectedPipelineId] = useState(pipelineParam ? Number(pipelineParam) : null);
+  const [createPipelineModalOpen, setCreatePipelineModalOpen] = useState(false);
   const [stages, setStages] = useState([]);
   const [loadingStages, setLoadingStages] = useState(false);
 
@@ -183,10 +189,34 @@ export const Settings = () => {
   const editStageDialogRef = useDialogA11y(editStageModalOpen, () => setEditStageModalOpen(false));
   const deleteStageDialogRef = useDialogA11y(deleteStageModalOpen, () => setDeleteStageModalOpen(false));
 
-  const fetchStages = async () => {
+  const fetchPipelines = async (preferredId = null) => {
+    try {
+      const res = await leadApi.getPipelines({ all: 'true' });
+      const list = res?.results || (Array.isArray(res) ? res : []);
+      setPipelines(list);
+      const targetId = preferredId || (pipelineParam ? Number(pipelineParam) : null) || selectedPipelineId;
+      if (targetId && list.some((p) => p.id === Number(targetId))) {
+        setSelectedPipelineId(Number(targetId));
+        return Number(targetId);
+      }
+      const def = list.find((p) => p.is_default) || list[0];
+      if (def) {
+        setSelectedPipelineId(def.id);
+        return def.id;
+      }
+    } catch {
+      // ignore
+    }
+    return null;
+  };
+
+  const fetchStages = async (pipelineOverride = null) => {
     setLoadingStages(true);
     try {
-      const res = await leadApi.getStages({ all: 'true' });
+      const pid = pipelineOverride || selectedPipelineId;
+      const params = { all: 'true' };
+      if (pid) params.pipeline = pid;
+      const res = await leadApi.getStages(params);
       const items = res.results || (Array.isArray(res) ? res : []);
       // Sort by display_order
       items.sort((a, b) => a.display_order - b.display_order || a.id - b.id);
@@ -209,12 +239,46 @@ export const Settings = () => {
 
   useEffect(() => {
     if (canManageStages || user?.role === 'ADMIN' || user?.role === 'MANAGER') {
-      fetchStages();
+      fetchPipelines().then((pid) => fetchStages(pid));
     }
     if (canManageSources) {
       fetchSources();
     }
   }, [canManageStages, canManageSources]);
+
+  useEffect(() => {
+    if (pipelineParam && Number(pipelineParam) !== selectedPipelineId) {
+      const num = Number(pipelineParam);
+      setSelectedPipelineId(num);
+      fetchStages(num);
+    }
+  }, [pipelineParam]);
+
+  const handleSelectPipeline = (pid) => {
+    const num = Number(pid);
+    setSelectedPipelineId(num);
+    fetchStages(num);
+  };
+
+  const handleDeleteCustomPipeline = async (pipelineObj) => {
+    if (!pipelineObj || pipelineObj.is_default) return;
+    const msg =
+      pipelineObj.leads_count > 0
+        ? `Delete custom pipeline "${pipelineObj.name}"? Its ${pipelineObj.leads_count} active lead(s) will be moved safely back to the Default Pipeline.`
+        : `Delete custom pipeline "${pipelineObj.name}"? This will remove all custom stages in this pipeline.`;
+    if (!window.confirm(msg)) return;
+
+    try {
+      const res = await leadApi.deletePipeline(pipelineObj.id, { fallback_to_default: true });
+      showToast(res?.message || `Deleted pipeline "${pipelineObj.name}".`, 'success');
+      const def = pipelines.find((p) => p.is_default);
+      const nextId = def ? def.id : null;
+      await fetchPipelines(nextId);
+      fetchStages(nextId);
+    } catch (err) {
+      showToast(extractErrorMessage(err, 'Failed to delete custom pipeline'), 'error');
+    }
+  };
 
   // Profile submission
   const handleProfileSubmit = async (e) => {
@@ -335,6 +399,7 @@ export const Settings = () => {
     setSubmittingStage(true);
     try {
       await leadApi.createStage({
+        pipeline: selectedPipelineId || undefined,
         name: stageFormData.name.trim(),
         description: stageFormData.description.trim() || undefined,
         color: stageFormData.color.trim(),
@@ -347,6 +412,7 @@ export const Settings = () => {
       showToast(`Stage "${stageFormData.name.trim()}" created successfully!`, 'success');
       setCreateStageModalOpen(false);
       fetchStages();
+      fetchPipelines(selectedPipelineId);
     } catch (err) {
       showToast(extractErrorMessage(err, 'Failed to create stage'), 'error');
     } finally {
@@ -659,27 +725,99 @@ export const Settings = () => {
       </div>
 
       {/* TAB 1: LEAD STAGES MANAGEMENT (Admin Only) */}
-      {activeTab === 'stages' && canManageStages && (
+      {activeTab === 'stages' && canManageStages && (() => {
+        const currentPipeline = pipelines.find((p) => p.id === selectedPipelineId) || pipelines.find((p) => p.is_default);
+        return (
         <div className="card">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '1rem', marginBottom: '1.25rem' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '1rem', marginBottom: '1rem' }}>
             <div>
               <h3 style={{ fontSize: '1.25rem', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Kanban size={20} color="var(--primary)" />
-                <span>Dynamic Lead Stages</span>
+                <span>Dynamic Pipelines & Lead Stages</span>
               </h3>
               <p className="text-muted font-sm" style={{ margin: '0.25rem 0 0 0' }}>
-                Manage stages, display order, colors, and active visibility in real-time across the pipeline.
+                Configure stages for the Default Global Pipeline or build completely custom pipelines per product.
               </p>
             </div>
 
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={handleOpenCreateStage}
-            >
-              <Plus size={16} />
-              <span>Add New Stage</span>
-            </button>
+            <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setCreatePipelineModalOpen(true)}
+              >
+                <GitBranch size={16} color="var(--primary)" />
+                <span>New Product Pipeline</span>
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={handleOpenCreateStage}
+              >
+                <Plus size={16} />
+                <span>Add New Stage</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Pipeline Selector Banner */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '0.75rem',
+              padding: '0.85rem 1rem',
+              marginBottom: '1.25rem',
+              borderRadius: 'var(--radius-md)',
+              background: 'var(--bg-surface-elevated)',
+              border: '1px solid var(--border-subtle)',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+              <label htmlFor="settings-pipeline-select" style={{ fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem', margin: 0 }}>
+                <GitBranch size={15} color="var(--primary)" />
+                <span>Editing Pipeline:</span>
+              </label>
+              <select
+                id="settings-pipeline-select"
+                className="form-control"
+                value={selectedPipelineId || ''}
+                onChange={(e) => handleSelectPipeline(e.target.value)}
+                style={{ width: 'auto', minWidth: '280px', padding: '0.4rem 0.75rem', fontSize: '0.875rem', fontWeight: 600 }}
+              >
+                {pipelines.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.is_default ? `🌐 ${p.name} (Global)` : `📦 ${p.name} — ${p.product_name || 'Custom'}`} ({p.stages_count ?? 0} stages)
+                  </option>
+                ))}
+              </select>
+
+              {currentPipeline && !currentPipeline.is_default && (
+                <span className="badge badge-info" style={{ fontSize: '0.75rem', padding: '0.25rem 0.6rem' }}>
+                  Product: {currentPipeline.product_name} ({currentPipeline.product_code})
+                </span>
+              )}
+              {currentPipeline?.is_default && (
+                <span className="text-dim font-xs">
+                  Used by all leads unless their product has a custom pipeline.
+                </span>
+              )}
+            </div>
+
+            {currentPipeline && !currentPipeline.is_default && (
+              <button
+                type="button"
+                className="btn btn-sm btn-secondary"
+                style={{ color: 'var(--danger)', borderColor: 'rgba(225, 29, 72, 0.35)' }}
+                onClick={() => handleDeleteCustomPipeline(currentPipeline)}
+              >
+                <Trash2 size={14} />
+                <span>Delete Custom Pipeline</span>
+              </button>
+            )}
           </div>
 
           <div className="table-responsive embedded">
@@ -873,12 +1011,14 @@ export const Settings = () => {
 
           <div style={{ marginTop: '2rem' }}>
             <WinProbabilityFunnel
-              key={stages.map((s) => `${s.id}-${s.win_probability}-${s.win_probability_reason}-${s.leads_count}`).join(',')}
+              key={`${selectedPipelineId || 'def'}-${stages.map((s) => `${s.id}-${s.win_probability}-${s.win_probability_reason}-${s.leads_count}`).join(',')}`}
+              pipelineId={selectedPipelineId}
               onStageClick={handleOpenEditStage}
             />
           </div>
         </div>
-      )}
+        );
+      })()}
 
       {/* TAB 2: PERSONAL PROFILE & SECURITY */}
       {activeTab === 'profile' && (
@@ -1572,7 +1712,8 @@ export const Settings = () => {
       {activeTab === 'stage-fields' && canManageStages && (
         <StageCustomFieldsManager
           initialStageId={selectedStageForFields}
-          onStageUpdated={fetchStages}
+          initialPipelineId={selectedPipelineId}
+          onStageUpdated={() => fetchStages(selectedPipelineId)}
         />
       )}
 
@@ -1581,12 +1722,15 @@ export const Settings = () => {
 
       {/* TAB: STAGE TASKS & PROGRESSION RULES (Admin / Manager) */}
       {activeTab === 'tasks' && canManageTaskRules && (
-        <StageTasksManager onStageUpdated={fetchStages} />
+        <StageTasksManager
+          initialPipelineId={selectedPipelineId}
+          onStageUpdated={() => fetchStages(selectedPipelineId)}
+        />
       )}
 
       {/* TAB: PLD DISCOVERY & PROBLEM QUALIFICATION RULES (Admin / Manager) */}
       {activeTab === 'pld' && canManagePld && (
-        <PldSettingsManager />
+        <PldSettingsManager initialPipelineId={selectedPipelineId} />
       )}
 
       {/* TAB: WEB-TO-LEAD / WEBSITE CONTACT INTEGRATION */}
@@ -1595,8 +1739,30 @@ export const Settings = () => {
       )}
 
       {activeTab === 'products' && (isAdmin || isManager) && (
-        <ProductsManager />
+        <ProductsManager
+          onConfigurePipeline={(pipelineId) => {
+            fetchPipelines(pipelineId).then(() => {
+              setSelectedPipelineId(pipelineId);
+              fetchStages(pipelineId);
+              handleTabChange('stages');
+            });
+          }}
+        />
       )}
+
+      <ProductPipelineModal
+        isOpen={createPipelineModalOpen}
+        onClose={() => setCreatePipelineModalOpen(false)}
+        existingPipelines={pipelines}
+        onCreated={(created) => {
+          if (created?.id) {
+            fetchPipelines(created.id).then(() => {
+              setSelectedPipelineId(created.id);
+              fetchStages(created.id);
+            });
+          }
+        }}
+      />
 
       {activeTab === 'assignment' && (isAdmin || isManager) && (
         <LeadAssignmentManager />

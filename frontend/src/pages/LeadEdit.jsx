@@ -52,6 +52,7 @@ export const LeadEdit = () => {
     lead_type: 'INBOUND',
     expected_close_date: '',
     source: '',
+    pipeline: '',
     stage: '',
     priority: '',
     assigned_to: '',
@@ -63,6 +64,7 @@ export const LeadEdit = () => {
     win_probability_reason: '',
   });
 
+  const [pipelines, setPipelines] = useState([]);
   const [stages, setStages] = useState([]);
   const [sources, setSources] = useState([]);
   const [users, setUsers] = useState([]);
@@ -79,12 +81,17 @@ export const LeadEdit = () => {
     setInitialLoading(true);
     setLoadError(null);
     try {
-      const [leadRes, sourcesRes, stagesRes] = await Promise.all([
+      const [leadRes, sourcesRes, pipesRes] = await Promise.all([
         leadApi.getLeadById(id),
         leadApi.getSources(),
-        leadApi.getStages(),
+        leadApi.getPipelines().catch(() => []),
       ]);
 
+      const pipeList = pipesRes?.results || (Array.isArray(pipesRes) ? pipesRes : []);
+      setPipelines(pipeList);
+      const leadPipelineId = leadRes.pipeline || leadRes.pipeline_details?.id || pipeList.find((p) => p.is_default)?.id || '';
+
+      const stagesRes = await leadApi.getStages(leadPipelineId ? { pipeline: leadPipelineId } : {});
       let loadedStages = stagesRes.results || (Array.isArray(stagesRes) ? stagesRes : []);
       if (leadRes.stage_details && !loadedStages.some((s) => s.id === leadRes.stage_details.id)) {
         loadedStages = [...loadedStages, { ...leadRes.stage_details, name: `${leadRes.stage_details.name} (Inactive)` }];
@@ -122,6 +129,7 @@ export const LeadEdit = () => {
         lead_type: leadRes.lead_type || 'INBOUND',
         expected_close_date: leadRes.expected_close_date || '',
         source: leadRes.source || '',
+        pipeline: leadPipelineId || '',
         stage: leadRes.stage || leadRes.stage_details?.id || '',
         priority: leadRes.priority || '',
         assigned_to: leadRes.assigned_to || '',
@@ -318,6 +326,7 @@ export const LeadEdit = () => {
         qualification_notes: formData.qualification_notes.trim(),
         lead_type: formData.lead_type || 'INBOUND',
         expected_close_date: formData.expected_close_date || null,
+        pipeline: formData.pipeline ? parseInt(formData.pipeline) : undefined,
         stage: formData.stage ? parseInt(formData.stage) : null,
         source: formData.source ? parseInt(formData.source) : null,
         priority: formData.priority,
@@ -752,6 +761,36 @@ export const LeadEdit = () => {
           </div>
 
           <div className="form-layout">
+            {pipelines.length > 1 && (
+              <div className="form-group">
+                <label className="form-label" htmlFor="lead-pipeline">Sales Pipeline</label>
+                <select
+                  id="lead-pipeline"
+                  name="pipeline"
+                  className="form-control"
+                  value={formData.pipeline}
+                  onChange={async (e) => {
+                    const newPid = e.target.value;
+                    setFormData((prev) => ({ ...prev, pipeline: newPid }));
+                    try {
+                      const stRes = await leadApi.getStages({ pipeline: newPid });
+                      const stList = stRes?.results || (Array.isArray(stRes) ? stRes : []);
+                      setStages(stList);
+                      if (stList.length > 0) {
+                        const firstSt = stList.find((s) => s.slug === 'new') || stList[0];
+                        setFormData((prev) => ({ ...prev, pipeline: newPid, stage: firstSt.id }));
+                      }
+                    } catch {}
+                  }}
+                >
+                  {pipelines.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.is_default ? `${p.name} (Default)` : `${p.name} (${p.product_name || 'Custom'})`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {stages.length > 0 && (
               <div className="form-group">

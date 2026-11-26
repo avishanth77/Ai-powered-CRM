@@ -15,8 +15,11 @@ import {
   Loader2,
   AlertCircle,
   RefreshCw,
+  GitBranch,
 } from 'lucide-react';
 import { productApi } from '../api/productApi';
+import { leadApi } from '../api/leadApi';
+import ProductPipelineModal from './ProductPipelineModal';
 import { useToast } from '../context/ToastContext';
 import { useDialogA11y } from '../hooks/useDialogA11y';
 import { formatCurrency } from '../utils/formatters';
@@ -38,9 +41,11 @@ const DEFAULT_CATEGORIES = [
   'Support & Maintenance',
 ];
 
-export default function ProductsManager() {
+export default function ProductsManager({ onConfigurePipeline = null }) {
   const { showToast } = useToast();
   const [products, setProducts] = useState([]);
+  const [pipelines, setPipelines] = useState([]);
+  const [pipelineModalProduct, setPipelineModalProduct] = useState(null);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
@@ -70,9 +75,14 @@ export default function ProductsManager() {
   const fetchProducts = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await productApi.getProducts();
+      const [res, pipeRes] = await Promise.all([
+        productApi.getProducts(),
+        leadApi.getPipelines({ all: 'true' }).catch(() => []),
+      ]);
       const list = res.results || (Array.isArray(res) ? res : []);
       setProducts(list);
+      const pipeList = pipeRes?.results || (Array.isArray(pipeRes) ? pipeRes : []);
+      setPipelines(pipeList);
     } catch (err) {
       showToast(extractErrorMessage(err, 'Failed to load products'), 'error');
     } finally {
@@ -317,6 +327,7 @@ export default function ProductsManager() {
                 <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-dim)' }}>Category</th>
                 <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-dim)' }}>Standard Unit Price</th>
                 <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-dim)' }}>Billing</th>
+                <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-dim)' }}>Pipeline</th>
                 <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-dim)' }}>Deals</th>
                 <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-dim)' }}>Status</th>
                 <th style={{ padding: '0.75rem 1rem', fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-dim)', textAlign: 'right' }}>Actions</th>
@@ -325,14 +336,14 @@ export default function ProductsManager() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '2.5rem' }}>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '2.5rem' }}>
                     <Loader2 size={24} className="spinner" style={{ margin: '0 auto' }} />
                     <div className="text-dim font-sm" style={{ marginTop: '0.5rem' }}>Loading catalog...</div>
                   </td>
                 </tr>
               ) : filteredProducts.length === 0 ? (
                 <tr>
-                  <td colSpan="8" style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-dim)' }}>
+                  <td colSpan="9" style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-dim)' }}>
                     <Package size={36} style={{ opacity: 0.3, margin: '0 auto 0.5rem auto', display: 'block' }} />
                     <div style={{ fontWeight: 600 }}>No products found</div>
                     <div className="font-xs">Try adjusting your filters or click "Add Product" to create one.</div>
@@ -364,6 +375,31 @@ export default function ProductsManager() {
                     </td>
                     <td style={{ padding: '0.85rem 1rem' }}>
                       <span className="text-dim font-xs">{p.billing_cycle_display || p.billing_cycle}</span>
+                    </td>
+                    <td style={{ padding: '0.85rem 1rem' }}>
+                      {p.has_custom_pipeline ? (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => onConfigurePipeline && onConfigurePipeline(p.custom_pipeline_id)}
+                          title={`Configure "${p.custom_pipeline_name}"`}
+                          style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem', display: 'inline-flex', alignItems: 'center', gap: '0.35rem', color: 'var(--primary)' }}
+                        >
+                          <GitBranch size={13} />
+                          <span>Custom ({p.custom_pipeline_stages_count || 0} stages)</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-sm btn-secondary"
+                          onClick={() => setPipelineModalProduct(p)}
+                          title="Create a completely custom pipeline for this product"
+                          style={{ fontSize: '0.75rem', padding: '0.25rem 0.55rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+                        >
+                          <Plus size={12} />
+                          <span>Customize Pipeline</span>
+                        </button>
+                      )}
                     </td>
                     <td style={{ padding: '0.85rem 1rem' }}>
                       <span className="tab-badge" style={{ fontWeight: 600 }}>
@@ -591,6 +627,18 @@ export default function ProductsManager() {
           </div>
         </div>
       )}
+      <ProductPipelineModal
+        isOpen={Boolean(pipelineModalProduct)}
+        onClose={() => setPipelineModalProduct(null)}
+        preselectedProduct={pipelineModalProduct}
+        existingPipelines={pipelines}
+        onCreated={(created) => {
+          fetchProducts();
+          if (created?.id && onConfigurePipeline) {
+            onConfigurePipeline(created.id);
+          }
+        }}
+      />
     </div>
   );
 }

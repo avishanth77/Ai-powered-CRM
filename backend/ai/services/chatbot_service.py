@@ -51,8 +51,11 @@ class ChatbotService:
                         matched_lead = ld
                         break
 
-            # Find matching stage
-            matched_stage = LeadStage.objects.filter(name__icontains=stage_query).first()
+            # Find matching stage within the lead's pipeline first
+            stage_qs = LeadStage.objects.filter(pipeline=matched_lead.pipeline) if (matched_lead and matched_lead.pipeline_id) else LeadStage.objects.all()
+            matched_stage = stage_qs.filter(name__icontains=stage_query).first()
+            if not matched_stage and matched_lead and matched_lead.pipeline_id:
+                matched_stage = LeadStage.objects.filter(name__icontains=stage_query).first()
 
             if matched_lead and matched_stage:
                 return {
@@ -475,9 +478,12 @@ class ChatbotService:
                     pass
 
             if not stage and stage_name:
-                stage = LeadStage.objects.filter(name__iexact=str(stage_name).strip()).first()
+                stage_qs = LeadStage.objects.filter(pipeline=lead.pipeline) if lead.pipeline_id else LeadStage.objects.all()
+                stage = stage_qs.filter(name__iexact=str(stage_name).strip()).first()
                 if not stage:
-                    stage = LeadStage.objects.filter(name__icontains=str(stage_name).strip()).first()
+                    stage = stage_qs.filter(name__icontains=str(stage_name).strip()).first()
+                if not stage and lead.pipeline_id:
+                    stage = LeadStage.objects.filter(name__iexact=str(stage_name).strip()).first() or LeadStage.objects.filter(name__icontains=str(stage_name).strip()).first()
 
             if not stage:
                 raise ValueError("Target lead stage was not found.")

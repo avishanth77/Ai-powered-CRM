@@ -1,8 +1,9 @@
 import django_filters
 from django.db.models import Q
-from .models import Lead, LeadSource, LeadStage
+from .models import Lead, LeadSource, LeadStage, Pipeline
 
 class LeadFilter(django_filters.FilterSet):
+    pipeline = django_filters.ModelChoiceFilter(queryset=Pipeline.objects.all())
     stage = django_filters.ModelChoiceFilter(queryset=LeadStage.objects.all())
     status = django_filters.CharFilter(method='filter_status')
     priority = django_filters.ChoiceFilter(choices=Lead.Priority.choices)
@@ -23,6 +24,7 @@ class LeadFilter(django_filters.FilterSet):
     class Meta:
         model = Lead
         fields = [
+            'pipeline',
             'stage',
             'status',
             'priority',

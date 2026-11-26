@@ -62,6 +62,7 @@ export const LeadCreate = () => {
     lead_type: 'INBOUND',
     expected_close_date: '',
     source: '',
+    pipeline: '',
     stage: '',
     priority: LEAD_PRIORITY.MEDIUM,
     assigned_to: user?.id || '',
@@ -73,6 +74,8 @@ export const LeadCreate = () => {
     win_probability_reason: '',
   });
 
+  const [pipelines, setPipelines] = useState([]);
+  const [pipelineManuallyChosen, setPipelineManuallyChosen] = useState(false);
   const [stages, setStages] = useState([]);
   const [sources, setSources] = useState([]);
   const [users, setUsers] = useState([]);
@@ -80,18 +83,39 @@ export const LeadCreate = () => {
   const [errors, setErrors] = useState({});
   const [formError, setFormError] = useState(null);
 
-  useEffect(() => {
+  const loadStagesForPipeline = (pipelineId) => {
+    const params = pipelineId ? { pipeline: pipelineId } : {};
     leadApi
-      .getStages()
+      .getStages(params)
       .then((res) => {
         const stageList = res.results || (Array.isArray(res) ? res : []);
         setStages(stageList);
         if (stageList.length > 0) {
           const defaultStage = stageList.find((s) => s.slug === 'new') || stageList[0];
-          setFormData((prev) => ({ ...prev, stage: prev.stage || defaultStage.id }));
+          setFormData((prev) => ({
+            ...prev,
+            stage: stageList.some((s) => String(s.id) === String(prev.stage)) ? prev.stage : defaultStage.id,
+          }));
         }
       })
       .catch(() => {});
+  };
+
+  useEffect(() => {
+    leadApi
+      .getPipelines()
+      .then((res) => {
+        const pipeList = res?.results || (Array.isArray(res) ? res : []);
+        setPipelines(pipeList);
+        const defPipe = pipeList.find((p) => p.is_default) || pipeList[0];
+        if (defPipe) {
+          setFormData((prev) => ({ ...prev, pipeline: prev.pipeline || defPipe.id }));
+          loadStagesForPipeline(defPipe.id);
+        } else {
+          loadStagesForPipeline(null);
+        }
+      })
+      .catch(() => loadStagesForPipeline(null));
 
     leadApi
       .getSources()
@@ -278,6 +302,7 @@ export const LeadCreate = () => {
         lead_type: formData.lead_type || 'INBOUND',
         expected_close_date: formData.expected_close_date || null,
         source: formData.source ? parseInt(formData.source) : null,
+        pipeline: formData.pipeline ? parseInt(formData.pipeline) : undefined,
         stage: formData.stage ? parseInt(formData.stage) : null,
         priority: formData.priority,
         assigned_to: formData.assigned_to ? parseInt(formData.assigned_to) : null,
@@ -733,6 +758,30 @@ export const LeadCreate = () => {
           </div>
 
           <div className="form-layout">
+            {pipelines.length > 0 && (
+              <div className="form-group">
+                <label className="form-label" htmlFor="lead-pipeline">Sales Pipeline</label>
+                <select
+                  id="lead-pipeline"
+                  name="pipeline"
+                  className="form-control"
+                  value={formData.pipeline}
+                  onChange={(e) => {
+                    const pid = e.target.value;
+                    setPipelineManuallyChosen(true);
+                    setFormData((prev) => ({ ...prev, pipeline: pid }));
+                    loadStagesForPipeline(pid);
+                  }}
+                >
+                  {pipelines.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.is_default ? `${p.name} (Default)` : `${p.name} (${p.product_name || 'Custom'})`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
             <div className="form-group">
               <label className="form-label form-label-required" htmlFor="lead-stage">Pipeline Stage</label>
               <select
@@ -985,8 +1034,21 @@ export const LeadCreate = () => {
             selectedProductIds={formData.product_ids || []}
             productItems={formData.product_items || []}
             onChange={(ids, items, totalValue) => {
+              let nextPipelineId = formData.pipeline;
+              if (!pipelineManuallyChosen && pipelines.length > 0) {
+                const matchingCustomPipe = pipelines.find(
+                  (p) => !p.is_default && p.product && ids.some((idVal) => Number(idVal) === Number(p.product))
+                );
+                const defPipe = pipelines.find((p) => p.is_default);
+                const autoPipeId = matchingCustomPipe ? matchingCustomPipe.id : defPipe?.id;
+                if (autoPipeId && String(autoPipeId) !== String(formData.pipeline)) {
+                  nextPipelineId = autoPipeId;
+                  loadStagesForPipeline(autoPipeId);
+                }
+              }
               setFormData((prev) => ({
                 ...prev,
+                pipeline: nextPipelineId,
                 product_ids: ids,
                 product_items: items,
                 expected_value: totalValue !== undefined ? Number(totalValue).toFixed(2) : prev.expected_value,

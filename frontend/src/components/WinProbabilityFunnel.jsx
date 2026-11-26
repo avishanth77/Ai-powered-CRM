@@ -21,6 +21,8 @@ import '../styles/funnel.css';
  */
 export default function WinProbabilityFunnel({
   initialData = null,
+  pipelineId = null,
+  productId = null,
   onStageClick = null,
   showBreakdownTable = true,
   compact = false,
@@ -43,12 +45,15 @@ export default function WinProbabilityFunnel({
     } else {
       setFunnelData(parseFunnelPayload(initialData));
     }
-  }, [initialData]);
+  }, [initialData, pipelineId, productId]);
 
   const loadFunnel = async () => {
     setLoading(true);
     try {
-      const res = await leadApi.getWinProbabilityFunnel();
+      const params = {};
+      if (pipelineId) params.pipeline = pipelineId;
+      if (productId) params.product = productId;
+      const res = await leadApi.getWinProbabilityFunnel(params);
       setFunnelData(parseFunnelPayload(res));
     } catch (err) {
       console.error('Failed to load win probability funnel:', err);

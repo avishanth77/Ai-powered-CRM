@@ -6,6 +6,7 @@ from django.db import models
 from django.utils import timezone
 from .models import (
     Lead,
+    Pipeline,
     LeadStage,
     LeadSource,
     LeadNote,
@@ -21,6 +22,72 @@ from accounts.serializers import UserSerializer
 
 User = get_user_model()
 
+
+class PipelineSimpleSerializer(serializers.ModelSerializer):
+    product_id = serializers.IntegerField(source='product.id', read_only=True, default=None)
+    product_name = serializers.CharField(source='product.name', read_only=True, default=None)
+    product_code = serializers.CharField(source='product.code', read_only=True, default=None)
+
+    class Meta:
+        model = Pipeline
+        fields = ['id', 'name', 'slug', 'product', 'product_id', 'product_name', 'product_code', 'is_default', 'is_active']
+
+
+class PipelineSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source='product.name', read_only=True, default=None)
+    product_code = serializers.CharField(source='product.code', read_only=True, default=None)
+    stages_count = serializers.IntegerField(read_only=True, default=0)
+    leads_count = serializers.IntegerField(read_only=True, default=0)
+
+    class Meta:
+        model = Pipeline
+        fields = [
+            'id',
+            'name',
+            'slug',
+            'description',
+            'product',
+            'product_name',
+            'product_code',
+            'is_default',
+            'is_active',
+            'stages_count',
+            'leads_count',
+            'created_at',
+            'updated_at',
+        ]
+        read_only_fields = ['id', 'slug', 'is_default', 'created_at', 'updated_at', 'stages_count', 'leads_count']
+
+    def validate_name(self, value):
+        name = (value or '').strip()
+        if not name:
+            raise serializers.ValidationError("Pipeline name cannot be empty.")
+        return name
+
+    def create(self, validated_data):
+        from django.utils.text import slugify
+        base_slug = slugify(validated_data['name']) or 'pipeline'
+        slug = base_slug
+        counter = 1
+        while Pipeline.objects.filter(slug=slug).exists():
+            slug = f"{base_slug}-{counter}"
+            counter += 1
+        validated_data['slug'] = slug
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        from django.utils.text import slugify
+        if 'name' in validated_data and validated_data['name'] != instance.name and not instance.is_default:
+            base_slug = slugify(validated_data['name']) or 'pipeline'
+            slug = base_slug
+            counter = 1
+            while Pipeline.objects.filter(slug=slug).exclude(id=instance.id).exists():
+                slug = f"{base_slug}-{counter}"
+                counter += 1
+            validated_data['slug'] = slug
+        return super().update(instance, validated_data)
+
+
 class LeadSourceSerializer(serializers.ModelSerializer):
     leads_count = serializers.IntegerField(read_only=True, default=0)
 
@@ -31,6 +98,14 @@ class LeadSourceSerializer(serializers.ModelSerializer):
 
 
 class LeadStageSerializer(serializers.ModelSerializer):
+    pipeline = serializers.PrimaryKeyRelatedField(
+        queryset=Pipeline.objects.all(),
+        required=False,
+        allow_null=True
+    )
+    pipeline_name = serializers.CharField(source='pipeline.name', read_only=True, default=None)
+    product_id = serializers.IntegerField(source='pipeline.product_id', read_only=True, default=None)
+    product_name = serializers.CharField(source='pipeline.product.name', read_only=True, default=None)
     leads_count = serializers.IntegerField(read_only=True, default=0)
     task_rules_count = serializers.IntegerField(read_only=True, default=0)
     custom_fields_count = serializers.SerializerMethodField(read_only=True)
@@ -39,6 +114,10 @@ class LeadStageSerializer(serializers.ModelSerializer):
         model = LeadStage
         fields = [
             'id',
+            'pipeline',
+            'pipeline_name',
+            'product_id',
+            'product_name',
             'name',
             'slug',
             'description',
@@ -55,21 +134,38 @@ class LeadStageSerializer(serializers.ModelSerializer):
             'task_rules_count',
             'custom_fields_count',
         ]
-        read_only_fields = ['id', 'slug', 'created_at', 'updated_at', 'leads_count', 'task_rules_count', 'custom_fields_count']
+        read_only_fields = [
+            'id', 'slug', 'pipeline_name', 'product_id', 'product_name',
+            'created_at', 'updated_at', 'leads_count', 'task_rules_count', 'custom_fields_count'
+        ]
+        validators = []
 
     def get_custom_fields_count(self, obj):
         return obj.custom_properties.filter(is_active=True).count()
+
+    def _resolve_target_pipeline(self):
+        if 'pipeline' in self.initial_data and self.initial_data.get('pipeline'):
+            try:
+                p = Pipeline.objects.filter(pk=int(self.initial_data['pipeline'])).first()
+                if p:
+                    return p
+            except (ValueError, TypeError):
+                pass
+        if self.instance and self.instance.pipeline:
+            return self.instance.pipeline
+        return Pipeline.get_default()
 
     def validate_name(self, value):
         name = value.strip()
         if not name:
             raise serializers.ValidationError("Stage name cannot be empty or contain only whitespace.")
         
-        qs = LeadStage.objects.filter(name__iexact=name)
+        target_pipeline = self._resolve_target_pipeline()
+        qs = LeadStage.objects.filter(pipeline=target_pipeline, name__iexact=name)
         if self.instance:
             qs = qs.exclude(id=self.instance.id)
         if qs.exists():
-            raise serializers.ValidationError("A lead stage with this name already exists.")
+            raise serializers.ValidationError("A lead stage with this name already exists in this pipeline.")
         return name
 
     def validate_color(self, value):
@@ -90,11 +186,14 @@ class LeadStageSerializer(serializers.ModelSerializer):
         from django.utils.text import slugify
         from .services.stage_ordering import shift_stages_for_insert, resequence_stages
 
+        pipeline = validated_data.get('pipeline') or Pipeline.get_default()
+        validated_data['pipeline'] = pipeline
+
         name = validated_data['name']
         base_slug = slugify(name) or 'stage'
         slug = base_slug
         counter = 1
-        while LeadStage.objects.filter(slug=slug).exists():
+        while LeadStage.objects.filter(pipeline=pipeline, slug=slug).exists():
             slug = f"{base_slug}-{counter}"
             counter += 1
         validated_data['slug'] = slug
@@ -102,14 +201,14 @@ class LeadStageSerializer(serializers.ModelSerializer):
         with transaction.atomic():
             target_order = validated_data.get('display_order')
             if target_order is None:
-                max_order = LeadStage.objects.aggregate(m=models.Max('display_order'))['m'] or 0
+                max_order = LeadStage.objects.filter(pipeline=pipeline).aggregate(m=models.Max('display_order'))['m'] or 0
                 target_order = max_order + 1
                 validated_data['display_order'] = target_order
             else:
-                shift_stages_for_insert(target_order)
+                shift_stages_for_insert(target_order, pipeline=pipeline)
 
             instance = super().create(validated_data)
-            resequence_stages()
+            resequence_stages(pipeline=pipeline)
             instance.refresh_from_db()
             return instance
 
@@ -118,12 +217,14 @@ class LeadStageSerializer(serializers.ModelSerializer):
         from django.utils.text import slugify
         from .services.stage_ordering import shift_stages_for_update, resequence_stages
 
+        pipeline = validated_data.get('pipeline') or instance.pipeline or Pipeline.get_default()
+
         if 'name' in validated_data and validated_data['name'] != instance.name:
             if not instance.is_system:
                 base_slug = slugify(validated_data['name']) or 'stage'
                 slug = base_slug
                 counter = 1
-                while LeadStage.objects.filter(slug=slug).exclude(id=instance.id).exists():
+                while LeadStage.objects.filter(pipeline=pipeline, slug=slug).exclude(id=instance.id).exists():
                     slug = f"{base_slug}-{counter}"
                     counter += 1
                 validated_data['slug'] = slug
@@ -136,10 +237,10 @@ class LeadStageSerializer(serializers.ModelSerializer):
                 if new_order < 1:
                     new_order = 1
                     validated_data['display_order'] = 1
-                shift_stages_for_update(instance.id, new_order, old_order)
+                shift_stages_for_update(instance.id, new_order, old_order, pipeline=pipeline)
 
             instance = super().update(instance, validated_data)
-            resequence_stages()
+            resequence_stages(pipeline=pipeline)
             instance.refresh_from_db()
             return instance
 
@@ -302,6 +403,7 @@ class LeadHandoverRequestSerializer(serializers.Serializer):
 
 class LeadListSerializer(serializers.ModelSerializer):
     source_name = serializers.CharField(source='source.name', read_only=True)
+    pipeline_name = serializers.CharField(source='pipeline.name', read_only=True, default=None)
     assigned_to_details = UserSimpleSerializer(source='assigned_to', read_only=True)
     stage_name = serializers.CharField(source='stage.name', read_only=True)
     stage_details = LeadStageSerializer(source='stage', read_only=True)
@@ -353,6 +455,8 @@ class LeadListSerializer(serializers.ModelSerializer):
             'company_name',
             'source',
             'source_name',
+            'pipeline',
+            'pipeline_name',
             'stage',
             'stage_name',
             'stage_details',
@@ -386,6 +490,7 @@ class LeadListSerializer(serializers.ModelSerializer):
 
 class LeadDetailSerializer(serializers.ModelSerializer):
     source_details = LeadSourceSerializer(source='source', read_only=True)
+    pipeline_details = PipelineSimpleSerializer(source='pipeline', read_only=True)
     assigned_to_details = UserSimpleSerializer(source='assigned_to', read_only=True)
     created_by_details = UserSimpleSerializer(source='created_by', read_only=True)
     stage_details = LeadStageSerializer(source='stage', read_only=True)
@@ -522,6 +627,8 @@ class LeadDetailSerializer(serializers.ModelSerializer):
             'lead_type',
             'source',
             'source_details',
+            'pipeline',
+            'pipeline_details',
             'stage',
             'stage_details',
             'previous_stage',
@@ -594,6 +701,11 @@ def _save_custom_properties(lead, custom_props):
 
 
 class LeadCreateUpdateSerializer(serializers.ModelSerializer):
+    pipeline = serializers.PrimaryKeyRelatedField(
+        queryset=Pipeline.objects.all(),
+        required=False,
+        allow_null=True
+    )
     stage = serializers.PrimaryKeyRelatedField(
         queryset=LeadStage.objects.all(),
         required=False,
@@ -658,6 +770,7 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
             # Sales Information
             'lead_type',
             'source',
+            'pipeline',
             'stage',
             'status',
             'priority',
@@ -687,17 +800,32 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
             ]
         if 'stage' not in internal and 'status' in data and data['status']:
             raw_st = str(data['status']).strip()
+            target_pipeline = internal.get('pipeline')
+            if not target_pipeline:
+                pids = internal.get('product_ids') or []
+                if pids:
+                    target_pipeline = Pipeline.objects.filter(product_id__in=pids, is_active=True).first()
+            if not target_pipeline and self.instance and getattr(self.instance, 'pipeline_id', None):
+                target_pipeline = self.instance.pipeline
+            if not target_pipeline:
+                target_pipeline = Pipeline.get_default()
+
+            stage_q = (
+                models.Q(slug__iexact=raw_st.lower().replace('_', '-')) |
+                models.Q(slug__iexact=raw_st) |
+                models.Q(name__iexact=raw_st)
+            )
             found = None
             if raw_st.isdigit():
                 found = LeadStage.objects.filter(id=int(raw_st)).first()
             if not found:
-                found = LeadStage.objects.filter(
-                    models.Q(slug__iexact=raw_st.lower().replace('_', '-')) |
-                    models.Q(slug__iexact=raw_st) |
-                    models.Q(name__iexact=raw_st)
-                ).first()
+                found = LeadStage.objects.filter(pipeline=target_pipeline).filter(stage_q).first()
+            if not found:
+                found = LeadStage.objects.filter(stage_q).first()
             if found:
                 internal['stage'] = found
+                if not internal.get('pipeline') and found.pipeline_id:
+                    internal['pipeline'] = found.pipeline
         return internal
 
     def validate_phone(self, value):
@@ -774,11 +902,20 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
                 attrs['last_name'] = parts[1]
 
         stage_val = attrs.get('stage', getattr(self.instance, 'stage', None))
+        pipeline_val = attrs.get('pipeline', getattr(self.instance, 'pipeline', None))
         lost_reason = attrs.get('lost_reason', getattr(self.instance, 'lost_reason', None))
+
+        # Check explicit pipeline/stage conflict
+        if 'pipeline' in attrs and 'stage' in attrs and attrs['pipeline'] and attrs['stage']:
+            if attrs['stage'].pipeline_id and attrs['stage'].pipeline_id != attrs['pipeline'].id:
+                raise serializers.ValidationError({
+                    "stage": f"Stage '{attrs['stage'].name}' belongs to pipeline '{attrs['stage'].pipeline.name}', not '{attrs['pipeline'].name}'."
+                })
 
         # Check inactive stage selection
         is_create = self.instance is None
-        stage_changed = self.instance and ('stage' in attrs and attrs['stage'] != self.instance.stage)
+        pipeline_changed = bool(self.instance and 'pipeline' in attrs and attrs['pipeline'] != self.instance.pipeline)
+        stage_changed = bool(self.instance and 'stage' in attrs and attrs['stage'] != self.instance.stage)
         if (is_create or stage_changed) and stage_val and not stage_val.is_active:
             raise serializers.ValidationError({"stage": f"The stage '{stage_val.name}' is inactive and cannot be selected."})
 
@@ -790,7 +927,7 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
         # Task-Based Lead Progression:
         # A lead may not advance to a new stage unless all mandatory tasks
         # assigned to its current stage have been completed.
-        if stage_val and stage_changed and self.instance:
+        if stage_val and stage_changed and self.instance and not (pipeline_changed and 'stage' not in attrs):
             from leads.services.progression import check_stage_progression
             request = self.context.get('request')
             actor = request.user if request and request.user.is_authenticated else None
@@ -838,8 +975,39 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
         stage_custom_props = validated_data.pop('stage_custom_properties', None)
         has_explicit_expected_val = 'expected_value' in validated_data
         request = self.context.get('request')
-        if 'stage' not in validated_data or not validated_data['stage']:
-            default_stage = LeadStage.objects.filter(is_system=True, slug='new').first() or LeadStage.objects.filter(is_active=True).order_by('display_order').first()
+
+        # Collect attached product IDs to determine custom product pipeline if not explicitly given
+        resolved_pids = []
+        if product_items:
+            resolved_pids = [int(item.get('product_id') or item.get('id')) for item in product_items if item.get('product_id') or item.get('id')]
+        elif product_ids:
+            resolved_pids = [int(pid) for pid in product_ids]
+
+        explicit_pipeline = validated_data.get('pipeline')
+        explicit_stage = validated_data.get('stage')
+
+        if explicit_pipeline:
+            target_pipeline = explicit_pipeline
+        elif explicit_stage and explicit_stage.pipeline_id:
+            target_pipeline = explicit_stage.pipeline
+        elif resolved_pids:
+            target_pipeline = (
+                Pipeline.objects.filter(product_id__in=resolved_pids, is_active=True).first()
+                or Pipeline.get_default()
+            )
+        else:
+            target_pipeline = Pipeline.get_default()
+
+        validated_data['pipeline'] = target_pipeline
+
+        if not explicit_stage or (explicit_stage.pipeline_id and explicit_stage.pipeline_id != target_pipeline.id):
+            default_stage = (
+                LeadStage.objects.filter(pipeline=target_pipeline, is_active=True, slug='new').first()
+                or LeadStage.objects.filter(pipeline=target_pipeline, is_active=True).order_by('display_order', 'id').first()
+                or LeadStage.objects.filter(pipeline=target_pipeline).order_by('display_order', 'id').first()
+                or LeadStage.objects.filter(is_system=True, slug='new').first()
+                or LeadStage.objects.filter(is_active=True).order_by('display_order', 'id').first()
+            )
             validated_data['stage'] = default_stage
 
         if request and request.user.is_authenticated:
@@ -916,7 +1084,22 @@ class LeadCreateUpdateSerializer(serializers.ModelSerializer):
         product_items = validated_data.pop('product_items', None)
         custom_props = validated_data.pop('custom_properties', None)
         stage_custom_props = validated_data.pop('stage_custom_properties', None)
+        old_stage_slug = instance.stage.slug if instance.stage else 'new'
+        pipeline_explicitly_set = 'pipeline' in validated_data
+        stage_explicitly_set = 'stage' in validated_data
+
         lead = super().update(instance, validated_data)
+
+        if pipeline_explicitly_set and not stage_explicitly_set and lead.pipeline_id:
+            if not lead.stage_id or lead.stage.pipeline_id != lead.pipeline_id:
+                mapped_stage = (
+                    LeadStage.objects.filter(pipeline_id=lead.pipeline_id, is_active=True, slug=old_stage_slug).first()
+                    or LeadStage.objects.filter(pipeline_id=lead.pipeline_id, is_active=True, slug='new').first()
+                    or LeadStage.objects.filter(pipeline_id=lead.pipeline_id, is_active=True).order_by('display_order', 'id').first()
+                )
+                if mapped_stage:
+                    lead.stage = mapped_stage
+                    lead.save(update_fields=['stage', 'pipeline', 'updated_at'])
 
         if custom_props is not None:
             _save_custom_properties(lead, custom_props)

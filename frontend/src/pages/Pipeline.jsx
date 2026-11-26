@@ -15,7 +15,7 @@ import StageTransitionModal from '../components/StageTransitionModal';
 import WinProbabilityFunnel from '../components/WinProbabilityFunnel';
 import { productApi } from '../api/productApi';
 import { useAuth } from '../context/AuthContext';
-import { Kanban, Plus, ChevronLeft, ChevronRight, LayoutGrid, GripVertical, TrendingUp, Package, Filter } from 'lucide-react';
+import { Kanban, Plus, ChevronLeft, ChevronRight, LayoutGrid, GripVertical, TrendingUp, Package, Filter, GitBranch } from 'lucide-react';
 
 export const Pipeline = () => {
   const { showToast } = useToast();
@@ -33,6 +33,9 @@ export const Pipeline = () => {
   const [viewMode, setViewMode] = useState('board'); // 'board' | 'funnel'
   const [productFilter, setProductFilter] = useState('');
   const [availableProducts, setAvailableProducts] = useState([]);
+  const [availablePipelines, setAvailablePipelines] = useState([]);
+  const [pipelineFilter, setPipelineFilter] = useState('');
+  const [activePipelineInfo, setActivePipelineInfo] = useState(null);
 
   // Drag and Drop state & refs
   const [draggedLead, setDraggedLead] = useState(null);
@@ -62,15 +65,19 @@ export const Pipeline = () => {
       ? allStages.slice(midpoint)
       : allStages;
 
-  const fetchPipeline = async (prodId = productFilter) => {
+  const fetchPipeline = async (prodId = productFilter, pipeId = pipelineFilter) => {
     setLoading(true);
     setError(null);
     try {
       const params = {};
       if (prodId) params.product = prodId;
+      if (pipeId) params.pipeline = pipeId;
       const res = await leadApi.getPipeline(params);
       if (res.success && res.data) {
         setPipelineData(res.data);
+        if (res.pipeline) {
+          setActivePipelineInfo(res.pipeline);
+        }
         setColumnPages({});
       } else {
         setError('No pipeline data was returned.');
@@ -88,15 +95,54 @@ export const Pipeline = () => {
       .getSimpleProducts()
       .then((data) => setAvailableProducts(Array.isArray(data) ? data : []))
       .catch(() => {});
+    leadApi
+      .getPipelines()
+      .then((res) => {
+        const list = res?.results || (Array.isArray(res) ? res : []);
+        setAvailablePipelines(list);
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
-    fetchPipeline(productFilter);
+    fetchPipeline(productFilter, pipelineFilter);
     return () => {
       if (autoScrollRef.current) cancelAnimationFrame(autoScrollRef.current);
       if (pageFlipTimeoutRef.current) clearTimeout(pageFlipTimeoutRef.current);
     };
-  }, [productFilter]);
+  }, [productFilter, pipelineFilter]);
+
+  const handleProductFilterChange = (val) => {
+    setProductFilter(val);
+    if (!val) {
+      setPipelineFilter('');
+      return;
+    }
+    const prod = availableProducts.find((p) => String(p.id) === String(val));
+    if (prod?.has_custom_pipeline && prod?.custom_pipeline_id) {
+      setPipelineFilter(String(prod.custom_pipeline_id));
+    } else {
+      const defPipe = availablePipelines.find((p) => p.is_default);
+      setPipelineFilter(defPipe ? String(defPipe.id) : '');
+    }
+  };
+
+  const handlePipelineFilterChange = (val) => {
+    setPipelineFilter(val);
+    if (!val) {
+      setProductFilter('');
+      return;
+    }
+    const chosen = availablePipelines.find((p) => String(p.id) === String(val));
+    if (chosen && chosen.product) {
+      setProductFilter(String(chosen.product));
+    } else if (chosen && chosen.is_default && productFilter) {
+      const currentProd = availableProducts.find((p) => String(p.id) === String(productFilter));
+      if (currentProd?.has_custom_pipeline) {
+        setProductFilter('');
+      }
+    }
+  };
 
   const handleMoveStage = (leadId, targetStage, sourceStage = null) => {
     if (!targetStage) return;
@@ -492,16 +538,51 @@ export const Pipeline = () => {
             <Kanban size={26} />
             <span>Sales Pipeline</span>
           </h1>
-          <p className="page-subtitle">
-            Visualize and transition deal progress across all stages
+          <p className="page-subtitle" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+            <span>Visualize and transition deal progress across stages</span>
+            {activePipelineInfo && (
+              <span
+                className={`badge ${activePipelineInfo.is_default ? 'badge-secondary' : 'badge-info'}`}
+                style={{ fontSize: '0.72rem', padding: '0.15rem 0.5rem', display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}
+              >
+                <GitBranch size={11} />
+                {activePipelineInfo.name}
+                {activePipelineInfo.product_name ? ` • ${activePipelineInfo.product_name}` : ''}
+              </span>
+            )}
           </p>
         </div>
-        <div className="page-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+        <div className="page-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          {availablePipelines.length > 1 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0.2rem 0.5rem' }}>
+              <GitBranch size={14} className="text-primary" />
+              <select
+                value={pipelineFilter || (activePipelineInfo?.id ? String(activePipelineInfo.id) : '')}
+                onChange={(e) => handlePipelineFilterChange(e.target.value)}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-main)',
+                  fontSize: '0.8125rem',
+                  outline: 'none',
+                  cursor: 'pointer',
+                }}
+                aria-label="Select sales pipeline"
+              >
+                {availablePipelines.map((pipe) => (
+                  <option key={pipe.id} value={pipe.id}>
+                    {pipe.is_default ? `🌐 ${pipe.name}` : `📦 ${pipe.name}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-md)', padding: '0.2rem 0.5rem' }}>
             <Package size={14} className="text-primary" />
             <select
               value={productFilter}
-              onChange={(e) => setProductFilter(e.target.value)}
+              onChange={(e) => handleProductFilterChange(e.target.value)}
               style={{
                 background: 'transparent',
                 border: 'none',
@@ -515,14 +596,14 @@ export const Pipeline = () => {
               <option value="">All Products ({availableProducts.length})</option>
               {availableProducts.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.name} ({p.code})
+                  {p.name} ({p.code}){p.has_custom_pipeline ? ' ★ Custom Pipeline' : ''}
                 </option>
               ))}
             </select>
             {productFilter && (
               <button
                 type="button"
-                onClick={() => setProductFilter('')}
+                onClick={() => handleProductFilterChange('')}
                 style={{
                   background: 'transparent',
                   border: 'none',
@@ -566,7 +647,10 @@ export const Pipeline = () => {
 
       {viewMode === 'funnel' ? (
         <div style={{ marginTop: '1rem' }}>
-          <WinProbabilityFunnel />
+          <WinProbabilityFunnel
+            pipelineId={activePipelineInfo?.id || pipelineFilter || null}
+            productId={productFilter || null}
+          />
         </div>
       ) : (
         <>

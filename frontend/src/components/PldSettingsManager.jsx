@@ -59,8 +59,12 @@ const gateSummary = (gate) => {
   return parts;
 };
 
-export const PldSettingsManager = () => {
+export const PldSettingsManager = ({ initialPipelineId = null }) => {
   const { showToast } = useToast();
+
+  // Pipelines
+  const [pipelines, setPipelines] = useState([]);
+  const [selectedPipelineId, setSelectedPipelineId] = useState(initialPipelineId ? String(initialPipelineId) : '');
 
   // Problems
   const [problems, setProblems] = useState([]);
@@ -132,13 +136,25 @@ export const PldSettingsManager = () => {
 
   const loadStages = useCallback(async () => {
     try {
-      const res = await leadApi.getStages({ all: 'true' });
+      const pipeRes = await leadApi.getPipelines({ all: 'true' }).catch(() => []);
+      const pipeList = pipeRes?.results || (Array.isArray(pipeRes) ? pipeRes : []);
+      setPipelines(pipeList);
+      let activePid = selectedPipelineId;
+      if (!activePid && pipeList.length > 0) {
+        const def = pipeList.find((p) => p.is_default) || pipeList[0];
+        activePid = String(def.id);
+        setSelectedPipelineId(activePid);
+      }
+
+      const params = { all: 'true' };
+      if (activePid) params.pipeline = activePid;
+      const res = await leadApi.getStages(params);
       const items = res.results || (Array.isArray(res) ? res : []);
       setStages(items.sort((a, b) => a.display_order - b.display_order || a.id - b.id));
     } catch (err) {
       showToast(extractErrorMessage(err, 'Failed to load lead stages'), 'error');
     }
-  }, [showToast]);
+  }, [showToast, selectedPipelineId]);
 
   const loadGates = useCallback(async () => {
     setLoadingGates(true);
@@ -410,6 +426,24 @@ export const PldSettingsManager = () => {
 
         {/* Stage Filter */}
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginBottom: '1.25rem', alignItems: 'center' }}>
+          {pipelines.length > 1 && (
+            <select
+              className="form-control"
+              value={selectedPipelineId}
+              onChange={(e) => {
+                setSelectedPipelineId(e.target.value);
+                setSelectedStageFilter('ALL');
+              }}
+              style={{ width: 'auto', minWidth: '210px', padding: '0.3rem 0.6rem', fontSize: '0.8125rem' }}
+              aria-label="Select Pipeline"
+            >
+              {pipelines.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}{p.product_name ? ` (${p.product_name})` : ' (Global)'}
+                </option>
+              ))}
+            </select>
+          )}
           <span className="text-dim font-sm" style={{ fontWeight: 600 }}>Filter by Stage:</span>
           <button
             type="button"

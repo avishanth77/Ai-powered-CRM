@@ -25,7 +25,7 @@ from accounts.views import (
 )
 from accounts.views_targets import StaffTargetViewSet
 
-from leads.views import LeadStageViewSet, StageTaskRuleViewSet
+from leads.views import PipelineViewSet, LeadStageViewSet, StageTaskRuleViewSet
 from leads.views_email import EmailTestView
 from followups.views_calendar import CalendarEventsView
 from leads.views_comments import InternalCommentDetailView, MentionSuggestionsView
@@ -37,6 +37,10 @@ user_router.register(r'', UserViewSet, basename='system-users')
 # Top-level API router for Staff Targets
 target_router = DefaultRouter()
 target_router.register(r'', StaffTargetViewSet, basename='staff-targets')
+
+# Top-level API router for Pipelines
+pipeline_router = DefaultRouter()
+pipeline_router.register(r'', PipelineViewSet, basename='pipelines')
 
 # Top-level API router for Lead Stages
 stage_router = DefaultRouter()
@@ -69,7 +73,8 @@ urlpatterns = [
     # Staff Targets Management (Daily & Monthly Targets)
     path('api/targets/', include(target_router.urls)),
 
-    # Dynamic Lead Stages
+    # Dynamic Pipelines & Lead Stages
+    path('api/pipelines/', include(pipeline_router.urls)),
     path('api/lead-stages/', include(stage_router.urls)),
     path('api/stage-task-rules/', include(task_rule_router.urls)),
 

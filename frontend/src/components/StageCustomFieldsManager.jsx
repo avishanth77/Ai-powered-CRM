@@ -45,9 +45,11 @@ export const FIELD_TYPES = [
   { value: 'phone', label: 'Phone Number', icon: Phone },
 ];
 
-export const StageCustomFieldsManager = ({ initialStageId, onStageUpdated }) => {
+export const StageCustomFieldsManager = ({ initialStageId, initialPipelineId = null, onStageUpdated }) => {
   const { showToast } = useToast();
 
+  const [pipelines, setPipelines] = useState([]);
+  const [selectedPipelineId, setSelectedPipelineId] = useState(initialPipelineId || '');
   const [stages, setStages] = useState([]);
   const [selectedStageId, setSelectedStageId] = useState(initialStageId || null);
   const [properties, setProperties] = useState([]);
@@ -80,16 +82,31 @@ export const StageCustomFieldsManager = ({ initialStageId, onStageUpdated }) => 
     if (!submitting) setModalOpen(false);
   });
 
-  // Fetch all stages
+  useEffect(() => {
+    leadApi.getPipelines({ all: 'true' })
+      .then((res) => {
+        const list = res?.results || (Array.isArray(res) ? res : []);
+        setPipelines(list);
+        if (!selectedPipelineId && list.length > 0) {
+          const def = list.find((p) => p.is_default) || list[0];
+          setSelectedPipelineId(def.id);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  // Fetch all stages for selected pipeline
   const fetchStages = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await leadApi.getStages({ all: 'true' });
+      const params = { all: 'true' };
+      if (selectedPipelineId) params.pipeline = selectedPipelineId;
+      const res = await leadApi.getStages(params);
       const items = res?.results || (Array.isArray(res) ? res : []);
       items.sort((a, b) => (a.display_order || 0) - (b.display_order || 0) || a.id - b.id);
       setStages(items);
 
-      if (!selectedStageId && items.length > 0) {
+      if (items.length > 0 && (!selectedStageId || !items.some((s) => String(s.id) === String(selectedStageId)))) {
         setSelectedStageId(items[0].id);
       }
     } catch (err) {
@@ -97,7 +114,7 @@ export const StageCustomFieldsManager = ({ initialStageId, onStageUpdated }) => 
     } finally {
       setLoading(false);
     }
-  }, [selectedStageId, showToast]);
+  }, [selectedPipelineId, selectedStageId, showToast]);
 
   useEffect(() => {
     fetchStages();
@@ -278,6 +295,29 @@ export const StageCustomFieldsManager = ({ initialStageId, onStageUpdated }) => 
 
       {/* Stage Selector Pills */}
       <div style={{ marginBottom: '1.25rem' }}>
+        {pipelines.length > 1 && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem', marginBottom: '0.85rem', flexWrap: 'wrap' }}>
+            <label htmlFor="scf-pipeline-select" className="form-label" style={{ margin: 0, fontWeight: 600 }}>
+              Pipeline:
+            </label>
+            <select
+              id="scf-pipeline-select"
+              className="form-control"
+              value={selectedPipelineId}
+              onChange={(e) => {
+                setSelectedPipelineId(e.target.value);
+                setSelectedStageId(null);
+              }}
+              style={{ width: 'auto', minWidth: '240px', padding: '0.35rem 0.65rem', fontSize: '0.85rem' }}
+            >
+              {pipelines.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}{p.product_name ? ` (${p.product_name})` : ' (Global)'}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <label className="form-label" style={{ marginBottom: '0.5rem', display: 'block', fontWeight: 600 }}>
           Select Pipeline Stage to Customize:
         </label>
